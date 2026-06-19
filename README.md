@@ -8,12 +8,13 @@ There is no ad SDK anywhere in this project; "ad-free" is simply the default
 state of your own app.
 
 ## Features
-- Current conditions, next 12 hours, and a 5-day forecast in a single API call
+- Current conditions, next 24 hours, and a 7-day forecast in a single API call
+- Condition-responsive hero gradient — the background shifts tone to match the sky (clear blue, rain slate, thunder indigo, snow white-blue)
 - Automatic location via FusedLocationProvider + on-device reverse geocoding
 - Pull-to-refresh, plus quiet auto-refresh on resume and every 30 minutes
 - Built-in AI weather assistant (OpenRouter) that answers practical questions
   like "can I jog this evening?" using your actual forecast as context
-- Material 3 UI with light/dark themes and Compose previews for fast iteration
+- Material 3 UI with full light/dark theme support and Compose previews
 - No weather API key, no credit card, no usage worries for personal use
 
 ## Setup

@@ -3,7 +3,6 @@ package com.example.weatherly.ui
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +32,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -48,9 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,9 +58,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.material3.MaterialTheme
-import com.example.weatherly.R
-import kotlinx.coroutines.delay
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
@@ -74,10 +70,11 @@ import com.example.weatherly.ui.components.DetailSheet
 import com.example.weatherly.ui.components.DetailSheetContent
 import com.example.weatherly.ui.components.HourlyCard
 import com.example.weatherly.ui.components.MetricsGrid
-import com.example.weatherly.ui.components.TemperatureChartCard
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
 import com.example.weatherly.ui.components.TipBanner
+import com.example.weatherly.ui.components.conditionGradient
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -320,70 +317,102 @@ fun WeatherContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .systemBarsPadding()
-                    .padding(horizontal = 16.dp),
+                    .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Condition-responsive gradient hero — sky tone at top, fades to AppBackground
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(76.dp)
-                        .padding(top = 4.dp)
+                        .background(Brush.verticalGradient(conditionGradient(data.currentIcon, data.isDay)))
+                        .padding(horizontal = 16.dp)
                 ) {
-                    IconButton(onClick = onOpenLocations, modifier = Modifier.align(Alignment.CenterStart)) {
-                        Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
-                    }
-                    Image(
-                        painter = painterResource(R.drawable.original_weatherly_logo_upgraded),
-                        contentDescription = "Weatherly",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .height(60.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(40.dp)
-                            .shadow(3.dp, CircleShape, clip = false)
-                            .clip(CircleShape)
-                            .background(Cyan)
-                            .clickable { onOpenChat() },
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            Icons.Filled.AutoAwesome,
-                            contentDescription = "Ask the weather assistant",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        // App bar row: locations · wordmark · chat
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(76.dp)
+                                .padding(top = 4.dp)
+                        ) {
+                            IconButton(
+                                onClick = onOpenLocations,
+                                modifier = Modifier.align(Alignment.CenterStart)
+                            ) {
+                                Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
+                            }
+                            // Text wordmark — adapts to theme, no PNG bleeding required
+                            Text(
+                                "weatherly",
+                                color = TextPrimary,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Light,
+                                letterSpacing = 5.sp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(40.dp)
+                                    .shadow(3.dp, CircleShape, clip = false)
+                                    .clip(CircleShape)
+                                    .background(Cyan)
+                                    .clickable { onOpenChat() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.AutoAwesome,
+                                    contentDescription = "Ask the weather assistant",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
+                        if (data.tips.isNotEmpty()) {
+                            Spacer(Modifier.height(20.dp))
+                            data.tips.forEach { tip ->
+                                TipBanner(tip)
+                                Spacer(Modifier.height(10.dp))
+                            }
+                        } else {
+                            Spacer(Modifier.height(20.dp))
+                        }
+                        Spacer(Modifier.height(16.dp))
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
-                if (data.tips.isNotEmpty()) {
-                    Spacer(Modifier.height(20.dp))
-                    data.tips.forEach { tip ->
-                        TipBanner(tip)
-                        Spacer(Modifier.height(10.dp))
-                    }
-                } else {
-                    Spacer(Modifier.height(20.dp))
+
+                // Cards section on the plain app background
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(12.dp))
+                    HourlyCard(data)
+                    Spacer(Modifier.height(12.dp))
+                    DailyCard(
+                        data,
+                        onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    MetricsGrid(data, onMetricClick = { sheet = it })
+                    AttributionFooter(textColor = TextSecondary)
                 }
-                HourlyCard(data)
-                Spacer(Modifier.height(12.dp))
-                TemperatureChartCard(data)
-                Spacer(Modifier.height(12.dp))
-                DailyCard(data, onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) })
-                Spacer(Modifier.height(12.dp))
-                MetricsGrid(data, onMetricClick = { sheet = it })
-                AttributionFooter(textColor = TextSecondary)
             }
         }
     }
 
     sheet?.let { current ->
-        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = MaterialTheme.colorScheme.surface) {
+        ModalBottomSheet(
+            onDismissRequest = { sheet = null },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
             DetailSheetContent(current)
         }
     }

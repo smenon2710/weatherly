@@ -56,16 +56,20 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 ## UI theme & branding
 
-**Logo:** Single asset — `res/drawable/original_weatherly_logo_upgraded.png`. Rendered at 60 dp tall in the `WeatherScreen` header with no colour filter; the logo's own dark-teal background blends naturally in dark mode and reads as a clean mark in light mode. Do not add separate light/dark logo variants.
+**Logo:** Text wordmark — `"weatherly"` rendered as a `Text` composable in `WeatherScreen.kt` at 20 sp, `FontWeight.Light`, `letterSpacing = 5.sp`. Resolves colour from `TextPrimary` so it adapts to light/dark automatically. Do not reintroduce image assets for the logo.
 
 **Colour scheme (`ui/theme/Theme.kt`):**
 - Light: background `#F4F1EB` (warm cream), surface `#FDFCFA` (barely warm white), primary `#6B86A3` (dusty blue).
 - Dark: background `#0F1923` (deep navy), surface `#1A2530`, primary `#7FA3C2`.
 - `AppBackground`, `TextPrimary`, `TextSecondary` are `@Composable` vals in `WeatherComponents.kt` resolved from `MaterialTheme.colorScheme` — always use these rather than hardcoded colours.
 
-**`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, chart, daily, metric tiles) use `GlassCard`.
+**Condition gradient (`conditionGradient` in `WeatherComponents.kt`):** A `@Composable` function that maps a WMO weather code + `isDay` flag to a two-stop `List<Color>`. The first stop is a sky tone (blue for clear day, indigo for thunder, slate for rain, etc.); the second stop is always `MaterialTheme.colorScheme.background` so the gradient fades seamlessly into the card area. Used as the background of the hero section in `WeatherScreen.kt` via `Brush.verticalGradient`.
+
+**`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, daily, metric tiles) use `GlassCard`.
 
 **Section labels:** 11 sp uppercase with `letterSpacing = 0.8.sp` — keep this style consistent across any new sections.
+
+**`CurrentHeader` element order:** location (12 sp, Medium, 2 sp letter-spacing, uppercase) → glyph + condition (Row, 20 dp glyph, 15 sp Normal) → temperature (96 sp, Thin — the undisputed hero) → H/L → feels-like → comparison pill. The large standalone glyph (76 dp) no longer appears in the hero.
 
 ## Key invariants
 

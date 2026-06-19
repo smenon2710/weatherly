@@ -86,6 +86,34 @@ private fun tempColor(c: Int): Color = when {
     else -> Color(0xFFC58587)
 }
 
+/**
+ * Returns a two-stop vertical gradient: a sky tone for the weather condition
+ * at top, fading to the app background at the bottom so the hero section
+ * blends seamlessly into the card area below.
+ */
+@Composable
+fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
+    val isDark = isSystemInDarkTheme()
+    val base = MaterialTheme.colorScheme.background
+    val sky = when {
+        code in 95..99 ->
+            if (isDark) Color(0xFF1C1230) else Color(0xFF3A2F50)
+        code in 71..86 ->
+            if (isDark) Color(0xFF1A2230) else Color(0xFFD0E0EE)
+        code in 51..82 ->
+            if (isDark) Color(0xFF0E1C2A) else Color(0xFFBFD4E6)
+        code in 45..48 ->
+            if (isDark) Color(0xFF18202A) else Color(0xFFCDD3D8)
+        !isDay ->
+            if (isDark) Color(0xFF04091A) else Color(0xFF1A2448)
+        code <= 2 ->
+            if (isDark) Color(0xFF102030) else Color(0xFFB8D8F0)
+        else ->
+            if (isDark) Color(0xFF141C24) else Color(0xFFC8D2DC)
+    }
+    return listOf(sky, base)
+}
+
 // Soft tinted pill — light pastels in light mode, dark tints with contrasting text in dark mode.
 @Composable
 private fun tipColors(tone: TipTone): Pair<Color, Color> {
@@ -166,25 +194,42 @@ fun CurrentHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(data.locationName, color = textColor, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp)
-        Spacer(Modifier.height(6.dp))
-        WeatherGlyph(code = data.currentIcon, isDay = data.isDay, size = 76.dp)
-        Spacer(Modifier.height(2.dp))
-        Text("${data.currentTempC}°", color = textColor, fontSize = 92.sp, fontWeight = FontWeight.Thin)
-        data.realFeelC?.let {
-            Text("Feels like $it°", color = subColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        // Location — small caps, light weight, recedes so temperature can lead
+        Text(
+            data.locationName.uppercase(),
+            color = subColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        // Condition + glyph on the same line — supporting context, not the hero
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WeatherGlyph(code = data.currentIcon, isDay = data.isDay, size = 20.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(data.condition, color = subColor, fontSize = 15.sp, fontWeight = FontWeight.Normal)
         }
-        Text(data.condition, color = subColor, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        Text("H:${data.highTodayC}°   L:${data.lowTodayC}°", color = subColor, fontSize = 16.sp)
+        // Temperature — the undisputed hero
+        Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = FontWeight.Thin)
+        // H/L and feels-like as compact secondary info
+        Text(
+            "H:${data.highTodayC}°  ·  L:${data.lowTodayC}°",
+            color = subColor,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal
+        )
+        data.realFeelC?.let {
+            Text("Feels like $it°", color = subColor, fontSize = 13.sp, fontWeight = FontWeight.Normal)
+        }
         data.comparedToYesterday?.let {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(textColor.copy(alpha = 0.14f))
+                    .background(textColor.copy(alpha = 0.10f))
                     .padding(horizontal = 12.dp, vertical = 5.dp)
             ) {
-                Text(it, color = textColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(it, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Normal)
             }
         }
     }
@@ -219,21 +264,38 @@ private fun tipIcon(tone: TipTone): ImageVector = when (tone) {
 
 @Composable
 fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
+    val hourlyTemps = data.hourly.map { it.tempC }
+    val high = hourlyTemps.maxOrNull() ?: data.highTodayC
+    val low = hourlyTemps.minOrNull() ?: data.lowTodayC
     GlassCard(modifier.fillMaxWidth()) {
         Column {
-            SectionLabel(Icons.Filled.Schedule, "Hourly forecast", Amber)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel(Icons.Filled.Schedule, "Next ${data.hourly.size} hours", Amber)
+                Text("H:$high°  L:$low°", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            }
             Spacer(Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 items(data.hourly) { h ->
+                    val isNow = h.hourLabel == "Now"
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(h.hourLabel, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            h.hourLabel,
+                            color = if (isNow) TextPrimary else TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
+                        )
                         Spacer(Modifier.height(8.dp))
                         WeatherGlyph(code = h.icon, size = 26.dp)
                         h.precipChance?.takeIf { it > 0 }?.let {
-                            Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text("${h.tempC}°", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${h.tempC}°",
+                            color = if (isNow) TextPrimary else TextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
+                        )
                     }
                 }
             }

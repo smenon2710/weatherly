@@ -18,6 +18,11 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 7 | Debounced city search | 2 | ✅ Done |
 | 8 | Unit tests for `WeatherAdvisor` | 2 | ✅ Done |
 | 9 | Auto-retry on 429 in `ChatRepository` | 2 | ✅ Done |
+| 12 | Text wordmark replaces PNG logo | design | ✅ Done |
+| 13 | Condition-responsive hero gradient | design | ✅ Done |
+| 14 | `CurrentHeader` hierarchy fix — temp as hero | design | ✅ Done |
+| 15 | `HourlyCard` "Now" anchor + H/L summary | design | ✅ Done |
+| 16 | Remove redundant `TemperatureChartCard` | design | ✅ Done |
 | 10 | Offline last-known forecast | 3 | ⬜ Pending |
 | 11 | Adaptive launcher icon | 3 | ⬜ Pending |
 | — | Field naming cleanup | Deferred | ⬜ Pending |
@@ -356,6 +361,96 @@ private suspend fun apiCallWithRetry(auth: String, body: ChatCompletionRequest):
 ```
 
 `ask()` calls `apiCallWithRetry()` instead of `api.chat()` directly.
+
+---
+
+## Design polish ✅ All implemented
+
+### 12. ✅ Text wordmark replaces PNG logo
+
+**Problem**
+The `original_weatherly_logo_upgraded.png` asset had its own dark-teal background baked in, which bled visibly in light mode and fought the new gradient hero in dark mode. Multiple blending workarounds (per-theme assets, edge-fade processing) added asset-maintenance burden without fixing the root cause.
+
+**Files changed:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+**Implemented change:** The `Image` composable is replaced with a `Text` wordmark:
+```kotlin
+Text(
+    "weatherly",
+    color = TextPrimary,
+    fontSize = 20.sp,
+    fontWeight = FontWeight.Light,
+    letterSpacing = 5.sp,
+    modifier = Modifier.align(Alignment.Center)
+)
+```
+Resolves colour from `TextPrimary` (`MaterialTheme.colorScheme.onBackground`), so it is fully theme-aware with no per-mode assets needed.
+
+---
+
+### 13. ✅ Condition-responsive hero gradient
+
+**Problem**
+The weather hero section looked identical regardless of conditions — clear sunny days and thunderstorms showed the same cream/navy background. The app communicated *what* the weather was but not *what it felt like*.
+
+**Files changed:**
+- `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt` — new `conditionGradient()` function
+- `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt` — hero Box uses the gradient
+
+**Implemented change:** `conditionGradient(code: Int, isDay: Boolean): List<Color>` maps WMO condition codes to a sky-toned two-stop gradient (sky colour at top → `MaterialTheme.colorScheme.background` at bottom). The gradient is applied to the hero Box wrapping the header row, `CurrentHeader`, and `TipBanner`s. Condition-to-colour mapping:
+
+| Condition | Light sky | Dark sky |
+|---|---|---|
+| Clear day | `#B8D8F0` (pale blue) | `#102030` |
+| Clear night | `#1A2448` (deep indigo) | `#04091A` |
+| Rain / drizzle | `#BFD4E6` (slate blue) | `#0E1C2A` |
+| Snow | `#D0E0EE` (cold white-blue) | `#1A2230` |
+| Thunder | `#3A2F50` (dark violet) | `#1C1230` |
+| Fog | `#CDD3D8` (flat grey) | `#18202A` |
+| Overcast | `#C8D2DC` (grey-blue) | `#141C24` |
+
+---
+
+### 14. ✅ `CurrentHeader` hierarchy fix — temperature as hero
+
+**Problem**
+The large weather glyph (76 dp) sat between the location name and the temperature, breaking the most important visual relationship on the screen. Multiple elements competed at SemiBold / similar sizes with no clear winner.
+
+**Files changed:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+**Implemented change:** Element order and weights rebuilt from scratch:
+1. Location — 12 sp, Medium, 2 sp letter-spacing, uppercase (`TextSecondary`)
+2. `[glyph 20dp]  Condition text` — small glyph inline with condition, 15 sp Normal (`TextSecondary`)
+3. **Temperature — 96 sp Thin (`TextPrimary`) — the undisputed hero**
+4. `H:xx°  ·  L:xx°` — 15 sp Normal (`TextSecondary`)
+5. `Feels like xx°` — 13 sp Normal (`TextSecondary`)
+6. Comparison pill — 12 sp Normal, 10% alpha background
+
+The 76 dp standalone glyph is removed from the hero entirely.
+
+---
+
+### 15. ✅ `HourlyCard` "Now" anchor + H/L summary
+
+**Problem**
+The current hour (`"Now"`) rendered identically to future hours — users had to read the label to find the present moment. The section label gave no temperature range context.
+
+**Files changed:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+**Implemented change:**
+- Section label row shows `"Next N hours"` on the left and `"H:xx°  L:xx°"` on the right.
+- `"Now"` column renders at `TextPrimary + Bold`; all future hours at `TextSecondary + Normal`.
+
+---
+
+### 16. ✅ Remove redundant `TemperatureChartCard`
+
+**Problem**
+`TemperatureChartCard` plotted the same 24-hour temperatures already shown in `HourlyCard`, with the same time labels duplicated on the x-axis. It added ~120 dp of scroll depth with no new information.
+
+**Files changed:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+**Implemented change:** `TemperatureChartCard` is no longer called from `WeatherContent`. The H/L temperature range that was the chart's only unique value is now shown inline in the `HourlyCard` section label (see item 15). The `TemperatureChartCard` composable is retained in `WeatherComponents.kt` for potential future use (e.g., standalone chart in a day detail sheet).
 
 ---
 
