@@ -183,7 +183,7 @@ private fun ChatHeader(subtitle: String, onBack: () -> Unit, onNewChat: () -> Un
                 Icon(Icons.Filled.Edit, contentDescription = "New chat", tint = TextSecondary)
             }
         }
-        HorizontalDivider(color = Color(0x0F2B2F36))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
     }
 }
 

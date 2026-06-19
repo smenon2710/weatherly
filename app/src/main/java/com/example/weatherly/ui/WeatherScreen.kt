@@ -6,7 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -306,7 +305,6 @@ fun WeatherContent(
     onOpenChat: () -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
-    val isDark = isSystemInDarkTheme()
 
     Box(
         modifier = Modifier
@@ -329,17 +327,14 @@ fun WeatherContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(72.dp)
+                        .height(76.dp)
                         .padding(top = 4.dp)
                 ) {
                     IconButton(onClick = onOpenLocations, modifier = Modifier.align(Alignment.CenterStart)) {
                         Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
                     }
                     Image(
-                        painter = painterResource(
-                            if (isDark) R.drawable.weatherly_logo_dark
-                            else R.drawable.weatherly_logo_light
-                        ),
+                        painter = painterResource(R.drawable.original_weatherly_logo_upgraded),
                         contentDescription = "Weatherly",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -364,7 +359,7 @@ fun WeatherContent(
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
                 if (data.tips.isNotEmpty()) {
                     Spacer(Modifier.height(20.dp))

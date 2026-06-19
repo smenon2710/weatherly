@@ -54,8 +54,22 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 **WMO weather codes** are mapped to emoji and text in `util/WeatherIcon.kt`. All temperature/wind/precip values in `WeatherData` are stored in the user-selected unit (they come back from Open-Meteo already converted); `WeatherAdvisor` converts back to metric internally for threshold comparisons.
 
+## UI theme & branding
+
+**Logo:** Single asset — `res/drawable/original_weatherly_logo_upgraded.png`. Rendered at 60 dp tall in the `WeatherScreen` header with no colour filter; the logo's own dark-teal background blends naturally in dark mode and reads as a clean mark in light mode. Do not add separate light/dark logo variants.
+
+**Colour scheme (`ui/theme/Theme.kt`):**
+- Light: background `#F4F1EB` (warm cream), surface `#FDFCFA` (barely warm white), primary `#6B86A3` (dusty blue).
+- Dark: background `#0F1923` (deep navy), surface `#1A2530`, primary `#7FA3C2`.
+- `AppBackground`, `TextPrimary`, `TextSecondary` are `@Composable` vals in `WeatherComponents.kt` resolved from `MaterialTheme.colorScheme` — always use these rather than hardcoded colours.
+
+**`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, chart, daily, metric tiles) use `GlassCard`.
+
+**Section labels:** 11 sp uppercase with `letterSpacing = 0.8.sp` — keep this style consistent across any new sections.
+
 ## Key invariants
 
 - `WeatherData` fields store values **in the user's current unit system** (not always metric). This is set at fetch time via `UnitSystem.apiTemp`/`apiWind`/`apiPrecip` passed to Open-Meteo, and the unit labels (`windUnit`, `precipUnit`, `visibilityUnit`, `tempLabel`) travel alongside.
 - The 30-minute cache in `WeatherRepository` is in-memory only and scoped to the process. Widget updates bypass the app's ViewModel and create their own `WeatherRepository` instance.
 - OpenRouter key resolution: `PreferencesStore.getOpenRouterKey(buildDefault)` returns the on-device key first, falling back to the build-time `BuildConfig` value. Always pass `BuildConfig.OPENROUTER_API_KEY` as the fallback.
+- Drawable resource names must be all-lowercase (`a-z`, `0-9`, `_`) — Android's AAPT2 rejects uppercase characters.

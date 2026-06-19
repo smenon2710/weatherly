@@ -11,10 +11,10 @@ private val LightColors = lightColorScheme(
     primary          = Color(0xFF6B86A3),
     onPrimary        = Color.White,
     background       = Color(0xFFF4F1EB),
-    surface          = Color.White,
+    surface          = Color(0xFFFDFCFA),   // barely warm tint — cards read as quality paper, not clinical white
     onBackground     = Color(0xFF2B2F36),
     onSurface        = Color(0xFF2B2F36),
-    onSurfaceVariant = Color(0xFF828A93)
+    onSurfaceVariant = Color(0xFF78848F)    // slightly more legible than the previous value
 )
 
 private val DarkColors = darkColorScheme(

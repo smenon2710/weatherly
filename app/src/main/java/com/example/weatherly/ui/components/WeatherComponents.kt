@@ -123,12 +123,15 @@ fun GlassCard(
     corner: Dp = 22.dp,
     content: @Composable () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val surface = MaterialTheme.colorScheme.surface
-    val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    // Light mode: soft 1dp shadow keeps cards airy; dark mode: 6dp lifts them off the background.
+    val elevation = if (isDark) 6.dp else 1.dp
+    val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.07f)
     val actualFill = if (fill == Color.Unspecified) surface else fill
     val shape = RoundedCornerShape(corner)
     var m = modifier
-        .shadow(elevation = 2.dp, shape = shape, clip = false)
+        .shadow(elevation = elevation, shape = shape, clip = false)
         .clip(shape)
         .background(actualFill)
         .border(1.dp, stroke, shape)
@@ -140,9 +143,15 @@ fun GlassCard(
 @Composable
 private fun SectionLabel(icon: ImageVector, text: String, tint: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(6.dp))
-        Text(text.uppercase(), color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            text.uppercase(),
+            color = TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.8.sp
+        )
     }
 }
 
@@ -157,7 +166,7 @@ fun CurrentHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(data.locationName, color = textColor, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+        Text(data.locationName, color = textColor, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp)
         Spacer(Modifier.height(6.dp))
         WeatherGlyph(code = data.currentIcon, isDay = data.isDay, size = 76.dp)
         Spacer(Modifier.height(2.dp))
