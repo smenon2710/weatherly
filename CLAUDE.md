@@ -37,15 +37,16 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 | Class | Role |
 |---|---|
-| `NetworkModule` | Singleton object wiring four Retrofit clients: Open-Meteo forecast, Open-Meteo geocoding, Open-Meteo air quality, OpenRouter. No DI framework. |
+| `NetworkModule` | Singleton object wiring four Retrofit clients: Open-Meteo forecast, Open-Meteo geocoding, Open-Meteo air quality, OpenRouter. Exposes `makeStreamingCall(Request)` for raw SSE calls. No DI framework. |
 | `WeatherRepository` | Single source of truth. Fetches forecast + air quality in parallel (`coroutineScope`/`async`). 30-minute in-memory cache keyed by `"lat,lon,units"`. |
-| `ChatRepository` | Builds a compact weather-context system prompt from `WeatherData`, then calls OpenRouter for free-form questions. |
+| `ChatRepository` | Streams OpenRouter responses token-by-token via SSE (`askStreaming`) and simulates the same feel for rule-based answers (`simulateStreaming`). Both return `Flow<String>`. Retries once on HTTP 429. |
 | `PreferencesStore` | `SharedPreferences` wrapper for unit system, saved places, selected place, and on-device OpenRouter key/model. |
 | `WeatherAdvisor` | Pure object (no network). Answers six hard-coded intents (UMBRELLA, JACKET, WALKING, DRIVING, HIKING, CLOTHING) locally from the current `WeatherData`. |
 
 **UI layer:**
 
 - `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. Background refreshes keep existing data visible (only the spinner changes).
+- `ChatViewModel` — Exposes `messages`, `sending`, and `streamingText: StateFlow<String>`. Accumulates SSE/simulated chunks into `_streamingText`; on completion moves the full text into `_messages`. `clear()` cancels any in-flight stream job.
 - `WeatherScreen` / `ChatScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
 - `ui/components/` — Reusable Compose functions (header, hourly row, daily list, detail tiles).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.

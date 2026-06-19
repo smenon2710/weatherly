@@ -2,83 +2,130 @@ package com.example.weatherly.data.repository
 
 import com.example.weatherly.data.model.ChatApiMessage
 import com.example.weatherly.data.model.ChatCompletionRequest
-import com.example.weatherly.data.model.ChatCompletionResponse
 import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
+import com.example.weatherly.data.model.ChatStreamChunk
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.remote.NetworkModule
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import retrofit2.HttpException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.random.Random
 
 /**
- * Talks to OpenRouter for the AI assistant. Builds a compact, current-conditions
- * weather brief from [WeatherData] and injects it as a system prompt so the model
- * can answer practical questions ("can I jog this evening?", "umbrella?", etc.)
- * grounded in the user's actual forecast.
+ * Talks to OpenRouter for the AI assistant. Exposes [askStreaming] for real-time
+ * token-by-token delivery via SSE, and [simulateStreaming] for the rule-based
+ * advisor so both paths feel identical to the user.
  */
 class ChatRepository {
 
-    private val api = NetworkModule.openRouterApi
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val requestAdapter = moshi.adapter(ChatCompletionRequest::class.java)
+    private val chunkAdapter = moshi.adapter(ChatStreamChunk::class.java)
 
-    suspend fun ask(
+    /**
+     * Calls OpenRouter with [stream = true] and emits content deltas as they
+     * arrive. Retries once after 2 s on HTTP 429. Throws [IllegalStateException]
+     * on all other failures so the caller can surface them as an error bubble.
+     */
+    fun askStreaming(
         history: List<ChatMessage>,
         weather: WeatherData?,
         units: UnitSystem,
         apiKey: String,
         model: String
-    ): Result<String> = withContext(Dispatchers.IO) {
+    ): Flow<String> = flow {
         if (apiKey.isBlank()) {
-            return@withContext Result.failure(
-                IllegalStateException(
-                    "The AI assistant isn't set up yet, but the quick suggestions above still work."
-                )
+            throw IllegalStateException(
+                "The AI assistant isn't set up yet, but the quick suggestions above still work."
             )
         }
 
         val messages = buildList {
             add(ChatApiMessage("system", systemPrompt(weather, units)))
-            // Cap context sent to the API to avoid token-limit errors on long sessions.
             history.filterNot { it.isError }.takeLast(10).forEach {
-                val role = if (it.role == ChatRole.USER) "user" else "assistant"
-                add(ChatApiMessage(role, it.text))
+                add(ChatApiMessage(if (it.role == ChatRole.USER) "user" else "assistant", it.text))
             }
         }
 
-        try {
-            val response = apiCallWithRetry(
-                auth = "Bearer ${apiKey.trim()}",
-                body = ChatCompletionRequest(model = model, messages = messages)
-            )
-            val text = response.choices?.firstOrNull()?.message?.content?.trim()
-            when {
-                !text.isNullOrBlank() -> Result.success(text)
-                response.error?.message != null ->
-                    Result.failure(IllegalStateException(response.error.message))
-                else -> Result.failure(IllegalStateException("The assistant didn't return a reply."))
-            }
-        } catch (e: HttpException) {
-            Result.failure(IllegalStateException(httpMessage(e.code())))
-        } catch (e: Exception) {
-            Result.failure(IllegalStateException(e.message ?: "Couldn't reach the assistant."))
-        }
-    }
+        val body = ChatCompletionRequest(model = model, messages = messages, stream = true)
+        val requestBody = requestAdapter.toJson(body).toRequestBody("application/json".toMediaType())
 
-    private suspend fun apiCallWithRetry(auth: String, body: ChatCompletionRequest): ChatCompletionResponse {
-        repeat(2) { attempt ->
+        val httpRequest = Request.Builder()
+            .url("https://openrouter.ai/api/v1/chat/completions")
+            .addHeader("Authorization", "Bearer ${apiKey.trim()}")
+            .addHeader("X-Title", "Weatherly")
+            .post(requestBody)
+            .build()
+
+        var attempt = 0
+        while (attempt < 2) {
             if (attempt > 0) delay(2_000L)
-            try {
-                return api.chat(authorization = auth, body = body)
-            } catch (e: HttpException) {
-                if (e.code() != 429 || attempt == 1) throw e
+            val response = try {
+                NetworkModule.makeStreamingCall(httpRequest).execute()
+            } catch (e: Exception) {
+                throw IllegalStateException(e.message ?: "Couldn't reach the assistant.")
             }
+
+            if (response.code == 429 && attempt == 0) {
+                response.close()
+                attempt++
+                continue
+            }
+
+            if (!response.isSuccessful) {
+                response.close()
+                throw IllegalStateException(httpMessage(response.code))
+            }
+
+            val source = response.body?.source()
+                ?: throw IllegalStateException("Empty response from assistant.")
+
+            try {
+                while (!source.exhausted()) {
+                    val line = source.readUtf8Line() ?: break
+                    if (!line.startsWith("data: ")) continue
+                    val data = line.removePrefix("data: ").trim()
+                    if (data == "[DONE]") break
+                    try {
+                        val chunk = chunkAdapter.fromJson(data) ?: continue
+                        chunk.error?.message?.let { throw IllegalStateException(it) }
+                        val content = chunk.choices?.firstOrNull()?.delta?.content
+                        if (!content.isNullOrEmpty()) emit(content)
+                    } catch (e: IllegalStateException) {
+                        throw e
+                    } catch (_: Exception) { /* skip malformed SSE chunk */ }
+                }
+            } finally {
+                source.close()
+            }
+            break
         }
-        error("unreachable")
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Emits [text] in small character bursts with short random delays, giving
+     * rule-based advisor answers the same streaming feel as LLM responses.
+     */
+    fun simulateStreaming(text: String): Flow<String> = flow {
+        var i = 0
+        while (i < text.length) {
+            val end = minOf(i + Random.nextInt(1, 4), text.length)
+            emit(text.substring(i, end))
+            i = end
+            delay(15L + Random.nextLong(0, 20))
+        }
     }
 
     private fun httpMessage(code: Int): String = when (code) {
@@ -109,21 +156,24 @@ class ChatRepository {
     }
 
     private fun weatherBrief(w: WeatherData, units: UnitSystem): String {
-        val t = units.tempLabel // "°C" / "°F"
+        val t = units.tempLabel
         val sb = StringBuilder()
         sb.appendLine("Location: ${w.locationName}")
-        sb.appendLine("Now: ${w.currentTempC}$t, ${w.condition}" +
-            (w.realFeelC?.let { ", feels like $it$t" } ?: "") +
-            (if (w.isDay) " (daytime)" else " (night)"))
-        sb.appendLine("Today: high ${w.highTodayC}$t, low ${w.lowTodayC}$t" +
-            (w.comparedToYesterday?.let { ". $it" } ?: ""))
-
+        sb.appendLine(
+            "Now: ${w.currentTempC}$t, ${w.condition}" +
+                (w.realFeelC?.let { ", feels like $it$t" } ?: "") +
+                (if (w.isDay) " (daytime)" else " (night)")
+        )
+        sb.appendLine(
+            "Today: high ${w.highTodayC}$t, low ${w.lowTodayC}$t" +
+                (w.comparedToYesterday?.let { ". $it" } ?: "")
+        )
         val line = buildList {
             w.humidity?.let { add("humidity $it%") }
             w.windKmh?.let { add("wind $it ${w.windUnit}" + (w.windDir?.let { d -> " $d" } ?: "")) }
             w.windGustKmh?.let { add("gusts $it ${w.windUnit}") }
             w.cloudCoverPct?.let { add("cloud $it%") }
-            w.precipMm?.let { add("precip ${it} ${w.precipUnit}") }
+            w.precipMm?.let { add("precip $it ${w.precipUnit}") }
             w.uvIndex?.let { add("UV $it" + (w.uvLabel?.let { l -> " ($l)" } ?: "")) }
             w.aqi?.let { add("AQI $it" + (w.aqiLabel?.let { l -> " ($l)" } ?: "")) }
             w.visibility?.let { add("visibility $it ${w.visibilityUnit}") }
@@ -132,14 +182,12 @@ class ChatRepository {
         if (w.sunrise != null || w.sunset != null) {
             sb.appendLine("Sunrise ${w.sunrise ?: "?"}, sunset ${w.sunset ?: "?"}")
         }
-
         val hours = w.hourly.take(8)
         if (hours.isNotEmpty()) {
             sb.appendLine("Next hours: " + hours.joinToString("; ") { h ->
                 "${h.hourLabel} ${h.tempC}$t" + (h.precipChance?.let { " ${it}% rain" } ?: "")
             })
         }
-
         val days = w.daily.take(6)
         if (days.isNotEmpty()) {
             sb.appendLine("Coming days: " + days.joinToString("; ") { d ->

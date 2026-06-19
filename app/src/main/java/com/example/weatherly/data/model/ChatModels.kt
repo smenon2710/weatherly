@@ -24,7 +24,8 @@ data class ChatCompletionRequest(
     val model: String,
     val messages: List<ChatApiMessage>,
     @Json(name = "max_tokens") val maxTokens: Int = 500,
-    val temperature: Double = 0.4
+    val temperature: Double = 0.4,
+    val stream: Boolean = false
 )
 
 data class ChatCompletionResponse(
@@ -39,4 +40,20 @@ data class ChatChoice(
 data class ChatApiError(
     val message: String?,
     val code: Int? = null
+)
+
+// --- Streaming (SSE) response models ----------------------------------------
+
+data class ChatStreamChunk(
+    val choices: List<StreamChoice>?,
+    val error: ChatApiError? = null
+)
+
+data class StreamChoice(
+    val delta: StreamDelta?,
+    @Json(name = "finish_reason") val finishReason: String? = null
+)
+
+data class StreamDelta(
+    val content: String? = null
 )

@@ -26,15 +26,16 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 15 | `HourlyCard` "Now" anchor + H/L summary | design |
 | 16 | Remove redundant `TemperatureChartCard` | design |
 
-### Pending — Priority 1 (quick fixes, low risk)
+### Completed — Priority 1
 
-| # | Title | Effort |
-|---|---|---|
-| 17 | Wrap `Previews.kt` composables in `WeatherlyTheme` | 15 min |
-| 18 | Widget background colour out of sync with design system | 15 min |
-| 19 | Pull-to-refresh indicator colour | 15 min |
-| 20 | `forecastDays=10` fetches data the UI never shows | 15 min |
-| 21 | Remove or repurpose dead `TemperatureChartCard` composable | 30 min |
+| # | Title |
+|---|---|
+| 17 | Wrap `Previews.kt` composables in `WeatherlyTheme` |
+| 18 | Widget background colour synced to design system (`#6B86A3`) |
+| 19 | Pull-to-refresh indicator colour explicitly set to `Cyan` |
+| 20 | `forecastDays` reduced from 10 → 7 |
+| 21 | Dead `TemperatureChartCard` + `TemperatureChart` composables removed |
+| — | Streaming chat: LLM answers stream via SSE; rule-based answers simulate streaming |
 
 ### Pending — Priority 2 (medium effort, meaningful UX improvement)
 

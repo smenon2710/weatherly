@@ -1,6 +1,12 @@
 package com.example.weatherly.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +56,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +97,7 @@ fun ChatScreen(
     val units by weatherViewModel.units.collectAsStateWithLifecycle()
     val messages by chatViewModel.messages.collectAsStateWithLifecycle()
     val sending by chatViewModel.sending.collectAsStateWithLifecycle()
+    val streamingText by chatViewModel.streamingText.collectAsStateWithLifecycle()
 
     val weather: WeatherData? = (weatherState as? WeatherUiState.Success)?.data
 
@@ -96,7 +106,7 @@ fun ChatScreen(
     BackHandler(onBack = onBack)
 
     val listState = rememberLazyListState()
-    LaunchedEffect(messages.size, sending) {
+    LaunchedEffect(messages.size, sending, streamingText.isNotEmpty()) {
         val count = messages.size + if (sending) 1 else 0
         if (count > 0) listState.animateScrollToItem(count - 1)
     }
@@ -106,7 +116,7 @@ fun ChatScreen(
         input = ""
     }
 
-    // Suggestion chips are answered instantly from the forecast — no API call.
+    // Suggestion chips use the local rule engine; streaming simulates LLM-style output.
     fun answerLocally(s: Suggestion) {
         val reply = weather?.let { WeatherAdvisor.advise(s.intent, it, units) }
             ?: "Open the weather screen first so I can read your local conditions, then ask again."
@@ -143,7 +153,10 @@ fun ChatScreen(
                 }
                 itemsIndexed(messages) { _, msg -> MessageBubble(msg) }
                 if (sending) {
-                    item { TypingBubble() }
+                    item {
+                        if (streamingText.isNotEmpty()) StreamingBubble(streamingText)
+                        else TypingBubble()
+                    }
                 }
             }
 
@@ -234,6 +247,40 @@ private fun MessageBubble(msg: ChatMessage) {
                 .widthIn(max = 300.dp)
                 .clip(shape)
                 .background(bubbleColor)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        )
+    }
+}
+
+@Composable
+private fun StreamingBubble(text: String) {
+    val transition = rememberInfiniteTransition(label = "cursor")
+    val cursorAlpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 530, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blink"
+    )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        Text(
+            text = buildAnnotatedString {
+                append(text)
+                withStyle(SpanStyle(color = Cyan.copy(alpha = cursorAlpha))) { append("│") }
+            },
+            color = TextPrimary,
+            fontSize = 15.sp,
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 18.dp, topEnd = 18.dp,
+                        bottomStart = 4.dp, bottomEnd = 18.dp
+                    )
+                )
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         )
     }

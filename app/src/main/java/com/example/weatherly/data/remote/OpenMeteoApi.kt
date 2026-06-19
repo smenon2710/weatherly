@@ -24,6 +24,6 @@ interface OpenMeteoApi {
             "uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
         @Query("timezone") timezone: String = "auto",
         @Query("past_days") pastDays: Int = 1,
-        @Query("forecast_days") forecastDays: Int = 10
+        @Query("forecast_days") forecastDays: Int = 7
     ): OpenMeteoResponse
 }

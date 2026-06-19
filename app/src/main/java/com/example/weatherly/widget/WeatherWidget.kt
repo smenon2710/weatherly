@@ -71,7 +71,7 @@ private fun WidgetContent(data: WeatherData?) {
         modifier = GlanceModifier
             .fillMaxSize()
             .cornerRadius(24.dp)
-            .background(Color(0xFF12A5C9))
+            .background(Color(0xFF6B86A3))
             .padding(16.dp)
             .clickable(actionStartActivity(Intent(context, MainActivity::class.java))),
         verticalAlignment = Alignment.CenterVertically,

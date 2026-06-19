@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Visibility
@@ -47,9 +46,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -300,69 +296,6 @@ fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
                 }
             }
         }
-    }
-}
-
-@Composable
-fun TemperatureChartCard(data: WeatherData, modifier: Modifier = Modifier) {
-    val temps = data.hourly.map { it.tempC }
-    GlassCard(modifier.fillMaxWidth()) {
-        Column {
-            SectionLabel(Icons.Filled.ShowChart, "Temperature trend", Teal)
-            if (temps.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Next ${data.hourly.size} hrs · High ${temps.max()}°  Low ${temps.min()}°",
-                    color = TextSecondary, fontSize = 13.sp
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            TemperatureChart(data.hourly)
-            if (data.hourly.size >= 2) {
-                Spacer(Modifier.height(8.dp))
-                val n = data.hourly.size
-                val idx = listOf(0, n / 4, n / 2, 3 * n / 4, n - 1).distinct()
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    idx.forEach { i -> Text(data.hourly[i].hourLabel, color = TextSecondary, fontSize = 11.sp) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TemperatureChart(hours: List<com.example.weatherly.data.model.HourEntry>) {
-    Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-        val temps = hours.map { it.tempC }
-        if (temps.size < 2) return@Canvas
-        val mn = temps.min()
-        val mx = temps.max()
-        val rng = (mx - mn).coerceAtLeast(1).toFloat()
-        val w = size.width
-        val h = size.height
-        val padTop = h * 0.18f
-        val usable = h * 0.64f
-        val n = temps.size
-        fun px(i: Int) = i / (n - 1).toFloat() * w
-        fun py(t: Int) = padTop + (1f - (t - mn) / rng) * usable
-
-        val area = Path().apply {
-            moveTo(px(0), h)
-            temps.forEachIndexed { i, t -> lineTo(px(i), py(t)) }
-            lineTo(px(n - 1), h)
-            close()
-        }
-        val line = Path().apply {
-            moveTo(px(0), py(temps[0]))
-            for (i in 1 until n) lineTo(px(i), py(temps[i]))
-        }
-        drawPath(area, Brush.verticalGradient(listOf(Cyan.copy(alpha = 0.16f), Color.Transparent)))
-        drawPath(
-            line,
-            color = Cyan,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-        )
-        drawCircle(Cyan, radius = 4.dp.toPx(), center = Offset(px(0), py(temps[0])))
     }
 }
 

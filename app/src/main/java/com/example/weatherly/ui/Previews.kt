@@ -8,6 +8,7 @@ import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
+import com.example.weatherly.ui.theme.WeatherlyTheme
 
 private fun sampleDay(
     label: String, full: String, high: Int, low: Int, icon: Int, phrase: String, pop: Int
@@ -83,7 +84,9 @@ private val sampleWeather = WeatherData(
 @Preview(name = "Weather - Day", showBackground = true, heightDp = 1300)
 @Composable
 private fun WeatherDayPreview() {
-    WeatherContent(sampleWeather, onRefresh = {})
+    WeatherlyTheme {
+        WeatherContent(sampleWeather, onRefresh = {})
+    }
 }
 
 @Preview(
@@ -94,5 +97,7 @@ private fun WeatherDayPreview() {
 )
 @Composable
 private fun WeatherNightPreview() {
-    WeatherContent(sampleWeather.copy(isDay = false, currentIcon = 0), onRefresh = {})
+    WeatherlyTheme(darkTheme = true) {
+        WeatherContent(sampleWeather.copy(isDay = false, currentIcon = 0), onRefresh = {})
+    }
 }

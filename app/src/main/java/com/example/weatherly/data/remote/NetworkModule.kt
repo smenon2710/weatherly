@@ -3,7 +3,9 @@ package com.example.weatherly.data.remote
 import com.example.weatherly.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -57,4 +59,6 @@ object NetworkModule {
             .build()
             .create(OpenRouterApi::class.java)
     }
+
+    fun makeStreamingCall(request: Request): Call = openRouterHttp.newCall(request)
 }
