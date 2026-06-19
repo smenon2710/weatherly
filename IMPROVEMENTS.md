@@ -4,28 +4,65 @@ Fixes and features ordered by effort. Items within each tier are independent.
 
 ## Status
 
-| # | Title | Tier | Status |
-|---|---|---|---|
-| 1 | Clear stale search results on sheet dismiss | 1 | ✅ Done |
-| 2 | Cap chat history sent to OpenRouter | 1 | ✅ Done |
-| 3 | Wire on-device OpenRouter key into `ChatViewModel` | 1 | ✅ Done |
-| 4 | Fix deprecated `Geocoder.getFromLocation()` | 1 | ✅ Done |
-| 5 | Move auto-refresh timer into `WeatherViewModel` | 1 | ✅ Done |
-| 6 | Dark theme | 2 | ✅ Done |
-| 6a | Dark theme — `TipBanner` colours | polish | ✅ Done |
-| 6b | Dark theme — logo per-theme assets with edge fade | polish | ✅ Done |
-| 6c | Dark theme — detail sheet hardcoded `Color.White` | polish | ✅ Done |
-| 7 | Debounced city search | 2 | ✅ Done |
-| 8 | Unit tests for `WeatherAdvisor` | 2 | ✅ Done |
-| 9 | Auto-retry on 429 in `ChatRepository` | 2 | ✅ Done |
-| 12 | Text wordmark replaces PNG logo | design | ✅ Done |
-| 13 | Condition-responsive hero gradient | design | ✅ Done |
-| 14 | `CurrentHeader` hierarchy fix — temp as hero | design | ✅ Done |
-| 15 | `HourlyCard` "Now" anchor + H/L summary | design | ✅ Done |
-| 16 | Remove redundant `TemperatureChartCard` | design | ✅ Done |
-| 10 | Offline last-known forecast | 3 | ⬜ Pending |
-| 11 | Adaptive launcher icon | 3 | ⬜ Pending |
-| — | Field naming cleanup | Deferred | ⬜ Pending |
+### Completed
+
+| # | Title | Tier |
+|---|---|---|
+| 1 | Clear stale search results on sheet dismiss | 1 |
+| 2 | Cap chat history sent to OpenRouter | 1 |
+| 3 | Wire on-device OpenRouter key into `ChatViewModel` | 1 |
+| 4 | Fix deprecated `Geocoder.getFromLocation()` | 1 |
+| 5 | Move auto-refresh timer into `WeatherViewModel` | 1 |
+| 6 | Dark theme | 2 |
+| 6a | Dark theme — `TipBanner` colours | polish |
+| 6b | Dark theme — logo per-theme assets with edge fade | polish |
+| 6c | Dark theme — detail sheet hardcoded `Color.White` | polish |
+| 7 | Debounced city search | 2 |
+| 8 | Unit tests for `WeatherAdvisor` | 2 |
+| 9 | Auto-retry on 429 in `ChatRepository` | 2 |
+| 12 | Text wordmark replaces PNG logo | design |
+| 13 | Condition-responsive hero gradient | design |
+| 14 | `CurrentHeader` hierarchy fix — temp as hero | design |
+| 15 | `HourlyCard` "Now" anchor + H/L summary | design |
+| 16 | Remove redundant `TemperatureChartCard` | design |
+
+### Pending — Priority 1 (quick fixes, low risk)
+
+| # | Title | Effort |
+|---|---|---|
+| 17 | Wrap `Previews.kt` composables in `WeatherlyTheme` | 15 min |
+| 18 | Widget background colour out of sync with design system | 15 min |
+| 19 | Pull-to-refresh indicator colour | 15 min |
+| 20 | `forecastDays=10` fetches data the UI never shows | 15 min |
+| 21 | Remove or repurpose dead `TemperatureChartCard` composable | 30 min |
+
+### Pending — Priority 2 (medium effort, meaningful UX improvement)
+
+| # | Title | Effort |
+|---|---|---|
+| 22 | Chat suggestion chips: semantic colour tinting | 1 h |
+| 23 | ChatScreen: compact weather context strip | 1–2 h |
+| 24 | MetricsGrid: primary strip + grouped secondary | 2 h |
+| 25 | In-app OpenRouter key + model settings UI | 2–3 h |
+| 26 | `WeatherGlyph` accessibility content descriptions | 1 h |
+| 27 | `TipBanner`: left-border annotation style | 1 h |
+| 10 | Offline last-known forecast (persist `WeatherData`) | 3–4 h |
+
+### Pending — Priority 3 (larger scope)
+
+| # | Title | Effort |
+|---|---|---|
+| 11 | Adaptive launcher icon | half-day |
+| 28 | Localization: replace hardcoded strings with `strings.xml` | 1–2 days |
+| 29 | Weather-change push notification | 1–2 days |
+| 30 | Share current weather | half-day |
+
+### Deferred
+
+| # | Title | Note |
+|---|---|---|
+| — | Field naming cleanup (`currentTempC` → `currentTemp` etc.) | Rename across ~15 files; safe but tedious |
+| — | `WeatherAdvisor` additional intents | Cycling, gardening, outdoor events |
 
 ---
 
@@ -525,6 +562,220 @@ The manifest has no `android:icon`, so the app uses the AOSP default icon on the
 ```
 
 Android Studio's **Image Asset Studio** (right-click `res` → New → Image Asset) automates steps 1–3 from the source PNG.
+
+---
+
+---
+
+## Priority 1 — Quick fixes
+
+### 17. Wrap `Previews.kt` composables in `WeatherlyTheme`
+
+**Problem**
+`WeatherDayPreview` and `WeatherNightPreview` call `WeatherContent` directly without a `WeatherlyTheme` wrapper. `conditionGradient`, `AppBackground`, `TextPrimary`, and `TextSecondary` all read from `MaterialTheme.colorScheme`, so previews render with Material3 defaults (white background, default purple primary) instead of Weatherly's cream/navy palette. The night preview's `uiMode = UI_MODE_NIGHT_YES` toggles `isSystemInDarkTheme()` but again hits Material3 defaults, not `DarkColors`.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/Previews.kt`
+
+**Change:** Wrap both preview composables in `WeatherlyTheme { ... }`.
+
+---
+
+### 18. Widget background colour out of sync with design system
+
+**Problem**
+`WeatherWidget.kt` uses a hardcoded `Color(0xFF12A5C9)` background — the old brand teal — which no longer matches the app's primary `#6B86A3` (dusty blue). The widget looks like it belongs to a different app.
+
+**File:** `app/src/main/java/com/example/weatherly/widget/WeatherWidget.kt`
+
+**Change:** Replace the hardcoded hex with the primary colour from the design system (`Color(0xFF6B86A3)`). For a more premium widget, apply a simplified condition-aware two-colour gradient (extend `conditionGradient` to be usable from Glance, or maintain a parallel lightweight map).
+
+---
+
+### 19. Pull-to-refresh indicator colour
+
+**Problem**
+`PullToRefreshBox` uses Material3's default spinner colour (the scheme's `primary`), which in Weatherly's theme maps to `#6B86A3`. This is actually correct by default, but it's worth verifying explicitly — if the indicator ever appears in the wrong colour after a theme change, it's because `PullToRefreshBox` uses `indicatorColor` which defaults to `MaterialTheme.colorScheme.primary`. Adding an explicit `indicatorColor = Cyan` parameter makes the intent clear and immune to future theme tweaks.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+---
+
+### 20. `forecastDays=10` fetches data the UI never shows
+
+**Problem**
+`OpenMeteoApi.getForecast` requests `forecast_days=10` but `WeatherContent` only ever displays the days the API returns starting from today. The repository builds `daily` from `todayIndex` onward, which could theoretically show up to 10 days, but the `DailyCard` label says "7-day forecast" in the README. In practice the Open-Meteo free tier returns up to 16 days; unnecessary data increases response size and parse time.
+
+**File:** `app/src/main/java/com/example/weatherly/data/remote/OpenMeteoApi.kt`
+
+**Change:** Either set `forecastDays = 7` (to match what's shown) or bump the UI to show 10 days and update the label.
+
+---
+
+### 21. Remove or repurpose dead `TemperatureChartCard` composable
+
+**Problem**
+`TemperatureChartCard` was removed from `WeatherContent` (item 16) but the composable still lives in `WeatherComponents.kt`. Dead Compose code adds maintenance surface and confuses future contributors.
+
+**Two options:**
+1. **Delete** it — the H/L summary in `HourlyCard` covers its former role.
+2. **Repurpose** it — wire it into `DetailSheet.Day` to show a mini temperature trend for the tapped day's hourly data.
+
+Option 2 requires passing the selected day's hourly data into the sheet, which is not currently available at the `DetailSheet.Day` level.
+
+---
+
+## Priority 2 — Medium effort
+
+### 22. Chat suggestion chips: semantic colour tinting
+
+**Problem**
+All six suggestion chips (`AssistChip`) in `ChatScreen` use `containerColor = MaterialTheme.colorScheme.surface` equally, giving them identical visual weight. The chips answer conceptually distinct questions (rain → umbrella, cold → jacket, etc.) and should communicate their domain at a glance.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/ChatScreen.kt`
+
+**Change:** Map each chip to a tinted background from the existing accent palette:
+
+| Intent | Chip tint |
+|---|---|
+| UMBRELLA | `Cyan.copy(alpha = 0.12f)` (blue/rain) |
+| JACKET | `Indigo.copy(alpha = 0.12f)` (cold) |
+| WALKING | `Green.copy(alpha = 0.12f)` |
+| DRIVING | `Amber.copy(alpha = 0.12f)` |
+| HIKING | `Teal.copy(alpha = 0.12f)` |
+| CLOTHING | `Coral.copy(alpha = 0.12f)` |
+
+---
+
+### 23. ChatScreen: compact weather context strip
+
+**Problem**
+The chat header subtitle reads "Grounded in West Lafayette" but the user has no sense of *what* conditions the AI is reading once they're in the chat view. The AI's answers reference specific numbers (temperature, rain chance) with no way for the user to verify them without leaving the screen.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/ChatScreen.kt`
+
+**Change:** Add a compact, non-scrollable one-line strip above the `LazyColumn` when `weather != null`:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  West Lafayette  ·  ☀  31°  ·  40% rain  ·  UV 8   │
+└─────────────────────────────────────────────────────┘
+```
+
+A single `GlassCard` with `TextSecondary` 13sp text. Use `WeatherGlyph` at 16dp for the condition icon.
+
+---
+
+### 24. MetricsGrid: primary strip + grouped secondary
+
+**Problem**
+Nine tiles at identical visual weight (118dp `GlassCard`) presents everything as equally important. Humidity, wind, and UV index are universally relevant; barometric pressure and visibility are specialist data most users rarely need.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+**Change:** Split `MetricsGrid` into two visual tiers:
+1. **Primary row** — three stats (Humidity, Wind, UV) in a single compact `GlassCard`, 64dp tall, 3-column, no icons, value at 22sp Bold + unit at 12sp.
+2. **Secondary grid** — remaining six tiles in the existing 2-col `GlassCard` pattern, grouped under `TextSecondary` eyebrows: "ATMOSPHERE" (Pressure, Visibility), "SUN & SAFETY" (UV detail, AQI), "DAILY" (Sunrise, Precipitation).
+
+---
+
+### 25. In-app OpenRouter key + model settings UI
+
+**Problem**
+`PreferencesStore.setOpenRouterKey()` and `setOpenRouterModel()` are fully implemented but there is no UI to call them. Users who want to use the AI assistant must know to edit `local.properties` before building — not viable for distributed builds or TestFlight-style installs.
+
+**Approach:** Add a settings icon or "Set up AI" prompt in `ChatScreen` when `chatViewModel.hasKey` is false. A `ModalBottomSheet` with two `OutlinedTextField`s (API key + optional model override) and a "Save" button is sufficient. The key input should use `KeyboardType.Password` so it's masked.
+
+**Files to touch:** `ChatScreen.kt`, `ChatViewModel.kt` (expose a `saveKey(key, model)` method).
+
+---
+
+### 26. `WeatherGlyph` accessibility content descriptions
+
+**Problem**
+`WeatherGlyph` draws weather icons on `Canvas` with zero semantic information. Screen readers (TalkBack) receive nothing from these elements — a user with visual impairment hears the temperature but gets no weather condition cue from the icon.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherGlyph.kt`
+
+**Change:** Add a `contentDescription` parameter defaulting to the WMO text label:
+
+```kotlin
+@Composable
+fun WeatherGlyph(
+    code: Int,
+    isDay: Boolean = true,
+    size: Dp = 48.dp,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = wmoText(code)
+) {
+    Canvas(modifier = modifier.size(size).semantics { this.contentDescription = contentDescription ?: "" }) { ... }
+}
+```
+
+Also add `import androidx.compose.ui.semantics.semantics` and `import androidx.compose.ui.semantics.contentDescription`.
+
+---
+
+### 27. `TipBanner`: left-border annotation style
+
+**Problem**
+The full-bleed `TipBanner` background (e.g. `Color(0xFF0D1E2E)` in dark mode) reads as an alert or notification rather than editorial context. The visual weight competes with the cards below.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+**Change:** Replace the filled background with a left accent border + very light tint:
+
+```kotlin
+Row(
+    modifier = modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp))
+        .background(fg.copy(alpha = if (isDark) 0.08f else 0.10f))
+        .drawBehind {
+            drawRect(color = fg, size = Size(4.dp.toPx(), size.height))
+        }
+        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
+)
+```
+
+This makes tips feel like margin annotations rather than push banners.
+
+---
+
+## Priority 3 — Larger scope
+
+### 28. Localization: replace hardcoded strings with `string` resources
+
+**Problem**
+All user-visible text is hardcoded in Kotlin (`"Feels like"`, `"No major weather to plan around today."`, section labels, error messages, etc.). There is a `strings.xml` in the project (`res/values/strings.xml`) with only `app_name`. This prevents translation and makes copy changes require code edits.
+
+**Scope:** ~60 distinct user-facing strings across `WeatherComponents.kt`, `WeatherScreen.kt`, `ChatScreen.kt`, `WeatherAdvisor.kt`, and `ChatRepository.kt` (system prompt excluded — it should stay in code). Extract to `strings.xml` using Android Studio's "Extract string resource" refactor. Parameterized strings (e.g. `"$diff° warmer than yesterday"`) use `getString(R.string.warmer_than_yesterday, diff)`.
+
+---
+
+### 29. Weather-change push notification
+
+**Problem**
+The app has no background awareness. A user who doesn't open the app won't know a thunderstorm is rolling in this afternoon.
+
+**Approach:**
+- Use `WorkManager` to schedule a daily check (e.g. 7 AM).
+- Compare tomorrow's forecast against simple thresholds (rain > 60%, UV > 8, thunderstorm code, temperature delta > 5°).
+- Fire a `NotificationCompat` with the condition and headline.
+- Requires `POST_NOTIFICATIONS` permission (Android 13+) and a notification channel.
+- The widget receiver could double as the trigger to avoid a separate background process.
+
+**New files:** `worker/WeatherCheckWorker.kt`, `notification/WeatherNotificationService.kt`
+
+---
+
+### 30. Share current weather
+
+**Problem**
+There is no way to share conditions with another person (e.g. "It's 31° and partly cloudy in West Lafayette — bring sunscreen").
+
+**Approach:** Add a share `IconButton` in the `WeatherContent` header row (alongside the existing locations and chat buttons). On tap, build a plain-text summary from `WeatherData` and fire `Intent.ACTION_SEND`. No new dependency needed.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
 
 ---
 
