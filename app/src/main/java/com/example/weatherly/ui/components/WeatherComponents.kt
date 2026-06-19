@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -60,12 +61,10 @@ import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 
-// --- Minimalist surfaces: warm off-white background, white cards, calm text ---
-val AppBackground = Color(0xFFF4F1EB)   // warm off-white
-val TextPrimary = Color(0xFF2B2F36)     // soft dark slate
-val TextSecondary = Color(0xFF828A93)   // muted grey
-private val CardFill = Color.White
-private val CardStroke = Color(0x0F2B2F36)
+// --- Colours resolved from the active Material 3 colour scheme ---
+val AppBackground: Color @Composable get() = MaterialTheme.colorScheme.background
+val TextPrimary: Color @Composable get() = MaterialTheme.colorScheme.onBackground
+val TextSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 
 // --- Muted pastel accent family (names kept; values softened) ---
 val Cyan = Color(0xFF6B86A3)    // dusty blue — the primary accent
@@ -87,30 +86,33 @@ private fun tempColor(c: Int): Color = when {
 }
 
 // Soft tinted pill + a darker readable text colour for each tone.
-private fun tipColors(tone: TipTone): Pair<Color, Color> = when (tone) {
+private fun tipColors(tone: TipTone, primaryText: Color): Pair<Color, Color> = when (tone) {
     TipTone.HOT -> Color(0xFFEFE4D0) to Color(0xFF6E5C3C)
     TipTone.RAIN -> Color(0xFFDCE6EF) to Color(0xFF3F5670)
     TipTone.SNOW -> Color(0xFFE2ECF1) to Color(0xFF3F5670)
     TipTone.COLD -> Color(0xFFE4E2EF) to Color(0xFF4C4A66)
     TipTone.WIND -> Color(0xFFDDEAE6) to Color(0xFF3E5A52)
     TipTone.NICE -> Color(0xFFE3EBDD) to Color(0xFF4C5A40)
-    TipTone.NEUTRAL -> Color(0xFFEAE6DE) to TextPrimary
+    TipTone.NEUTRAL -> Color(0xFFEAE6DE) to primaryText
 }
 
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    fill: Color = CardFill,
+    fill: Color = Color.Unspecified,
     corner: Dp = 22.dp,
     content: @Composable () -> Unit
 ) {
+    val surface = MaterialTheme.colorScheme.surface
+    val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val actualFill = if (fill == Color.Unspecified) surface else fill
     val shape = RoundedCornerShape(corner)
     var m = modifier
         .shadow(elevation = 2.dp, shape = shape, clip = false)
         .clip(shape)
-        .background(fill)
-        .border(1.dp, CardStroke, shape)
+        .background(actualFill)
+        .border(1.dp, stroke, shape)
     if (onClick != null) m = m.clickable { onClick() }
     m = m.padding(16.dp)
     Box(m) { content() }
@@ -162,7 +164,7 @@ fun CurrentHeader(
 
 @Composable
 fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
-    val (bg, fg) = tipColors(tip.tone)
+    val (bg, fg) = tipColors(tip.tone, TextPrimary)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -362,6 +364,7 @@ fun DailyCard(
 
 @Composable
 private fun TempRangeBar(low: Int, high: Int, weekMin: Int, weekMax: Int, currentC: Int?) {
+    val dotColor = TextPrimary
     Canvas(modifier = Modifier.fillMaxWidth().height(6.dp)) {
         val w = size.width
         val h = size.height
@@ -381,7 +384,7 @@ private fun TempRangeBar(low: Int, high: Int, weekMin: Int, weekMax: Int, curren
         )
         if (currentC != null) {
             val cx = (((currentC - weekMin) / range) * w).coerceIn(h, w - h)
-            drawCircle(color = TextPrimary, radius = h * 0.95f, center = Offset(cx, h / 2f))
+            drawCircle(color = dotColor, radius = h * 0.95f, center = Offset(cx, h / 2f))
         }
     }
 }

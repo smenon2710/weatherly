@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -65,9 +66,6 @@ import com.example.weatherly.ui.components.Coral
 import com.example.weatherly.ui.components.Cyan
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
-
-private val ChatBg = AppBackground
-private val HeaderSurface = Color.White
 
 private data class Suggestion(val label: String, val question: String, val intent: AdviceIntent)
 
@@ -118,7 +116,7 @@ fun ChatScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChatBg)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -163,7 +161,7 @@ fun ChatScreen(
 
 @Composable
 private fun ChatHeader(subtitle: String, onBack: () -> Unit, onNewChat: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().background(HeaderSurface)) {
+    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -212,7 +210,7 @@ private fun MessageBubble(msg: ChatMessage) {
     val bubbleColor = when {
         msg.isError -> Coral.copy(alpha = 0.14f)
         isUser -> Cyan
-        else -> Color.White
+        else -> MaterialTheme.colorScheme.surface
     }
     val textColor = when {
         msg.isError -> Coral
@@ -248,7 +246,7 @@ private fun TypingBubble() {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clip(RoundedCornerShape(18.dp))
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             CircularProgressIndicator(
@@ -274,7 +272,7 @@ private fun SuggestionRow(onPick: (Suggestion) -> Unit) {
                 onClick = { onPick(s) },
                 label = { Text(s.label) },
                 colors = AssistChipDefaults.assistChipColors(
-                    containerColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     labelColor = TextPrimary
                 )
             )

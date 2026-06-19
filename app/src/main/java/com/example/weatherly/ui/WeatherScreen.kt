@@ -59,7 +59,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material3.MaterialTheme
 import com.example.weatherly.R
+import kotlinx.coroutines.delay
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
@@ -76,7 +78,6 @@ import com.example.weatherly.ui.components.TemperatureChartCard
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
 import com.example.weatherly.ui.components.TipBanner
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,13 +107,6 @@ fun WeatherScreen(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (state is WeatherUiState.Success) viewModel.load(background = true)
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30 * 60 * 1000L)
-            if (state is WeatherUiState.Success) viewModel.load(forceRefresh = true, background = true)
-        }
     }
 
     when (val s = state) {
@@ -151,7 +145,13 @@ fun WeatherScreen(
     }
 
     if (showLocations) {
-        ModalBottomSheet(onDismissRequest = { showLocations = false }, containerColor = Color.White) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showLocations = false
+                viewModel.clearSearch()
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
             LocationsSheet(
                 units = units,
                 selected = selected,
@@ -184,6 +184,12 @@ private fun LocationsSheet(
     onRemove: (SavedPlace) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    LaunchedEffect(query) {
+        if (query.length >= 2) {
+            delay(400)
+            onSearch(query)
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()

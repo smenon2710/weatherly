@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weatherly.BuildConfig
 import com.example.weatherly.data.model.ChatMessage
+import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.model.ChatRole
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
@@ -17,11 +18,10 @@ import kotlinx.coroutines.launch
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = ChatRepository()
+    private val prefs = PreferencesStore(app)
 
-    // Key and model come only from local.properties -> BuildConfig. They are never
-    // shown to or editable by the user.
-    private val apiKey: String = BuildConfig.OPENROUTER_API_KEY
-    private val model: String = BuildConfig.OPENROUTER_MODEL
+    private val apiKey: String get() = prefs.getOpenRouterKey(BuildConfig.OPENROUTER_API_KEY)
+    private val model: String get() = prefs.getOpenRouterModel(BuildConfig.OPENROUTER_MODEL)
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()

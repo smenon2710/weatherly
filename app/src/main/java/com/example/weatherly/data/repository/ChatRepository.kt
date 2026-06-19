@@ -2,12 +2,14 @@ package com.example.weatherly.data.repository
 
 import com.example.weatherly.data.model.ChatApiMessage
 import com.example.weatherly.data.model.ChatCompletionRequest
+import com.example.weatherly.data.model.ChatCompletionResponse
 import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.remote.NetworkModule
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.text.SimpleDateFormat
@@ -41,15 +43,16 @@ class ChatRepository {
 
         val messages = buildList {
             add(ChatApiMessage("system", systemPrompt(weather, units)))
-            history.filterNot { it.isError }.forEach {
+            // Cap context sent to the API to avoid token-limit errors on long sessions.
+            history.filterNot { it.isError }.takeLast(10).forEach {
                 val role = if (it.role == ChatRole.USER) "user" else "assistant"
                 add(ChatApiMessage(role, it.text))
             }
         }
 
         try {
-            val response = api.chat(
-                authorization = "Bearer ${apiKey.trim()}",
+            val response = apiCallWithRetry(
+                auth = "Bearer ${apiKey.trim()}",
                 body = ChatCompletionRequest(model = model, messages = messages)
             )
             val text = response.choices?.firstOrNull()?.message?.content?.trim()
@@ -64,6 +67,18 @@ class ChatRepository {
         } catch (e: Exception) {
             Result.failure(IllegalStateException(e.message ?: "Couldn't reach the assistant."))
         }
+    }
+
+    private suspend fun apiCallWithRetry(auth: String, body: ChatCompletionRequest): ChatCompletionResponse {
+        repeat(2) { attempt ->
+            if (attempt > 0) delay(2_000L)
+            try {
+                return api.chat(authorization = auth, body = body)
+            } catch (e: HttpException) {
+                if (e.code() != 429 || attempt == 1) throw e
+            }
+        }
+        error("unreachable")
     }
 
     private fun httpMessage(code: Int): String = when (code) {

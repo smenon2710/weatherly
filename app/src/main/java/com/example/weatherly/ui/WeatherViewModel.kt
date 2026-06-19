@@ -9,6 +9,7 @@ import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +51,15 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                delay(30 * 60 * 1000L)
+                if (_state.value is WeatherUiState.Success) load(forceRefresh = true, background = true)
+            }
+        }
+    }
 
     /**
      * Loads weather. When [background] is true (pull-to-refresh, periodic, or

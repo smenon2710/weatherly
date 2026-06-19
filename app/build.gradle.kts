@@ -85,6 +85,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Unit tests
+    testImplementation("junit:junit:4.13.2")
+
     // Location (FusedLocationProvider)
     implementation("com.google.android.gms:play-services-location:21.3.0")
 

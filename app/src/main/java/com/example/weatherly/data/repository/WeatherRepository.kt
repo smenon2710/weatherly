@@ -2,6 +2,7 @@ package com.example.weatherly.data.repository
 
 import android.content.Context
 import android.location.Geocoder
+import android.os.Build
 import com.example.weatherly.data.model.AirQualityResponse
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
@@ -17,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.abs
@@ -244,12 +247,26 @@ class WeatherRepository(private val context: Context) {
         if (isEmpty()) add(WeatherTip("🌤️", "No major weather to plan around today.", TipTone.NEUTRAL))
     }.take(2)
 
-    @Suppress("DEPRECATION")
-    private fun reverseGeocode(lat: Double, lon: Double): String {
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String {
         return try {
             if (!Geocoder.isPresent()) return "Current location"
-            val results = Geocoder(context, Locale.getDefault()).getFromLocation(lat, lon, 1)
-            val address = results?.firstOrNull() ?: return "Current location"
+            val geocoder = Geocoder(context, Locale.getDefault())
+            val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                suspendCoroutine { cont ->
+                    geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
+                        override fun onGeocode(results: List<android.location.Address>) {
+                            cont.resume(results.firstOrNull())
+                        }
+                        override fun onError(errorMessage: String?) {
+                            cont.resume(null)
+                        }
+                    })
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()
+            }
+            address ?: return "Current location"
             listOfNotNull(address.locality ?: address.subAdminArea, address.adminArea)
                 .distinct().joinToString(", ").ifBlank { "Current location" }
         } catch (e: Exception) {
