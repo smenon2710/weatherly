@@ -1,0 +1,14 @@
+# Android Studio auto-creates local.properties with your sdk.dir on first sync.
+sdk.dir=/path/to/your/Android/sdk
+
+# --- AI chat (OpenRouter) ---------------------------------------------------
+# The weather features need NO key (Open-Meteo is free). The AI assistant uses
+# OpenRouter. Create a free key at https://openrouter.ai/keys and paste it below,
+# OR leave this blank and enter the key inside the app's AI chat screen (it is
+# stored only on your device).
+OPENROUTER_API_KEY=
+
+# Optional: which model to use. Defaults to a free Gemma route. Free model IDs
+# rotate over time — check https://openrouter.ai/models (filter: Free) and copy
+# the exact ":free" slug. "openrouter/free" auto-picks an available free model.
+OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free
