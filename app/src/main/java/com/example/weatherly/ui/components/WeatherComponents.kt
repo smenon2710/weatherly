@@ -2,6 +2,7 @@ package com.example.weatherly.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -85,15 +86,33 @@ private fun tempColor(c: Int): Color = when {
     else -> Color(0xFFC58587)
 }
 
-// Soft tinted pill + a darker readable text colour for each tone.
-private fun tipColors(tone: TipTone, primaryText: Color): Pair<Color, Color> = when (tone) {
-    TipTone.HOT -> Color(0xFFEFE4D0) to Color(0xFF6E5C3C)
-    TipTone.RAIN -> Color(0xFFDCE6EF) to Color(0xFF3F5670)
-    TipTone.SNOW -> Color(0xFFE2ECF1) to Color(0xFF3F5670)
-    TipTone.COLD -> Color(0xFFE4E2EF) to Color(0xFF4C4A66)
-    TipTone.WIND -> Color(0xFFDDEAE6) to Color(0xFF3E5A52)
-    TipTone.NICE -> Color(0xFFE3EBDD) to Color(0xFF4C5A40)
-    TipTone.NEUTRAL -> Color(0xFFEAE6DE) to primaryText
+// Soft tinted pill — light pastels in light mode, dark tints with contrasting text in dark mode.
+@Composable
+private fun tipColors(tone: TipTone): Pair<Color, Color> {
+    val isDark = isSystemInDarkTheme()
+    return when (tone) {
+        TipTone.HOT ->
+            if (isDark) Color(0xFF2C1A06) to Color(0xFFE8BE7A)
+            else Color(0xFFEFE4D0) to Color(0xFF6E5C3C)
+        TipTone.RAIN ->
+            if (isDark) Color(0xFF0D1E2E) to Color(0xFF7FA8C9)
+            else Color(0xFFDCE6EF) to Color(0xFF3F5670)
+        TipTone.SNOW ->
+            if (isDark) Color(0xFF0F1F2C) to Color(0xFF8AB8CF)
+            else Color(0xFFE2ECF1) to Color(0xFF3F5670)
+        TipTone.COLD ->
+            if (isDark) Color(0xFF1A1828) to Color(0xFF9C96BE)
+            else Color(0xFFE4E2EF) to Color(0xFF4C4A66)
+        TipTone.WIND ->
+            if (isDark) Color(0xFF0E1F1C) to Color(0xFF7AB8A8)
+            else Color(0xFFDDEAE6) to Color(0xFF3E5A52)
+        TipTone.NICE ->
+            if (isDark) Color(0xFF0F1E10) to Color(0xFF8AB88E)
+            else Color(0xFFE3EBDD) to Color(0xFF4C5A40)
+        TipTone.NEUTRAL ->
+            if (isDark) Color(0xFF1A1810) to TextPrimary
+            else Color(0xFFEAE6DE) to TextPrimary
+    }
 }
 
 @Composable
@@ -164,7 +183,7 @@ fun CurrentHeader(
 
 @Composable
 fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
-    val (bg, fg) = tipColors(tip.tone, TextPrimary)
+    val (bg, fg) = tipColors(tip.tone)
     Row(
         modifier = modifier
             .fillMaxWidth()

@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -305,6 +306,7 @@ fun WeatherContent(
     onOpenChat: () -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
+    val isDark = isSystemInDarkTheme()
 
     Box(
         modifier = Modifier
@@ -334,7 +336,10 @@ fun WeatherContent(
                         Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
                     }
                     Image(
-                        painter = painterResource(R.drawable.weatherly_logo),
+                        painter = painterResource(
+                            if (isDark) R.drawable.weatherly_logo_dark
+                            else R.drawable.weatherly_logo_light
+                        ),
                         contentDescription = "Weatherly",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -383,7 +388,7 @@ fun WeatherContent(
     }
 
     sheet?.let { current ->
-        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = Color.White) {
+        ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = MaterialTheme.colorScheme.surface) {
             DetailSheetContent(current)
         }
     }

@@ -12,6 +12,9 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 4 | Fix deprecated `Geocoder.getFromLocation()` | 1 | ✅ Done |
 | 5 | Move auto-refresh timer into `WeatherViewModel` | 1 | ✅ Done |
 | 6 | Dark theme | 2 | ✅ Done |
+| 6a | Dark theme — `TipBanner` colours | polish | ✅ Done |
+| 6b | Dark theme — logo per-theme assets with edge fade | polish | ✅ Done |
+| 6c | Dark theme — detail sheet hardcoded `Color.White` | polish | ✅ Done |
 | 7 | Debounced city search | 2 | ✅ Done |
 | 8 | Unit tests for `WeatherAdvisor` | 2 | ✅ Done |
 | 9 | Auto-retry on 429 in `ChatRepository` | 2 | ✅ Done |
@@ -211,6 +214,82 @@ val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
 **Note:** `WeatherWidget.kt` uses Jetpack Glance and has its own colour system — unchanged intentionally.
 
 To verify: toggle system dark mode or use the existing `WeatherNightPreview` in `Previews.kt` (it uses `uiMode = UI_MODE_NIGHT_YES` and now reflects the real dark scheme).
+
+---
+
+### 6a. ✅ Dark theme — `TipBanner` colours
+
+**Problem**  
+`tipColors()` returned hardcoded light pastel backgrounds for all tones (e.g. `#EFE4D0`). In dark mode these light pills appeared jarring against the deep navy background, and text was unreadable.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+**Implemented change:** Promoted `tipColors()` to a `@Composable` function using `isSystemInDarkTheme()`. Each tone now has a distinct dark-mode pair — a deeply tinted background and a lighter, saturated foreground text:
+
+```kotlin
+@Composable
+private fun tipColors(tone: TipTone): Pair<Color, Color> {
+    val isDark = isSystemInDarkTheme()
+    return when (tone) {
+        TipTone.HOT ->
+            if (isDark) Color(0xFF2C1A06) to Color(0xFFE8BE7A)
+            else Color(0xFFEFE4D0) to Color(0xFF6E5C3C)
+        TipTone.RAIN ->
+            if (isDark) Color(0xFF0D1E2E) to Color(0xFF7FA8C9)
+            else Color(0xFFDCE6EF) to Color(0xFF3F5670)
+        // … all 7 tones
+    }
+}
+```
+
+The `primaryText: Color` parameter was removed; `TextPrimary` is now read directly inside the composable.
+
+---
+
+### 6b. ✅ Dark theme — logo per-theme assets with edge fade
+
+**Problem**  
+The original `weatherly_logo.png` had a white background baked in. In dark mode the logo appeared as a white rectangle. Multiple blend-mode approaches (ColorMatrix, BlendMode.Multiply) either hid the logo entirely or left visible artefacts.
+
+**Files changed:**
+- `app/src/main/res/drawable/weatherly_logo.png` — **deleted**
+- `app/src/main/res/drawable/weatherly_logo_light.png` — new asset for light mode
+- `app/src/main/res/drawable/weatherly_logo_dark.png` — new asset for dark mode
+- `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+**Asset preparation:** Both PNGs were processed with a Python/Pillow script that applies a 10% cosine-eased alpha fade on all four edges. This makes the rectangular boundary invisible regardless of the background colour — the logo content stays fully opaque in the centre and dissolves to transparent at the edges.
+
+**`WeatherScreen.kt`** — `Image` selects the asset based on `isSystemInDarkTheme()`:
+```kotlin
+val isDark = isSystemInDarkTheme()
+// …
+Image(
+    painter = painterResource(
+        if (isDark) R.drawable.weatherly_logo_dark
+        else R.drawable.weatherly_logo_light
+    ),
+    contentDescription = "Weatherly",
+    contentScale = ContentScale.Fit,
+    modifier = Modifier.align(Alignment.Center).height(60.dp)
+)
+```
+
+---
+
+### 6c. ✅ Dark theme — detail sheet hardcoded `Color.White`
+
+**Problem**  
+The metrics/day detail `ModalBottomSheet` used `containerColor = Color.White`, so it showed a white popup in dark mode.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+**Implemented change:**
+```kotlin
+// Before
+ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = Color.White)
+// After
+ModalBottomSheet(onDismissRequest = { sheet = null }, containerColor = MaterialTheme.colorScheme.surface)
+```
 
 ---
 
