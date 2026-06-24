@@ -24,7 +24,7 @@ Copy `local.properties.template` to `local.properties` (already git-ignored) and
 ```
 sdk.dir=/path/to/your/Android/sdk
 OPENROUTER_API_KEY=sk-or-...   # optional — quick-suggest chips work without it
-OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free   # optional override
+OPENROUTER_MODEL=openrouter/free   # optional override; any OpenRouter model ID works
 ```
 
 Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and `BuildConfig.OPENROUTER_MODEL`. If no key is present at build time, users can enter one directly in the chat screen; it is stored in `SharedPreferences` via `PreferencesStore`.
@@ -39,19 +39,22 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 |---|---|
 | `NetworkModule` | Singleton object wiring four Retrofit clients: Open-Meteo forecast, Open-Meteo geocoding, Open-Meteo air quality, OpenRouter. Exposes `makeStreamingCall(Request)` for raw SSE calls. No DI framework. |
 | `WeatherRepository` | Single source of truth. Fetches forecast + air quality in parallel (`coroutineScope`/`async`). 30-minute in-memory cache keyed by `"lat,lon,units"`. |
-| `ChatRepository` | Streams OpenRouter responses token-by-token via SSE (`askStreaming`) and simulates the same feel for rule-based answers (`simulateStreaming`). Both return `Flow<String>`. Retries once on HTTP 429. |
+| `ChatRepository` | Streams OpenRouter responses token-by-token via SSE (`askStreaming`) and simulates the same feel for rule-based answers (`simulateStreaming`). Both return `Flow<String>`. Retries once on HTTP 429. All requests include `HTTP-Referer` and `X-Title` headers for OpenRouter log attribution. |
+| `ForecastCache` | Persists the last successful `WeatherData` as JSON in `SharedPreferences` (`forecast_cache`). `WeatherViewModel.init` loads it synchronously so the app opens instantly offline. Replaced by fresh data on every successful network fetch. |
 | `PreferencesStore` | `SharedPreferences` wrapper for unit system, saved places, selected place, and on-device OpenRouter key/model. |
 | `WeatherAdvisor` | Pure object (no network). Answers six hard-coded intents (UMBRELLA, JACKET, WALKING, DRIVING, HIKING, CLOTHING) locally from the current `WeatherData`. |
 
 **UI layer:**
 
-- `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. Background refreshes keep existing data visible (only the spinner changes).
+- `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. On `init`, loads `ForecastCache` synchronously so the screen is never blank on cold start. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. `WeatherUiState.Success` carries a `cachedAt: Long?` timestamp; non-null means the data came from cache and triggers a "Showing data from Xm ago" label. Background refreshes keep existing data visible (only the spinner changes).
 - `ChatViewModel` — Exposes `messages`, `sending`, and `streamingText: StateFlow<String>`. Accumulates SSE/simulated chunks into `_streamingText`; on completion moves the full text into `_messages`. `clear()` cancels any in-flight stream job.
 - `WeatherScreen` / `ChatScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
 - `ui/components/` — Reusable Compose functions (header, hourly row, daily list, detail tiles).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.
 
-**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals and renders a compact tile. `WeatherWidgetReceiver` wires it into the manifest.
+**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals and renders a compact tile. `WeatherWidgetReceiver` wires it into the manifest. The widget creates its own `WeatherRepository` instance and does not share the app's `ForecastCache`.
+
+**Launcher icon:** Adaptive icon (`mipmap-anydpi-v26/`) — warm-gold sun glyph (`#E0B15C`, matching `WeatherGlyph.kt`'s `SunColor`) on deep navy (`#0F1923`). XML-only; no PNG fallbacks needed since `minSdk = 26`.
 
 **WMO weather codes** are mapped to emoji and text in `util/WeatherIcon.kt`. All temperature/wind/precip values in `WeatherData` are stored in the user-selected unit (they come back from Open-Meteo already converted); `WeatherAdvisor` converts back to metric internally for threshold comparisons.
 
@@ -67,6 +70,10 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 **Condition gradient (`conditionGradient` in `WeatherComponents.kt`):** A `@Composable` function that maps a WMO weather code + `isDay` flag to a two-stop `List<Color>`. The first stop is a sky tone (blue for clear day, indigo for thunder, slate for rain, etc.); the second stop is always `MaterialTheme.colorScheme.background` so the gradient fades seamlessly into the card area. Used as the background of the hero section in `WeatherScreen.kt` via `Brush.verticalGradient`.
 
 **`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, daily, metric tiles) use `GlassCard`.
+
+**`TipBanner`:** Left-border annotation style — 4dp accent bar on the left edge, very subtle tint (`fg` at 8–10% alpha), rounded only on the right corners. Reads as editorial context rather than an alert.
+
+**`WeatherGlyph`:** Accepts an optional `contentDescription: String?` parameter (defaults to `wmoText(code)`). Pass `null` for decorative instances where adjacent text already carries the meaning.
 
 **Section labels:** 11 sp uppercase with `letterSpacing = 0.8.sp` — keep this style consistent across any new sections.
 

@@ -37,23 +37,33 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 21 | Dead `TemperatureChartCard` + `TemperatureChart` composables removed |
 | — | Streaming chat: LLM answers stream via SSE; rule-based answers simulate streaming |
 
+### Completed — Priority 2
+
+| # | Title |
+|---|---|
+| 10 | Offline last-known forecast (`ForecastCache` + stale label) |
+| 23 | ChatScreen: compact weather context strip |
+| 26 | `WeatherGlyph` accessibility content descriptions |
+| 27 | `TipBanner`: left-border annotation style |
+
+### Completed — Priority 3
+
+| # | Title |
+|---|---|
+| 11 | Adaptive launcher icon (warm-gold sun on deep navy, XML only — minSdk 26) |
+
 ### Pending — Priority 2 (medium effort, meaningful UX improvement)
 
 | # | Title | Effort |
 |---|---|---|
 | 22 | Chat suggestion chips: semantic colour tinting | 1 h |
-| 23 | ChatScreen: compact weather context strip | 1–2 h |
 | 24 | MetricsGrid: primary strip + grouped secondary | 2 h |
-| 25 | In-app OpenRouter key + model settings UI | 2–3 h |
-| 26 | `WeatherGlyph` accessibility content descriptions | 1 h |
-| 27 | `TipBanner`: left-border annotation style | 1 h |
-| 10 | Offline last-known forecast (persist `WeatherData`) | 3–4 h |
+| 25 | In-app OpenRouter key + model settings UI | 2–3 h (security trade-off — deferred) |
 
 ### Pending — Priority 3 (larger scope)
 
 | # | Title | Effort |
 |---|---|---|
-| 11 | Adaptive launcher icon | half-day |
 | 28 | Localization: replace hardcoded strings with `strings.xml` | 1–2 days |
 | 29 | Weather-change push notification | 1–2 days |
 | 30 | Share current weather | half-day |
