@@ -65,6 +65,7 @@ class ChatRepository {
         val httpRequest = Request.Builder()
             .url("https://openrouter.ai/api/v1/chat/completions")
             .addHeader("Authorization", "Bearer ${apiKey.trim()}")
+            .addHeader("HTTP-Referer", "https://github.com/smenon2710/weatherly")
             .addHeader("X-Title", "Weatherly")
             .post(requestBody)
             .build()
