@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -233,13 +234,15 @@ fun CurrentHeader(
 
 @Composable
 fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
-    val (bg, fg) = tipColors(tip.tone)
+    val (_, fg) = tipColors(tip.tone)
+    val isDark = isSystemInDarkTheme()
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .clip(RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp))
+            .background(fg.copy(alpha = if (isDark) 0.08f else 0.10f))
+            .drawBehind { drawRect(color = fg, size = Size(4.dp.toPx(), size.height)) }
+            .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(tipIcon(tip.tone), contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))

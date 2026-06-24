@@ -112,6 +112,7 @@ fun WeatherScreen(
         is WeatherUiState.Success ->
             WeatherContent(
                 data = s.data,
+                cachedAt = s.cachedAt,
                 isRefreshing = refreshing,
                 onRefresh = { viewModel.refresh() },
                 onOpenLocations = { showLocations = true },
@@ -298,6 +299,7 @@ private fun PlaceRow(
 @Composable
 fun WeatherContent(
     data: WeatherData,
+    cachedAt: Long? = null,
     onRefresh: () -> Unit,
     isRefreshing: Boolean = false,
     onOpenLocations: () -> Unit = {},
@@ -413,6 +415,19 @@ fun WeatherContent(
                     )
                     Spacer(Modifier.height(12.dp))
                     MetricsGrid(data, onMetricClick = { sheet = it })
+                    if (cachedAt != null) {
+                        val agoText = remember(cachedAt) {
+                            val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
+                            if (agoMin < 1) "just now" else "${agoMin}m ago"
+                        }
+                        Text(
+                            "Showing data from $agoText · pull to refresh",
+                            color = TextSecondary.copy(alpha = 0.6f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        )
+                    }
                     AttributionFooter(textColor = TextSecondary)
                 }
             }

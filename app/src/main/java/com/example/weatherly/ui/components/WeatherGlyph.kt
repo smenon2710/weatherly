@@ -4,6 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.example.weatherly.util.wmoText
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -27,9 +30,14 @@ fun WeatherGlyph(
     code: Int,
     isDay: Boolean = true,
     size: Dp = 48.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentDescription: String? = wmoText(code)
 ) {
-    Canvas(modifier = modifier.size(size)) {
+    val m = if (contentDescription != null)
+        modifier.size(size).semantics { this.contentDescription = contentDescription }
+    else
+        modifier.size(size)
+    Canvas(modifier = m) {
         val center = Offset(this.size.width / 2f, this.size.height / 2f)
         drawWeather(glyphFor(code, isDay), center, this.size.minDimension)
     }

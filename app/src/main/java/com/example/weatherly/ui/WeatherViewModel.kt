@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
@@ -18,7 +19,7 @@ import kotlinx.coroutines.launch
 sealed interface WeatherUiState {
     data object Idle : WeatherUiState
     data object Loading : WeatherUiState
-    data class Success(val data: WeatherData) : WeatherUiState
+    data class Success(val data: WeatherData, val cachedAt: Long? = null) : WeatherUiState
     data class Error(val message: String) : WeatherUiState
     data object NeedsPermission : WeatherUiState
 }
@@ -28,6 +29,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = WeatherRepository(app)
     private val locationProvider = LocationProvider(app)
     private val prefs = PreferencesStore(app)
+    private val forecastCache = ForecastCache(app)
 
     private val _state = MutableStateFlow<WeatherUiState>(WeatherUiState.Idle)
     val state: StateFlow<WeatherUiState> = _state.asStateFlow()
@@ -53,6 +55,10 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     val searching: StateFlow<Boolean> = _searching.asStateFlow()
 
     init {
+        // Show the last known forecast immediately so the app never opens to a blank screen.
+        forecastCache.load()?.let { (data, ts) ->
+            _state.value = WeatherUiState.Success(data, cachedAt = ts)
+        }
         viewModelScope.launch {
             while (true) {
                 delay(30 * 60 * 1000L)
@@ -91,7 +97,10 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     lat = ll.first; lon = ll.second; name = null
                 }
                 repository.getWeather(lat, lon, units, placeName = name, forceRefresh = forceRefresh)
-                    .onSuccess { _state.value = WeatherUiState.Success(it) }
+                    .onSuccess {
+                    forecastCache.save(it)
+                    _state.value = WeatherUiState.Success(it)
+                }
                     .onFailure {
                         if (!background || _state.value !is WeatherUiState.Success) {
                             _state.value = WeatherUiState.Error(it.message ?: "Something went wrong.")

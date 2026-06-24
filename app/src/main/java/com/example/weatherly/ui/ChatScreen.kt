@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -69,12 +70,14 @@ import com.example.weatherly.data.advice.AdviceIntent
 import com.example.weatherly.data.advice.WeatherAdvisor
 import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
+import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.Coral
 import com.example.weatherly.ui.components.Cyan
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
+import com.example.weatherly.ui.components.WeatherGlyph
 
 private data class Suggestion(val label: String, val question: String, val intent: AdviceIntent)
 
@@ -141,6 +144,7 @@ fun ChatScreen(
                 onBack = onBack,
                 onNewChat = { chatViewModel.clear() }
             )
+            if (weather != null) WeatherContextStrip(weather, units)
 
             LazyColumn(
                 state = listState,
@@ -169,6 +173,37 @@ fun ChatScreen(
                 enabled = !sending
             )
         }
+    }
+}
+
+@Composable
+private fun WeatherContextStrip(weather: WeatherData, units: UnitSystem) {
+    val rainChance = maxOf(
+        weather.hourly.take(6).mapNotNull { it.precipChance }.maxOrNull() ?: 0,
+        weather.daily.firstOrNull()?.precipProbMax ?: 0
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            weather.locationName,
+            color = TextSecondary,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        WeatherGlyph(code = weather.currentIcon, isDay = weather.isDay, size = 16.dp, contentDescription = null)
+        Text("${weather.currentTempC}${units.tempLabel}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        if (rainChance > 0) Text("·  ${rainChance}% rain", color = TextSecondary, fontSize = 13.sp)
+        weather.uvIndex?.let { Text("·  UV $it", color = TextSecondary, fontSize = 13.sp) }
     }
 }
 
