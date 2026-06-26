@@ -45,6 +45,10 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 23 | ChatScreen: compact weather context strip |
 | 26 | `WeatherGlyph` accessibility content descriptions |
 | 27 | `TipBanner`: left-border annotation style |
+| 31 | 12-hour lookahead headline under temperature (`buildUpcomingHeadline`) |
+| 31a | Fix: time-aware tips — use tomorrow's forecast at night, not today's stale high |
+| 31b | Fix: headline WMO-code trust — remove false precip-probability gate on rain codes |
+| 32 | Daily forecast: precipitation probability shown on rain/snow/fog days |
 
 ### Completed — Priority 3
 

@@ -218,7 +218,7 @@ fun CurrentHeader(
         data.realFeelC?.let {
             Text("Feels like $it°", color = subColor, fontSize = 13.sp, fontWeight = FontWeight.Normal)
         }
-        data.comparedToYesterday?.let {
+        (data.headline ?: data.comparedToYesterday)?.let {
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
@@ -364,8 +364,19 @@ fun DailyCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(day.dayLabel, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(52.dp))
-                    Box(modifier = Modifier.width(36.dp), contentAlignment = Alignment.Center) {
+                    Column(
+                        modifier = Modifier.width(36.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         WeatherGlyph(code = day.icon, size = 24.dp)
+                        day.precipProbMax?.takeIf { it > 0 && day.icon in 45..99 }?.let {
+                            Text(
+                                "$it%",
+                                color = Indigo,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                     Text(
                         "${day.lowC}°", color = TextSecondary, fontSize = 15.sp,

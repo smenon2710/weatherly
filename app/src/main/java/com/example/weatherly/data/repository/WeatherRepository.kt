@@ -179,7 +179,15 @@ class WeatherRepository(private val context: Context) {
             }
         }
 
-        val tips = buildTips(today?.icon ?: currentCode, highToday, lowToday, today?.precipProbMax, today?.windMaxKmh, units)
+        // At night the day's peak heat is past — use tomorrow's data so tips reflect what's coming next.
+        val isCurrentDay = (current?.isDay ?: 1) == 1
+        val nextDay = daily.getOrNull(1)
+        val tipDay = if (isCurrentDay || nextDay == null) today else nextDay
+        // Merge the tip day's daily pop with the max precip chance in the next 12 hourly slots.
+        val nextHoursMaxPop = hourly.drop(1).take(12).mapNotNull { it.precipChance }.maxOrNull() ?: 0
+        val tipsPop = maxOf(tipDay?.precipProbMax ?: 0, nextHoursMaxPop)
+        val tips = buildTips(tipDay?.icon ?: currentCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
+        val headline = buildUpcomingHeadline(hourly, hourlyWind, units.windLabel, currentCode, units)
 
         return WeatherData(
             locationName = locationName,
@@ -207,7 +215,7 @@ class WeatherRepository(private val context: Context) {
             aqiLabel = aqiNow?.let { aqiLabel(it) },
             sunrise = clock(dSunrise.getOrNull(todayIndex)),
             sunset = clock(dSunset.getOrNull(todayIndex)),
-            headline = today?.let { "${it.phrase} today. High ${it.highC}°, low ${it.lowC}°." },
+            headline = headline,
             comparedToYesterday = comparedToYesterday,
             tips = tips,
             weekMinC = weekMin,
@@ -223,6 +231,53 @@ class WeatherRepository(private val context: Context) {
             hourlyAqi = hourlyAqi,
             daily = daily
         )
+    }
+
+    private fun buildUpcomingHeadline(
+        hourly: List<HourEntry>,
+        hourlyWind: List<Int>,
+        windUnit: String,
+        currentIcon: Int,
+        units: UnitSystem
+    ): String? {
+        val limit = minOf(13, hourly.size) // up to 12 hours ahead
+        // "already" flags use tight ranges: drizzle (51-57) doesn't suppress incoming rain/thunder.
+        val alreadyRain = currentIcon in 61..82
+        val alreadySnow = currentIcon in 71..77 || currentIcon in 85..86
+        val alreadyThunder = currentIcon in 95..99
+        val alreadyFog = currentIcon == 45 || currentIcon == 48
+
+        var eventDesc: String? = null
+        var eventTime: String? = null
+        for (i in 1 until limit) {
+            val h = hourly[i]
+            val code = h.icon
+            val precip = h.precipChance ?: 0
+            // Trust the WMO code for precipitation — it is already a forecast, not just a probability.
+            // Only drizzle (lightest precip) still requires a meaningful probability floor.
+            val match = when {
+                code in 95..99 && !alreadyThunder -> "Thunderstorm"
+                (code in 71..77 || code in 85..86) && !alreadySnow ->
+                    if (code in 85..86) "Snow showers" else "Snow"
+                code in 66..67 && !alreadyRain -> "Freezing rain"
+                code in 61..82 && !alreadyRain -> "Rain"
+                code in 51..57 && !alreadyRain && precip >= 30 -> "Drizzle"
+                (code == 45 || code == 48) && !alreadyFog -> "Fog"
+                else -> null
+            }
+            if (match != null) { eventDesc = match; eventTime = h.hourLabel; break }
+        }
+
+        val maxWind = (1 until limit).mapNotNull { hourlyWind.getOrNull(it) }.maxOrNull() ?: 0
+        val windThreshold = if (units == UnitSystem.IMPERIAL) 25 else 40
+
+        return when {
+            eventDesc != null && maxWind >= windThreshold ->
+                "$eventDesc expected around $eventTime. Winds up to $maxWind $windUnit."
+            eventDesc != null -> "$eventDesc expected around $eventTime."
+            maxWind >= windThreshold -> "Winds up to $maxWind $windUnit in the next few hours."
+            else -> null
+        }
     }
 
     private fun buildTips(
