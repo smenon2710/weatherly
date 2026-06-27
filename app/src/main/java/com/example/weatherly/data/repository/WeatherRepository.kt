@@ -6,6 +6,7 @@ import android.os.Build
 import com.example.weatherly.data.model.AirQualityResponse
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
+import com.example.weatherly.data.model.HourlyBlock
 import com.example.weatherly.data.model.OpenMeteoResponse
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TipTone
@@ -187,7 +188,7 @@ class WeatherRepository(private val context: Context) {
         val nextHoursMaxPop = hourly.drop(1).take(12).mapNotNull { it.precipChance }.maxOrNull() ?: 0
         val tipsPop = maxOf(tipDay?.precipProbMax ?: 0, nextHoursMaxPop)
         val tips = buildTips(tipDay?.icon ?: currentCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
-        val headline = buildUpcomingHeadline(hourly, hourlyWind, units.windLabel, currentCode, units)
+        val headline = r.hourly?.let { buildUpcomingHeadline(it, nowIndex, units.windLabel, currentCode, units) }
 
         return WeatherData(
             locationName = locationName,
@@ -234,14 +235,14 @@ class WeatherRepository(private val context: Context) {
     }
 
     private fun buildUpcomingHeadline(
-        hourly: List<HourEntry>,
-        hourlyWind: List<Int>,
+        rawHourly: HourlyBlock,
+        nowIndex: Int,
         windUnit: String,
         currentIcon: Int,
         units: UnitSystem
     ): String? {
-        val limit = minOf(13, hourly.size) // up to 12 hours ahead
-        // "already" flags use tight ranges: drizzle (51-57) doesn't suppress incoming rain/thunder.
+        val totalHours = rawHourly.time?.size ?: 0
+        val end = minOf(nowIndex + 13, totalHours) // scan nowIndex+1 .. nowIndex+12
         val alreadyRain = currentIcon in 61..82
         val alreadySnow = currentIcon in 71..77 || currentIcon in 85..86
         val alreadyThunder = currentIcon in 95..99
@@ -249,12 +250,9 @@ class WeatherRepository(private val context: Context) {
 
         var eventDesc: String? = null
         var eventTime: String? = null
-        for (i in 1 until limit) {
-            val h = hourly[i]
-            val code = h.icon
-            val precip = h.precipChance ?: 0
-            // Trust the WMO code for precipitation — it is already a forecast, not just a probability.
-            // Only drizzle (lightest precip) still requires a meaningful probability floor.
+        for (i in (nowIndex + 1) until end) {
+            val code = rawHourly.weatherCode?.getOrNull(i) ?: 0
+            val precip = rawHourly.precipitationProbability?.getOrNull(i) ?: 0
             val match = when {
                 code in 95..99 && !alreadyThunder -> "Thunderstorm"
                 (code in 71..77 || code in 85..86) && !alreadySnow ->
@@ -265,10 +263,16 @@ class WeatherRepository(private val context: Context) {
                 (code == 45 || code == 48) && !alreadyFog -> "Fog"
                 else -> null
             }
-            if (match != null) { eventDesc = match; eventTime = h.hourLabel; break }
+            if (match != null) {
+                eventDesc = match
+                eventTime = rawHourly.time?.getOrNull(i)?.let { formatHour(it) }
+                break
+            }
         }
 
-        val maxWind = (1 until limit).mapNotNull { hourlyWind.getOrNull(it) }.maxOrNull() ?: 0
+        val maxWind = ((nowIndex + 1) until end)
+            .mapNotNull { rawHourly.windSpeed?.getOrNull(it) }
+            .maxOrNull()?.roundToInt() ?: 0
         val windThreshold = if (units == UnitSystem.IMPERIAL) 25 else 40
 
         return when {

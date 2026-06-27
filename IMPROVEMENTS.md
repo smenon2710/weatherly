@@ -48,6 +48,7 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 31 | 12-hour lookahead headline under temperature (`buildUpcomingHeadline`) |
 | 31a | Fix: time-aware tips — use tomorrow's forecast at night, not today's stale high |
 | 31b | Fix: headline WMO-code trust — remove false precip-probability gate on rain codes |
+| 31c | Fix: headline scans raw `HourlyBlock` + `nowIndex` for accurate cross-day lookahead |
 | 32 | Daily forecast: precipitation probability shown on rain/snow/fog days |
 
 ### Completed — Priority 3
@@ -506,9 +507,9 @@ The current hour (`"Now"`) rendered identically to future hours — users had to
 
 ---
 
-## Tier 3 — Larger features ⬜ Pending
+## Tier 3 — Larger features ✅ Completed
 
-### 10. Offline last-known forecast (survive cold start with no network)
+### 10. ✅ Offline last-known forecast (survive cold start with no network)
 
 **Problem**  
 A cold start with no network connection shows an error screen. Persisting the last successful forecast lets the app open instantly with cached data and refresh silently in the background.
@@ -547,7 +548,7 @@ class ForecastCache(context: Context) {
 
 ---
 
-### 11. Adaptive launcher icon ⬜ Pending
+### 11. ✅ Adaptive launcher icon
 
 **Problem**  
 The manifest has no `android:icon`, so the app uses the AOSP default icon on the home screen.
