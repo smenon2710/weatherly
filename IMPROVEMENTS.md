@@ -50,6 +50,9 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 31b | Fix: headline WMO-code trust — remove false precip-probability gate on rain codes |
 | 31c | Fix: headline scans raw `HourlyBlock` + `nowIndex` for accurate cross-day lookahead |
 | 32 | Daily forecast: precipitation probability shown on rain/snow/fog days |
+| W1 | Widget: size-aware layouts via `SizeMode.Responsive` (2×1, 2×2, 4×1, 4×2) |
+| W2 | Widget: chrono-dynamic content — morning/daytime/night focus per size |
+| W3 | Widget: Material You dynamic colors from system accent palette (API 31+) |
 
 ### Completed — Priority 3
 

@@ -52,7 +52,28 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 - `ui/components/` — Reusable Compose functions (header, hourly row, daily list, detail tiles).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.
 
-**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals and renders a compact tile. `WeatherWidgetReceiver` wires it into the manifest. The widget creates its own `WeatherRepository` instance and does not share the app's `ForecastCache`.
+**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals. `WeatherWidgetReceiver` wires it into the manifest. The widget creates its own `WeatherRepository` instance and does not share the app's `ForecastCache`.
+
+- **Size-aware layouts** — `sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, WIDE, LARGE))`. Glance picks the largest declared breakpoint that fits the actual widget size; `WidgetContent` dispatches on `LocalSize.current`:
+
+  | Constant | DpSize | Cell grid | Content |
+  |---|---|---|---|
+  | `SMALL` | 110×50 dp | 2×1 | Emoji + current temp (22 sp Bold), centered |
+  | `MEDIUM` | 110×110 dp | 2×2 | Location header + chrono-dynamic vertical stack |
+  | `WIDE` | 250×50 dp | 4×1 | `emoji temp° · location` + compact next-4-hour text |
+  | `LARGE` | 250×110 dp | 4×2 | `LargeHeader` (2-column) + `HourlyStrip` (up to 5 cells) |
+
+  `weather_widget_info.xml` declares `minWidth="110dp"`, `minHeight="40dp"`, `targetCellWidth="2"`, `targetCellHeight="2"`, `resizeMode="horizontal|vertical"`.
+
+- **Chrono-dynamic content** — `currentTimeOfDay()` reads `Calendar.HOUR_OF_DAY`. MEDIUM and LARGE layouts branch on the result:
+
+  | TimeOfDay | Hours | Focus |
+  |---|---|---|
+  | `MORNING` | 5–10 | Today's high temp (hero) + rain probability |
+  | `DAYTIME` | 11–17 | Current temp (hero) + condition + H/L |
+  | `NIGHT` | 18–4 | Tomorrow's H/L (hero) + tomorrow's condition |
+
+- **Material You colors** — `resolveWidgetColors(context)` runs outside the composable (no `GlanceTheme` dependency needed). On API 31+ reads `android.R.color.system_accent1_100/700/900` via `ContextCompat.getColor` and detects dark mode from `context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK`. Light: accent1-100 bg + accent1-900 text. Dark: accent1-700 bg + accent1-100 text. Pre-API 31 falls back to the app's static dusty-blue palette. Returns `WColors(bg, textPrimary, textSecondary: ColorProvider)`. Only the `ColorProvider(Color)` single-argument overload is used — `ColorProvider(day, night)` does not exist in `glance-appwidget:1.1.0`.
 
 **Launcher icon:** Adaptive icon (`mipmap-anydpi-v26/`) — warm-gold sun glyph (`#E0B15C`, matching `WeatherGlyph.kt`'s `SunColor`) on deep navy (`#0F1923`). XML-only; no PNG fallbacks needed since `minSdk = 26`.
 
