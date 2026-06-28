@@ -38,6 +38,7 @@ import androidx.glance.unit.ColorProvider
 import com.example.weatherly.MainActivity
 import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
@@ -123,20 +124,25 @@ class WeatherWidget : GlanceAppWidget() {
         provideContent { WidgetContent(data, colors) }
     }
 
-    private suspend fun loadWeather(context: Context): WeatherData? = try {
-        val prefs = PreferencesStore(context)
-        val units = prefs.getUnitSystem()
-        val selected = prefs.getSelected()
-        val repo = WeatherRepository(context)
-        if (selected != null) {
-            repo.getWeather(selected.lat, selected.lon, units, placeName = selected.name).getOrNull()
-        } else {
-            val latLon = LocationProvider(context).currentLatLon()
-            if (latLon == null) null
-            else repo.getWeather(latLon.first, latLon.second, units).getOrNull()
+    private suspend fun loadWeather(context: Context): WeatherData? {
+        return try {
+            val prefs = PreferencesStore(context)
+            val units = prefs.getUnitSystem()
+            val selected = prefs.getSelected()
+            val repo = WeatherRepository(context)
+            val fresh = if (selected != null) {
+                repo.getWeather(selected.lat, selected.lon, units, placeName = selected.name).getOrNull()
+            } else {
+                val latLon = LocationProvider(context).currentLatLon()
+                if (latLon != null) repo.getWeather(latLon.first, latLon.second, units).getOrNull()
+                else null
+            }
+            // Fall back to the app's last cached forecast so the widget always
+            // shows real data once the user has opened the app at least once.
+            fresh ?: ForecastCache(context).load()?.first
+        } catch (e: Exception) {
+            ForecastCache(context).load()?.first
         }
-    } catch (e: Exception) {
-        null
     }
 }
 

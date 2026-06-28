@@ -49,10 +49,10 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 - `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. On `init`, loads `ForecastCache` synchronously so the screen is never blank on cold start. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. `WeatherUiState.Success` carries a `cachedAt: Long?` timestamp; non-null means the data came from cache and triggers a "Showing data from Xm ago" label. Background refreshes keep existing data visible (only the spinner changes).
 - `ChatViewModel` — Exposes `messages`, `sending`, and `streamingText: StateFlow<String>`. Accumulates SSE/simulated chunks into `_streamingText`; on completion moves the full text into `_messages`. `clear()` cancels any in-flight stream job.
 - `WeatherScreen` / `ChatScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
-- `ui/components/` — Reusable Compose functions (header, hourly row, daily list, detail tiles).
+- `ui/components/` — Reusable Compose functions (header, hourly row, daily list, metric tiles, detail sheets).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.
 
-**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals. `WeatherWidgetReceiver` wires it into the manifest. The widget creates its own `WeatherRepository` instance and does not share the app's `ForecastCache`.
+**Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals. `WeatherWidgetReceiver` wires it into the manifest (`android:exported="true"` — required for APPWIDGET_UPDATE broadcast delivery). The widget creates its own `WeatherRepository` instance; if a network fetch fails or location is unavailable it falls back to `ForecastCache` so it always shows real data after the first app open. `WeatherViewModel` calls `WeatherWidget().updateAll(getApplication())` after every successful fetch to keep the widget in sync immediately.
 
 - **Size-aware layouts** — `sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, WIDE, LARGE))`. Glance picks the largest declared breakpoint that fits the actual widget size; `WidgetContent` dispatches on `LocalSize.current`:
 
@@ -91,6 +91,27 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 **Condition gradient (`conditionGradient` in `WeatherComponents.kt`):** A `@Composable` function that maps a WMO weather code + `isDay` flag to a two-stop `List<Color>`. The first stop is a sky tone (blue for clear day, indigo for thunder, slate for rain, etc.); the second stop is always `MaterialTheme.colorScheme.background` so the gradient fades seamlessly into the card area. Used as the background of the hero section in `WeatherScreen.kt` via `Brush.verticalGradient`.
 
 **`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, daily, metric tiles) use `GlassCard`.
+
+**Metric tile system (`MetricsGrid` in `WeatherComponents.kt`):** Three distinct composables replace the old uniform rectangular tiles:
+
+| Composable | Used for | Visual |
+|---|---|---|
+| `ArcGaugeTile` | UV, AQI, Humidity, Pressure, Visibility | 88dp Canvas arc (240° sweep, 150° start), track + filled portion keyed by `gaugeFraction` in `MetricTileData` |
+| `SparklineTile` | Wind, Feels Like, Precipitation | Area sparkline with vertical gradient fill, "Now" dot at index 0, time axis labels |
+| `SunriseTile` | Sunrise/Sunset | 60dp semicircle arc, sun dot positioned by current hour between rise and set |
+
+`gaugeFraction` values: UV `(uv/11).coerceIn(0,1)`, AQI `(aqi/200).coerceIn(0,1)`, Humidity `hum/100`, Pressure `((hPa-960)/90).coerceIn(0,1)`, Visibility `(km/max).coerceIn(0,1)` where max is 10 mi or 16 km.
+
+**Detail sheet system (`DetailSheet` sealed interface, `DetailSheetContent`):** Tapping any metric tile opens a bottom sheet. `DetailSheet.Metric` carries optional fields `windDir: String?`, `windGust: String?`, `hourlyActualTemps: List<Int>?` for enriched views. `DetailSheetContent` dispatches on `sheet.title`:
+
+| Title | Composable | Content |
+|---|---|---|
+| `"Wind"` | `WindDetailContent` | Speed/gust row, 164dp compass rose (Canvas tick marks + direction needle via `windDirToAngle()`), color-coded hourly intensity bars via `windIntensityColor()` |
+| `"Feels like"` | `FeelsLikeDetailContent` | Warmer/cooler pill, 160dp dual-line Canvas chart (solid feels-like + dashed actual temp + shaded gap) using `PathEffect.dashPathEffect` |
+| `"Precipitation"` | `PrecipDetailContent` | 128dp color-coded probability bars via `precipIntensityColor()`, dashed 30%/70% threshold guidelines |
+| anything else | `DefaultMetricContent` | Value + description + `MetricBarChart` |
+
+Helper functions (private, in `WeatherComponents.kt`): `windDirToAngle(dir: String?): Float` maps all 16 compass points to degrees; `windIntensityColor(speed)` and `precipIntensityColor(prob)` return a `Color` from a 5-stop intensity palette. `@Composable` color values (`TextPrimary`, `TextSecondary`) must be captured as local `val`s before entering any Canvas `DrawScope`.
 
 **`TipBanner`:** Left-border annotation style — 4dp accent bar on the left edge, very subtle tint (`fg` at 8–10% alpha), rounded only on the right corners. Reads as editorial context rather than an alert.
 

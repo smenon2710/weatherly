@@ -10,6 +10,8 @@ import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
+import com.example.weatherly.widget.WeatherWidget
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -100,6 +102,8 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     .onSuccess {
                     forecastCache.save(it)
                     _state.value = WeatherUiState.Success(it)
+                    // Keep home-screen widget in sync whenever the app fetches fresh data.
+                    viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
                 }
                     .onFailure {
                         if (!background || _state.value !is WeatherUiState.Success) {

@@ -47,7 +47,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.util.Calendar
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -446,8 +455,183 @@ data class MetricTileData(
     val sub: String?,
     val accent: Color,
     val description: String,
-    val chart: MetricChart? = null
+    val chart: MetricChart? = null,
+    val gaugeFraction: Float? = null,
 )
+
+/** Arc-gauge tile: UV, AQI, Humidity, Pressure, Visibility. */
+@Composable
+fun ArcGaugeTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val trackColor = TextSecondary.copy(alpha = 0.15f)
+    val textColor = TextPrimary
+    val textSecColor = TextSecondary
+    GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            SectionLabel(data.icon, data.label, data.accent)
+            Spacer(Modifier.height(8.dp))
+            val fraction = (data.gaugeFraction ?: 0f).coerceIn(0f, 1f)
+            val accent = data.accent
+            Box(modifier = Modifier.size(88.dp), contentAlignment = Alignment.Center) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val sw = 10.dp.toPx()
+                    val diameter = size.minDimension - sw
+                    val tl = Offset(sw / 2f, sw / 2f)
+                    val arcSz = Size(diameter, diameter)
+                    // background track
+                    drawArc(color = trackColor, startAngle = 150f, sweepAngle = 240f,
+                        useCenter = false, topLeft = tl, size = arcSz,
+                        style = Stroke(width = sw, cap = StrokeCap.Round))
+                    // filled arc
+                    if (fraction > 0.01f) {
+                        drawArc(color = accent, startAngle = 150f, sweepAngle = 240f * fraction,
+                            useCenter = false, topLeft = tl, size = arcSz,
+                            style = Stroke(width = sw, cap = StrokeCap.Round))
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(data.value, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center)
+                    data.sub?.let {
+                        Text(it, color = textSecColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Full-width sparkline tile: Wind, Feels Like, Precipitation. */
+@Composable
+fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val textSecColor = TextSecondary
+    GlassCard(modifier = modifier, onClick = onClick) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel(data.icon, data.label, data.accent)
+                Text(data.value, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+            data.sub?.let {
+                Text(it, color = textSecColor, fontSize = 12.sp)
+            }
+            val chart = data.chart
+            if (chart != null && chart.values.size >= 2) {
+                Spacer(Modifier.height(10.dp))
+                val accent = data.accent
+                val fillTop = accent.copy(alpha = 0.22f)
+                val fillBot = accent.copy(alpha = 0.03f)
+                Canvas(modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    val values = chart.values
+                    val n = values.size
+                    val mn = values.min()
+                    val mx = values.max()
+                    val rng = (mx - mn).coerceAtLeast(1f)
+                    val pad = 4.dp.toPx()
+
+                    fun xAt(i: Int) = (i.toFloat() / (n - 1)) * size.width
+                    fun yAt(v: Float) = size.height - pad - ((v - mn) / rng) * (size.height - 2 * pad)
+
+                    val linePath = Path()
+                    val fillPath = Path()
+                    values.forEachIndexed { i, v ->
+                        val x = xAt(i); val y = yAt(v)
+                        if (i == 0) {
+                            linePath.moveTo(x, y)
+                            fillPath.moveTo(x, size.height)
+                            fillPath.lineTo(x, y)
+                        } else {
+                            linePath.lineTo(x, y)
+                            fillPath.lineTo(x, y)
+                        }
+                    }
+                    fillPath.lineTo(size.width, size.height)
+                    fillPath.close()
+
+                    drawPath(fillPath, brush = Brush.verticalGradient(listOf(fillTop, fillBot)))
+                    drawPath(linePath, color = accent,
+                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    // "Now" anchor dot
+                    drawCircle(color = accent, radius = 3.5.dp.toPx(),
+                        center = Offset(xAt(0), yAt(values.first())))
+                }
+                if (chart.labels.isNotEmpty()) {
+                    val n = chart.labels.size
+                    val idxs = listOf(0, n / 3, 2 * n / 3, n - 1).distinct().filter { it in chart.labels.indices }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        idxs.forEach { i -> Text(chart.labels[i], color = textSecColor, fontSize = 10.sp) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Sunrise/sunset tile with a sun-arc position indicator. */
+@Composable
+fun SunriseTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val sunsetTime = data.sub?.removePrefix("Sunset ")
+    val accentCapture = data.accent
+    val trackColor = TextSecondary.copy(alpha = 0.15f)
+    val textPrimary = TextPrimary
+    val textSec = TextSecondary
+    GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            SectionLabel(data.icon, data.label, data.accent)
+            Spacer(Modifier.height(8.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.BottomCenter) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val sw = 2.5.dp.toPx()
+                    val r = (size.width / 2f - sw).coerceAtMost(size.height - sw)
+                    val cx = size.width / 2f
+                    val cy = size.height
+                    val arcTL = Offset(cx - r, cy - r)
+                    val arcSz = Size(r * 2f, r * 2f)
+                    // Semicircle track
+                    drawArc(color = trackColor, startAngle = 180f, sweepAngle = 180f,
+                        useCenter = false, topLeft = arcTL, size = arcSz,
+                        style = Stroke(width = sw, cap = StrokeCap.Round))
+                    // Current hour position
+                    val cal = Calendar.getInstance()
+                    val nowH = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
+                    val riseH = parseTimeHour(data.value)
+                    val setH = parseTimeHour(sunsetTime) ?: riseH?.plus(12f)
+                    val frac = if (riseH != null && setH != null && setH > riseH) {
+                        ((nowH - riseH) / (setH - riseH)).coerceIn(0f, 1f)
+                    } else 0.5f
+                    // arc: 0 = left (rise, 180°), 1 = right (set, 0°)
+                    val angleDeg = 180.0 - frac * 180.0
+                    val angleRad = angleDeg * (PI / 180.0)
+                    val sunX = (cx + r * cos(angleRad)).toFloat()
+                    val sunY = (cy - r * sin(angleRad)).toFloat()
+                    drawCircle(color = accentCapture.copy(alpha = 0.25f), radius = 9.dp.toPx(),
+                        center = Offset(sunX, sunY))
+                    drawCircle(color = accentCapture, radius = 5.dp.toPx(),
+                        center = Offset(sunX, sunY))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("↑ rise", color = textSec, fontSize = 10.sp)
+                    Text(data.value, color = textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("↓ set", color = textSec, fontSize = 10.sp)
+                    Text(sunsetTime ?: "--", color = textSec, fontSize = 15.sp)
+                }
+            }
+        }
+    }
+}
+
+private fun parseTimeHour(time: String?): Float? {
+    if (time == null || time == "--") return null
+    val parts = time.split(":")
+    val h = parts.getOrNull(0)?.toFloatOrNull() ?: return null
+    val m = parts.getOrNull(1)?.toFloatOrNull() ?: 0f
+    return h + m / 60f
+}
 
 sealed interface DetailSheet {
     data class Metric(
@@ -456,7 +640,11 @@ sealed interface DetailSheet {
         val title: String,
         val value: String,
         val description: String,
-        val chart: MetricChart? = null
+        val chart: MetricChart? = null,
+        // Extra context for specialized detail views
+        val windDir: String? = null,
+        val windGust: String? = null,
+        val hourlyActualTemps: List<Int>? = null,
     ) : DetailSheet
 
     data class Day(val day: DayEntry, val windUnit: String, val precipUnit: String) : DetailSheet
@@ -469,22 +657,45 @@ fun MetricsGrid(
     modifier: Modifier = Modifier
 ) {
     val tiles = buildMetricTiles(data)
+    val m = tiles.associateBy { it.label }
+
+    fun click(t: MetricTileData) =
+        onMetricClick(DetailSheet.Metric(t.icon, t.accent, t.label, t.value, t.description, t.chart))
+
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        tiles.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                pair.forEach { tile ->
-                    MetricTile(
-                        data = tile,
-                        onClick = {
-                            onMetricClick(
-                                DetailSheet.Metric(tile.icon, tile.accent, tile.label, tile.value, tile.description, tile.chart)
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+        // Arc gauges: UV + AQI
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["UV Index"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+            m["Air Quality"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+        }
+        // Arc gauges: Humidity + Pressure
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["Humidity"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+            m["Pressure"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+        }
+        // Sparklines: Wind, Feels Like, Precipitation — each with its own rich detail payload
+        m["Wind"]?.let { t ->
+            SparklineTile(t, onClick = {
+                onMetricClick(DetailSheet.Metric(
+                    t.icon, t.accent, t.label, t.value, t.description, t.chart,
+                    windDir = data.windDir,
+                    windGust = data.windGustKmh?.let { "$it ${data.windUnit}" },
+                ))
+            }, Modifier.fillMaxWidth())
+        }
+        m["Feels like"]?.let { t ->
+            SparklineTile(t, onClick = {
+                onMetricClick(DetailSheet.Metric(
+                    t.icon, t.accent, t.label, t.value, t.description, t.chart,
+                    hourlyActualTemps = data.hourly.map { it.tempC },
+                ))
+            }, Modifier.fillMaxWidth())
+        }
+        m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
+        // Sunrise arc card + Visibility gauge
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["Sunrise"]?.let { t -> SunriseTile(t, { click(t) }, Modifier.weight(1f)) }
+            m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
         }
     }
 }
@@ -504,7 +715,8 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
     add(MetricTileData(Icons.Filled.WbSunny, "UV Index", d.uvIndex?.toString() ?: "--", d.uvLabel, Amber,
         "The UV index measures the strength of the sun's ultraviolet radiation. " +
             "Current level: ${d.uvLabel ?: "unknown"}. $uvAdvice",
-        chart(d.hourlyUv, "")))
+        chart(d.hourlyUv, ""),
+        gaugeFraction = d.uvIndex?.let { (it / 11f).coerceIn(0f, 1f) }))
 
     val aqiAdvice = when {
         d.aqi == null -> "Air quality data isn't available right now."
@@ -518,7 +730,8 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
     add(MetricTileData(Icons.Filled.Eco, "Air Quality", d.aqi?.toString() ?: "--", d.aqiLabel, aqiColor(d.aqi),
         "The US Air Quality Index (AQI) summarises pollutants like fine particles and ozone on a 0–500+ scale " +
             "(lower is better). Current reading: ${d.aqiLabel ?: "unknown"}. $aqiAdvice",
-        if (d.aqi != null) chart(d.hourlyAqi, "") else null))
+        if (d.aqi != null) chart(d.hourlyAqi, "") else null,
+        gaugeFraction = d.aqi?.let { (it / 200f).coerceIn(0f, 1f) }))
 
     add(MetricTileData(Icons.Filled.WbTwilight, "Sunrise", d.sunrise ?: "--", d.sunset?.let { "Sunset $it" }, Orange,
         "The sun rises at ${d.sunrise ?: "--"} and sets at ${d.sunset ?: "--"} today."))
@@ -535,14 +748,20 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         d.cloudCoverPct?.let { "Cloud $it%" }, Cyan,
         "Relative humidity is ${d.humidity ?: 0}%" + (d.cloudCoverPct?.let { ", with $it% cloud cover" } ?: "") +
             ". Higher humidity makes warm air feel hotter and cold air feel colder.",
-        chart(d.hourlyHumidity, "%")))
+        chart(d.hourlyHumidity, "%"),
+        gaugeFraction = d.humidity?.let { it / 100f }))
     add(MetricTileData(Icons.Filled.Visibility, "Visibility", d.visibility?.let { "$it ${d.visibilityUnit}" } ?: "--", null, Indigo,
         "You can currently see clearly for about ${d.visibility ?: 0} ${d.visibilityUnit}.",
-        chart(d.hourlyVisibility, d.visibilityUnit)))
+        chart(d.hourlyVisibility, d.visibilityUnit),
+        gaugeFraction = d.visibility?.let { v ->
+            val max = if (d.visibilityUnit.contains("mi")) 10f else 16f
+            (v / max).coerceIn(0f, 1f)
+        }))
     add(MetricTileData(Icons.Filled.Speed, "Pressure", d.pressureHpa?.toString() ?: "--", "hPa", Purple,
         "Atmospheric pressure is ${d.pressureHpa ?: 0} hPa. Around 1013 hPa is average; " +
             "falling pressure often signals incoming unsettled weather, while rising pressure means clearing.",
-        chart(d.hourlyPressure, "hPa")))
+        chart(d.hourlyPressure, "hPa"),
+        gaugeFraction = d.pressureHpa?.let { ((it - 960) / 90f).coerceIn(0f, 1f) }))
     add(MetricTileData(Icons.Filled.Grain, "Precipitation", d.precipMm?.let { "$it ${d.precipUnit}" } ?: "0 ${d.precipUnit}", "In last hour", Cyan,
         "${d.precipMm ?: 0.0} ${d.precipUnit} of precipitation fell in the last hour. " +
             "The chart shows the chance of precipitation over the coming hours.",
@@ -560,20 +779,402 @@ private fun aqiColor(aqi: Int?): Color = when {
     else -> Color(0xFF8E3B46)
 }
 
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+private fun windDirToAngle(dir: String?): Float = when (dir?.uppercase()?.trim()) {
+    "N"   -> 0f;   "NNE" -> 22.5f; "NE"  -> 45f;   "ENE" -> 67.5f
+    "E"   -> 90f;  "ESE" -> 112.5f;"SE"  -> 135f;  "SSE" -> 157.5f
+    "S"   -> 180f; "SSW" -> 202.5f;"SW"  -> 225f;  "WSW" -> 247.5f
+    "W"   -> 270f; "WNW" -> 292.5f;"NW"  -> 315f;  "NNW" -> 337.5f
+    else  -> 0f
+}
+
+private fun windIntensityColor(speed: Float): Color = when {
+    speed < 10 -> Color(0xFF5B9B78)
+    speed < 20 -> Color(0xFF6B9BB0)
+    speed < 40 -> Color(0xFFC8A86A)
+    speed < 60 -> Color(0xFFCC7B40)
+    else       -> Color(0xFFC05050)
+}
+
+private fun precipIntensityColor(prob: Float): Color = when {
+    prob < 20 -> Color(0xFF5B9B78)
+    prob < 40 -> Color(0xFF8AB870)
+    prob < 60 -> Color(0xFFC8A86A)
+    prob < 80 -> Color(0xFFCC7B40)
+    else      -> Color(0xFFC05050)
+}
+
+// ── Default detail (bar chart) ────────────────────────────────────────────────
+
+@Composable
+private fun DefaultMetricContent(sheet: DetailSheet.Metric) {
+    SectionLabel(sheet.icon, sheet.title, sheet.accent)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.value, color = sheet.accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.description, color = TextSecondary, fontSize = 15.sp, lineHeight = 22.sp)
+    sheet.chart?.let { chart ->
+        Spacer(Modifier.height(22.dp))
+        MetricBarChart(chart, sheet.accent)
+    }
+}
+
+// ── Wind: compass rose + intensity strip ──────────────────────────────────────
+
+@Composable
+private fun WindDetailContent(sheet: DetailSheet.Metric) {
+    val accent = sheet.accent
+    val textPrimary = TextPrimary
+    val textSec = TextSecondary
+    val ringColor = TextSecondary.copy(alpha = 0.18f)
+    val tickColor = TextSecondary.copy(alpha = 0.55f)
+
+    SectionLabel(sheet.icon, sheet.title, accent)
+    Spacer(Modifier.height(12.dp))
+    Text(sheet.description, color = textSec, fontSize = 15.sp, lineHeight = 22.sp)
+    Spacer(Modifier.height(24.dp))
+
+    // Speed + gust row
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("SPEED", color = textSec, fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(sheet.value, color = accent, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+        }
+        if (!sheet.windGust.isNullOrBlank()) {
+            Box(Modifier.width(1.dp).height(52.dp).background(textSec.copy(alpha = 0.18f)))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("GUSTS", color = textSec, fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(sheet.windGust, color = textPrimary, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+
+    Spacer(Modifier.height(28.dp))
+
+    // Compass rose
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        Box(modifier = Modifier.size(164.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val outerR = size.minDimension / 2f - 2.dp.toPx()
+                val innerR = outerR * 0.72f
+
+                drawCircle(color = ringColor, radius = outerR, center = Offset(cx, cy),
+                    style = Stroke(width = 1.5.dp.toPx()))
+                drawCircle(color = ringColor.copy(alpha = 0.5f), radius = innerR, center = Offset(cx, cy),
+                    style = Stroke(width = 0.75.dp.toPx()))
+
+                for (i in 0 until 8) {
+                    val rad = i * 45.0 * PI / 180.0
+                    val s = sin(rad).toFloat(); val c = cos(rad).toFloat()
+                    val isCardinal = i % 2 == 0
+                    val tickIn = if (isCardinal) outerR * 0.82f else outerR * 0.89f
+                    drawLine(
+                        color = if (isCardinal) tickColor else tickColor.copy(alpha = 0.45f),
+                        start = Offset(cx + tickIn * s, cy - tickIn * c),
+                        end = Offset(cx + outerR * 0.96f * s, cy - outerR * 0.96f * c),
+                        strokeWidth = if (isCardinal) 1.5.dp.toPx() else 0.75.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+
+                // Needle — points toward the direction wind is coming FROM
+                val angleDeg = windDirToAngle(sheet.windDir)
+                val rad = angleDeg * PI / 180.0
+                val nSin = sin(rad).toFloat(); val nCos = cos(rad).toFloat()
+                val needleLen = innerR * 0.82f
+
+                // Tail (opposite direction, faded)
+                drawLine(
+                    color = accent.copy(alpha = 0.30f),
+                    start = Offset(cx, cy),
+                    end = Offset(cx - nSin * needleLen * 0.32f, cy + nCos * needleLen * 0.32f),
+                    strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round
+                )
+                // Main shaft
+                drawLine(
+                    color = accent,
+                    start = Offset(cx, cy),
+                    end = Offset(cx + nSin * needleLen, cy - nCos * needleLen),
+                    strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round
+                )
+                // Center dot
+                drawCircle(color = accent, radius = 5.dp.toPx(), center = Offset(cx, cy))
+                drawCircle(color = ringColor, radius = 3.dp.toPx(), center = Offset(cx, cy))
+            }
+            // Cardinal labels
+            Text("N", color = textSec, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp))
+            Text("S", color = textSec, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp))
+            Text("E", color = textSec, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp))
+            Text("W", color = textSec, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 2.dp))
+        }
+    }
+
+    // Hourly intensity strip
+    sheet.chart?.let { chart ->
+        Spacer(Modifier.height(24.dp))
+        Text("THROUGHOUT THE DAY", color = textSec, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        Spacer(Modifier.height(10.dp))
+        val values = chart.values
+        val mn = values.minOrNull() ?: 0f
+        val mx = values.maxOrNull() ?: 1f
+        val rng = (mx - mn).coerceAtLeast(1f)
+        Canvas(modifier = Modifier.fillMaxWidth().height(72.dp)) {
+            val n = values.size
+            val gap = 2.5.dp.toPx()
+            val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
+            val r = CornerRadius(3.dp.toPx())
+            values.forEachIndexed { i, v ->
+                val barH = size.height * (0.18f + 0.80f * ((v - mn) / rng))
+                drawRoundRect(
+                    color = windIntensityColor(v),
+                    topLeft = Offset(i * (barW + gap), size.height - barH),
+                    size = Size(barW, barH), cornerRadius = r
+                )
+            }
+        }
+        val n = chart.labels.size
+        val idxs = listOf(0, n / 4, n / 2, 3 * n / 4, n - 1).distinct().filter { it in chart.labels.indices }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            idxs.forEach { i -> Text(chart.labels[i], color = textSec, fontSize = 11.sp) }
+        }
+        Spacer(Modifier.height(10.dp))
+        // Speed legend
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf("Calm" to windIntensityColor(5f), "Breezy" to windIntensityColor(25f),
+                   "Windy" to windIntensityColor(45f), "Strong" to windIntensityColor(65f))
+                .forEach { (label, color) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
+                        Spacer(Modifier.width(4.dp))
+                        Text(label, color = textSec, fontSize = 10.sp)
+                    }
+                }
+        }
+    }
+}
+
+// ── Feels Like: dual-line apparent vs actual ──────────────────────────────────
+
+@Composable
+private fun FeelsLikeDetailContent(sheet: DetailSheet.Metric) {
+    val accent = sheet.accent
+    val textSec = TextSecondary
+    val dashColor = TextSecondary.copy(alpha = 0.55f)
+    val fillColor = accent.copy(alpha = 0.13f)
+
+    SectionLabel(sheet.icon, sheet.title, accent)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.value, color = accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.description, color = textSec, fontSize = 15.sp, lineHeight = 22.sp)
+
+    val feelsVals = sheet.chart?.values
+    val actualInts = sheet.hourlyActualTemps
+    if (feelsVals != null && actualInts != null && feelsVals.size >= 2 && actualInts.size >= 2) {
+        val n = minOf(feelsVals.size, actualInts.size)
+        val actualVals = actualInts.map { it.toFloat() }
+
+        // Comparison pill
+        val diff = (feelsVals.firstOrNull()?.toInt() ?: 0) - (actualInts.firstOrNull() ?: 0)
+        if (diff != 0) {
+            Spacer(Modifier.height(12.dp))
+            val msg = if (diff > 0) "Feels $diff° warmer than actual" else "Feels ${-diff}° cooler than actual"
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(accent.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) { Text(msg, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+        }
+
+        Spacer(Modifier.height(22.dp))
+        Text("APPARENT VS ACTUAL", color = textSec, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        Spacer(Modifier.height(10.dp))
+
+        // Legend
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(16.dp, 2.dp).background(accent))
+                Spacer(Modifier.width(6.dp))
+                Text("Feels like", color = textSec, fontSize = 12.sp)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(Modifier.size(16.dp, 2.dp)) {
+                    drawLine(
+                        color = dashColor,
+                        start = Offset(0f, size.height / 2f),
+                        end = Offset(size.width, size.height / 2f),
+                        strokeWidth = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 3f))
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text("Actual temp", color = textSec, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+
+        val accentCapture = accent
+        val dashCapture = dashColor
+        val fillCapture = fillColor
+        Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            val allVals = feelsVals.take(n) + actualVals.take(n)
+            val mn = allVals.min()
+            val mx = allVals.max()
+            val rng = (mx - mn).coerceAtLeast(1f)
+            val pad = 10.dp.toPx()
+
+            fun xAt(i: Int) = (i.toFloat() / (n - 1)) * size.width
+            fun yAt(v: Float) = size.height - pad - ((v - mn) / rng) * (size.height - 2 * pad)
+
+            // Gap fill between the two curves
+            val gapPath = Path()
+            feelsVals.take(n).forEachIndexed { i, v ->
+                val x = xAt(i); val y = yAt(v)
+                if (i == 0) gapPath.moveTo(x, y) else gapPath.lineTo(x, y)
+            }
+            for (i in (n - 1) downTo 0) {
+                gapPath.lineTo(xAt(i), yAt(actualVals[i]))
+            }
+            gapPath.close()
+            drawPath(gapPath, color = fillCapture)
+
+            // Actual temp line (dashed)
+            val actualPath = Path()
+            actualVals.take(n).forEachIndexed { i, v ->
+                val x = xAt(i); val y = yAt(v)
+                if (i == 0) actualPath.moveTo(x, y) else actualPath.lineTo(x, y)
+            }
+            drawPath(actualPath, color = dashCapture,
+                style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 7f))))
+
+            // Feels-like line (solid)
+            val feelsPath = Path()
+            feelsVals.take(n).forEachIndexed { i, v ->
+                val x = xAt(i); val y = yAt(v)
+                if (i == 0) feelsPath.moveTo(x, y) else feelsPath.lineTo(x, y)
+            }
+            drawPath(feelsPath, color = accentCapture,
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+            // Now dot
+            drawCircle(color = accentCapture, radius = 4.dp.toPx(),
+                center = Offset(xAt(0), yAt(feelsVals.first())))
+        }
+
+        // Time axis
+        sheet.chart?.labels?.let { labels ->
+            val ln = labels.size
+            val idxs = listOf(0, ln / 4, ln / 2, 3 * ln / 4, ln - 1).distinct().filter { it in labels.indices }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                idxs.forEach { i -> Text(labels[i], color = textSec, fontSize = 11.sp) }
+            }
+        }
+    }
+}
+
+// ── Precipitation: colored intensity blocks ───────────────────────────────────
+
+@Composable
+private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
+    val accent = sheet.accent
+    val textSec = TextSecondary
+    val annotCapture = TextSecondary.copy(alpha = 0.50f)
+
+    SectionLabel(sheet.icon, sheet.title, accent)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.value, color = accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(14.dp))
+    Text(sheet.description, color = textSec, fontSize = 15.sp, lineHeight = 22.sp)
+
+    sheet.chart?.let { chart ->
+        Spacer(Modifier.height(22.dp))
+        Text("HOURLY RAIN CHANCE", color = textSec, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        Spacer(Modifier.height(8.dp))
+
+        // Intensity legend
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf("Low" to precipIntensityColor(10f), "Moderate" to precipIntensityColor(30f),
+                   "High" to precipIntensityColor(55f), "Very high" to precipIntensityColor(75f))
+                .forEach { (label, color) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
+                        Spacer(Modifier.width(4.dp))
+                        Text(label, color = textSec, fontSize = 10.sp)
+                    }
+                }
+        }
+        Spacer(Modifier.height(10.dp))
+
+        val values = chart.values
+        Canvas(modifier = Modifier.fillMaxWidth().height(128.dp)) {
+            val n = values.size
+            val gap = 2.5.dp.toPx()
+            val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
+            val r = CornerRadius(3.dp.toPx())
+
+            // Threshold annotations at 30% and 70%
+            listOf(0.30f, 0.70f).forEach { frac ->
+                val y = size.height * (1f - frac)
+                drawLine(
+                    color = annotCapture,
+                    start = Offset(0f, y), end = Offset(size.width, y),
+                    strokeWidth = 0.75.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                )
+            }
+
+            values.forEachIndexed { i, prob ->
+                val barH = (prob / 100f) * size.height
+                if (barH > 1.dp.toPx()) {
+                    drawRoundRect(
+                        color = precipIntensityColor(prob),
+                        topLeft = Offset(i * (barW + gap), size.height - barH),
+                        size = Size(barW, barH), cornerRadius = r
+                    )
+                }
+            }
+        }
+
+        // Time axis
+        val n = chart.labels.size
+        val idxs = listOf(0, n / 4, n / 2, 3 * n / 4, n - 1).distinct().filter { it in chart.labels.indices }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            idxs.forEach { i -> Text(chart.labels[i], color = textSec, fontSize = 11.sp) }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text("— — 30%: possible  ·  70%: likely", color = textSec.copy(alpha = 0.55f), fontSize = 11.sp)
+    }
+}
+
 @Composable
 fun DetailSheetContent(sheet: DetailSheet) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
         when (sheet) {
-            is DetailSheet.Metric -> {
-                SectionLabel(sheet.icon, sheet.title, sheet.accent)
-                Spacer(Modifier.height(14.dp))
-                Text(sheet.value, color = sheet.accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(14.dp))
-                Text(sheet.description, color = TextSecondary, fontSize = 15.sp, lineHeight = 22.sp)
-                sheet.chart?.let { chart ->
-                    Spacer(Modifier.height(22.dp))
-                    MetricBarChart(chart, sheet.accent)
-                }
+            is DetailSheet.Metric -> when (sheet.title) {
+                "Wind"          -> WindDetailContent(sheet)
+                "Feels like"    -> FeelsLikeDetailContent(sheet)
+                "Precipitation" -> PrecipDetailContent(sheet)
+                else            -> DefaultMetricContent(sheet)
             }
             is DetailSheet.Day -> {
                 val day = sheet.day
