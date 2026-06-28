@@ -53,6 +53,7 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | W1 | Widget: size-aware layouts via `SizeMode.Responsive` (2×1, 2×2, 4×1, 4×2) |
 | W2 | Widget: chrono-dynamic content — morning/daytime/night focus per size |
 | W3 | Widget: Material You dynamic colors from system accent palette (API 31+) |
+| R1 | Rebrand to SkySpeak: Premium Weather Chat — app name, two-tone wordmark, speech-wave launcher icon, all UI strings |
 
 ### Completed — Priority 3
 

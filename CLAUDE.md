@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Weatherly is an Android weather app (Kotlin + Jetpack Compose) that pulls forecast data from Open-Meteo (no API key) and optionally uses OpenRouter for an AI chat assistant.
+SkySpeak: Premium Weather Chat is an Android weather app (Kotlin + Jetpack Compose) that pulls forecast data from Open-Meteo (no API key) and optionally uses OpenRouter for an AI chat assistant. The app was formerly named Weatherly; the package name (`com.example.weatherly`) and all Kotlin class names retain the `Weatherly` prefix until the pre-launch application ID migration.
 
 ## Build & run
 
@@ -75,13 +75,13 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 - **Material You colors** — `resolveWidgetColors(context)` runs outside the composable (no `GlanceTheme` dependency needed). On API 31+ reads `android.R.color.system_accent1_100/700/900` via `ContextCompat.getColor` and detects dark mode from `context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK`. Light: accent1-100 bg + accent1-900 text. Dark: accent1-700 bg + accent1-100 text. Pre-API 31 falls back to the app's static dusty-blue palette. Returns `WColors(bg, textPrimary, textSecondary: ColorProvider)`. Only the `ColorProvider(Color)` single-argument overload is used — `ColorProvider(day, night)` does not exist in `glance-appwidget:1.1.0`.
 
-**Launcher icon:** Adaptive icon (`mipmap-anydpi-v26/`) — warm-gold sun glyph (`#E0B15C`, matching `WeatherGlyph.kt`'s `SunColor`) on deep navy (`#0F1923`). XML-only; no PNG fallbacks needed since `minSdk = 26`.
+**Launcher icon:** Adaptive icon (`mipmap-anydpi-v26/`) — warm-gold sun glyph (`#E0B15C`) on deep navy (`#0F1923`), with three concentric speech-wave arcs to the right of the sun (radii 20/25/30 dp, fading opacity) representing the "speak" dimension. XML-only; no PNG fallbacks needed since `minSdk = 26`.
 
 **WMO weather codes** are mapped to emoji and text in `util/WeatherIcon.kt`. All temperature/wind/precip values in `WeatherData` are stored in the user-selected unit (they come back from Open-Meteo already converted); `WeatherAdvisor` converts back to metric internally for threshold comparisons.
 
 ## UI theme & branding
 
-**Logo:** Text wordmark — `"weatherly"` rendered as a `Text` composable in `WeatherScreen.kt` at 20 sp, `FontWeight.Light`, `letterSpacing = 5.sp`. Resolves colour from `TextPrimary` so it adapts to light/dark automatically. Do not reintroduce image assets for the logo.
+**Logo:** Two-tone text wordmark — an `AnnotatedString` in `WeatherScreen.kt` rendering `"sky"` in `TextSecondary` and `"speak"` in `TextPrimary`, at 20 sp, `FontWeight.Light`, `letterSpacing = 5.sp`. The color split is subtle in light mode (muted slate → near-black) and more expressive in dark mode (slate → near-white). Colors are captured as local vals before the `buildAnnotatedString` block so they are read in composable scope. Do not reintroduce image assets or collapse the two spans into a single `color` parameter.
 
 **Colour scheme (`ui/theme/Theme.kt`):**
 - Light: background `#F4F1EB` (warm cream), surface `#FDFCFA` (barely warm white), primary `#6B86A3` (dusty blue).
