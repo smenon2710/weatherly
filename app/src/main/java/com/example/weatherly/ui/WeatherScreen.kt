@@ -52,8 +52,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -127,7 +130,7 @@ fun WeatherScreen(
         ) {
             when (s) {
                 is WeatherUiState.NeedsPermission -> CenterMessage(
-                    "Weatherly needs your location to show local weather.",
+                    "SkySpeak needs your location to show local weather.",
                     "Grant location access",
                     onAction = { permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
                     onSecondary = { showLocations = true }
@@ -357,10 +360,14 @@ fun WeatherContent(
                             ) {
                                 Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
                             }
-                            // Text wordmark — adapts to theme, no PNG bleeding required
+                            // Two-tone wordmark: "sky" recedes, "speak" steps forward
+                            val skyColor = TextSecondary
+                            val speakColor = TextPrimary
                             Text(
-                                "weatherly",
-                                color = TextPrimary,
+                                buildAnnotatedString {
+                                    withStyle(SpanStyle(color = skyColor)) { append("sky") }
+                                    withStyle(SpanStyle(color = speakColor)) { append("speak") }
+                                },
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Light,
                                 letterSpacing = 5.sp,

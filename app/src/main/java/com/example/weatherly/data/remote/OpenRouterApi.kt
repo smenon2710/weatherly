@@ -13,7 +13,7 @@ import retrofit2.http.POST
  * call so a runtime-entered key works without rebuilding.
  */
 interface OpenRouterApi {
-    @Headers("X-Title: Weatherly")
+    @Headers("X-Title: SkySpeak")
     @POST("api/v1/chat/completions")
     suspend fun chat(
         @Header("Authorization") authorization: String,

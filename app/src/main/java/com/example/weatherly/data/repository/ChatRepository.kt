@@ -66,7 +66,7 @@ class ChatRepository {
             .url("https://openrouter.ai/api/v1/chat/completions")
             .addHeader("Authorization", "Bearer ${apiKey.trim()}")
             .addHeader("HTTP-Referer", "https://github.com/smenon2710/weatherly")
-            .addHeader("X-Title", "Weatherly")
+            .addHeader("X-Title", "SkySpeak")
             .post(requestBody)
             .build()
 
@@ -140,7 +140,7 @@ class ChatRepository {
     private fun systemPrompt(w: WeatherData?, units: UnitSystem): String {
         val now = SimpleDateFormat("EEEE d MMM, h:mm a", Locale.getDefault()).format(Date())
         val rules = """
-            You are Weatherly's friendly weather assistant. Today is $now.
+            You are SkySpeak's friendly weather assistant. Today is $now.
             Answer the user's question in 1-3 short sentences, in a warm, practical tone.
             Base every answer ONLY on the weather data below — do not invent numbers.
             When asked about an activity (jogging, driving, hiking, cycling, what to wear,

@@ -188,7 +188,7 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
     Column(modifier = mod) {
         if (data == null) {
             Text(
-                "Open Weatherly to set up",
+                "Open SkySpeak to set up",
                 style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
             )
         } else {
@@ -280,7 +280,7 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
     ) {
         if (data == null) {
             Text(
-                "Open Weatherly to set up",
+                "Open SkySpeak to set up",
                 style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
             )
         } else {
@@ -311,7 +311,7 @@ private fun LargeWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDay
     Column(modifier = mod) {
         if (data == null) {
             Text(
-                "Open Weatherly to set up",
+                "Open SkySpeak to set up",
                 style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
             )
         } else {

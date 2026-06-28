@@ -223,7 +223,7 @@ private fun ChatHeader(subtitle: String, onBack: () -> Unit, onNewChat: () -> Un
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Cyan, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Ask Weatherly", color = TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Ask SkySpeak", color = TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Text(subtitle, color = TextSecondary, fontSize = 12.sp)
             }
