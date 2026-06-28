@@ -13,7 +13,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Dp
@@ -43,20 +43,27 @@ fun WeatherGlyph(
     }
 }
 
-private enum class Glyph { SUN, MOON, CLOUD_SUN, CLOUD_MOON, CLOUD, FOG, RAIN, SNOW, THUNDER }
+private enum class Glyph {
+    SUN, MOON, CLOUD_SUN, CLOUD_MOON, CLOUD, FOG,
+    RAIN, SNOW, THUNDER,
+    MOON_RAIN, MOON_SNOW, MOON_THUNDER
+}
 
 private fun glyphFor(code: Int, isDay: Boolean): Glyph = when (code) {
-    0 -> if (isDay) Glyph.SUN else Glyph.MOON
-    1, 2 -> if (isDay) Glyph.CLOUD_SUN else Glyph.CLOUD_MOON
-    3 -> Glyph.CLOUD
-    45, 48 -> Glyph.FOG
-    51, 53, 55, 56, 57 -> Glyph.RAIN
-    61, 63, 65, 66, 67 -> Glyph.RAIN
-    71, 73, 75, 77 -> Glyph.SNOW
-    80, 81, 82 -> Glyph.RAIN
-    85, 86 -> Glyph.SNOW
-    95, 96, 99 -> Glyph.THUNDER
-    else -> Glyph.CLOUD
+    0          -> if (isDay) Glyph.SUN        else Glyph.MOON
+    1, 2       -> if (isDay) Glyph.CLOUD_SUN  else Glyph.CLOUD_MOON
+    3          -> Glyph.CLOUD
+    45, 48     -> Glyph.FOG
+    51, 53, 55,
+    56, 57     -> if (isDay) Glyph.RAIN       else Glyph.MOON_RAIN
+    61, 63, 65,
+    66, 67     -> if (isDay) Glyph.RAIN       else Glyph.MOON_RAIN
+    71, 73, 75,
+    77         -> if (isDay) Glyph.SNOW       else Glyph.MOON_SNOW
+    80, 81, 82 -> if (isDay) Glyph.RAIN       else Glyph.MOON_RAIN
+    85, 86     -> if (isDay) Glyph.SNOW       else Glyph.MOON_SNOW
+    95, 96, 99 -> if (isDay) Glyph.THUNDER    else Glyph.MOON_THUNDER
+    else       -> Glyph.CLOUD
 }
 
 private val SunColor = Color(0xFFE0B15C)
@@ -69,15 +76,15 @@ private val FogColor = Color(0xFFB3BCC6)
 
 private fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float) {
     when (glyph) {
-        Glyph.SUN -> drawSun(c, dim * 0.19f, SunColor)
-        Glyph.MOON -> drawMoon(c, dim * 0.30f, MoonColor)
-        Glyph.CLOUD -> drawCloud(Offset(c.x, c.y + dim * 0.04f), dim * 0.82f, CloudColor)
-        Glyph.CLOUD_SUN -> {
+        Glyph.SUN        -> drawSun(c, dim * 0.19f, SunColor)
+        Glyph.MOON       -> drawMoon(c, dim * 0.30f, MoonColor)
+        Glyph.CLOUD      -> drawCloud(Offset(c.x, c.y + dim * 0.04f), dim * 0.82f, CloudColor)
+        Glyph.CLOUD_SUN  -> {
             drawSun(Offset(c.x - dim * 0.20f, c.y - dim * 0.22f), dim * 0.12f, SunColor)
             drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, CloudColor)
         }
         Glyph.CLOUD_MOON -> {
-            drawMoon(Offset(c.x - dim * 0.20f, c.y - dim * 0.20f), dim * 0.15f, MoonColor)
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.20f), dim * 0.15f, MoonColor)
             drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, CloudColor)
         }
         Glyph.FOG -> {
@@ -98,12 +105,8 @@ private fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float) {
             val sw = dim * 0.055f
             listOf(-0.22f, 0f, 0.22f).forEach { xf ->
                 val x = c.x + xf * dim
-                drawLine(
-                    RainColor,
-                    Offset(x + dim * 0.04f, c.y + dim * 0.20f),
-                    Offset(x - dim * 0.02f, c.y + dim * 0.36f),
-                    strokeWidth = sw, cap = StrokeCap.Round
-                )
+                drawLine(RainColor, Offset(x + dim * 0.04f, c.y + dim * 0.20f),
+                    Offset(x - dim * 0.02f, c.y + dim * 0.36f), strokeWidth = sw, cap = StrokeCap.Round)
             }
         }
         Glyph.SNOW -> {
@@ -114,16 +117,29 @@ private fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float) {
         }
         Glyph.THUNDER -> {
             drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, CloudColor)
-            val bolt = Path().apply {
-                moveTo(c.x + dim * 0.04f, c.y + dim * 0.12f)
-                lineTo(c.x - dim * 0.12f, c.y + dim * 0.30f)
-                lineTo(c.x - dim * 0.01f, c.y + dim * 0.30f)
-                lineTo(c.x - dim * 0.06f, c.y + dim * 0.44f)
-                lineTo(c.x + dim * 0.14f, c.y + dim * 0.22f)
-                lineTo(c.x + dim * 0.02f, c.y + dim * 0.22f)
-                close()
+            drawBolt(c, dim)
+        }
+        Glyph.MOON_RAIN -> {
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
+            val sw = dim * 0.055f
+            listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
+                val x = c.x + xf * dim
+                drawLine(RainColor, Offset(x + dim * 0.04f, c.y + dim * 0.16f),
+                    Offset(x - dim * 0.02f, c.y + dim * 0.32f), strokeWidth = sw, cap = StrokeCap.Round)
             }
-            drawPath(bolt, BoltColor)
+        }
+        Glyph.MOON_SNOW -> {
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
+            listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
+                drawCircle(SnowColor, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.22f))
+            }
+        }
+        Glyph.MOON_THUNDER -> {
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
+            drawBolt(c, dim)
         }
     }
 }
@@ -146,14 +162,30 @@ private fun DrawScope.drawSun(c: Offset, coreR: Float, color: Color) {
     drawCircle(color, coreR, c)
 }
 
-private fun DrawScope.drawMoon(c: Offset, r: Float, color: Color) {
-    val p = Path().apply {
-        addOval(Rect(c.x - r, c.y - r, c.x + r, c.y + r))
-        val o = r * 0.58f
-        addOval(Rect(c.x - r + o, c.y - r - r * 0.18f, c.x + r + o, c.y + r - r * 0.18f))
-        fillType = PathFillType.EvenOdd
+// Crescent moon via PathOperation.Difference — subtracts the shadow circle from
+// the outer circle cleanly, without the EvenOdd overflow issue.
+private fun DrawScope.drawMoon(c: Offset, r: Float, col: Color) {
+    val outer = Path().apply { addOval(Rect(c.x - r, c.y - r, c.x + r, c.y + r)) }
+    val cut   = Path().apply {
+        val cx2 = c.x + r * 0.40f
+        val cy2 = c.y - r * 0.10f
+        addOval(Rect(cx2 - r, cy2 - r, cx2 + r, cy2 + r))
     }
-    drawPath(p, color)
+    val crescent = Path().also { it.op(outer, cut, PathOperation.Difference) }
+    drawPath(crescent, col)
+}
+
+private fun DrawScope.drawBolt(c: Offset, dim: Float) {
+    val bolt = Path().apply {
+        moveTo(c.x + dim * 0.04f, c.y + dim * 0.12f)
+        lineTo(c.x - dim * 0.12f, c.y + dim * 0.30f)
+        lineTo(c.x - dim * 0.01f, c.y + dim * 0.30f)
+        lineTo(c.x - dim * 0.06f, c.y + dim * 0.44f)
+        lineTo(c.x + dim * 0.14f, c.y + dim * 0.22f)
+        lineTo(c.x + dim * 0.02f, c.y + dim * 0.22f)
+        close()
+    }
+    drawPath(bolt, BoltColor)
 }
 
 private fun DrawScope.drawCloud(c: Offset, w: Float, color: Color) {

@@ -77,7 +77,6 @@ import com.example.weatherly.ui.components.HourlyCard
 import com.example.weatherly.ui.components.MetricsGrid
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
-import com.example.weatherly.ui.components.TipBanner
 import com.example.weatherly.ui.components.conditionGradient
 import kotlinx.coroutines.delay
 
@@ -393,16 +392,7 @@ fun WeatherContent(
                         }
                         Spacer(Modifier.height(8.dp))
                         CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
-                        if (data.tips.isNotEmpty()) {
-                            Spacer(Modifier.height(20.dp))
-                            data.tips.forEach { tip ->
-                                TipBanner(tip)
-                                Spacer(Modifier.height(10.dp))
-                            }
-                        } else {
-                            Spacer(Modifier.height(20.dp))
-                        }
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(20.dp))
                     }
                 }
 

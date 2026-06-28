@@ -293,7 +293,7 @@ fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
                             fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
                         )
                         Spacer(Modifier.height(8.dp))
-                        WeatherGlyph(code = h.icon, size = 26.dp)
+                        WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
                         h.precipChance?.takeIf { it > 0 }?.let {
                             Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }

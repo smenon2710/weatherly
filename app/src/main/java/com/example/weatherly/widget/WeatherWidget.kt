@@ -300,7 +300,7 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
             if (upcoming.isNotEmpty()) {
                 Text(
                     upcoming.joinToString("   ") {
-                        "${it.hourLabel} ${weatherEmoji(it.icon, true)} ${it.tempC}°"
+                        "${it.hourLabel} ${weatherEmoji(it.icon, it.isDay)} ${it.tempC}°"
                     },
                     style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                     maxLines = 1,
@@ -403,7 +403,7 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
                     maxLines = 1,
                 )
                 Text(
-                    weatherEmoji(entry.icon, true),
+                    weatherEmoji(entry.icon, entry.isDay),
                     style = TextStyle(color = c.textPrimary, fontSize = 12.sp),
                 )
                 Text(

@@ -58,6 +58,7 @@ data class HourEntry(
     val hourLabel: String,
     val tempC: Int,
     val icon: Int,
+    val isDay: Boolean,
     val precipChance: Int?
 )
 

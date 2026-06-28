@@ -60,8 +60,8 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
   |---|---|---|---|
   | `SMALL` | 110×50 dp | 2×1 | Emoji + current temp (22 sp Bold), centered |
   | `MEDIUM` | 110×110 dp | 2×2 | Location header + chrono-dynamic vertical stack |
-  | `WIDE` | 250×50 dp | 4×1 | `emoji temp° · location` + compact next-4-hour text |
-  | `LARGE` | 250×110 dp | 4×2 | `LargeHeader` (2-column) + `HourlyStrip` (up to 5 cells) |
+  | `WIDE` | 250×50 dp | 4×1 | `emoji temp° · location` + compact next-4-hour text (`isDay`-aware emoji) |
+  | `LARGE` | 250×110 dp | 4×2 | `LargeHeader` (2-column) + `HourlyStrip` (up to 5 cells, `isDay`-aware emoji) |
 
   `weather_widget_info.xml` declares `minWidth="110dp"`, `minHeight="40dp"`, `targetCellWidth="2"`, `targetCellHeight="2"`, `resizeMode="horizontal|vertical"`.
 
@@ -78,6 +78,8 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 **Launcher icon:** Adaptive icon (`mipmap-anydpi-v26/`) — warm-gold sun glyph (`#E0B15C`) on deep navy (`#0F1923`), with three concentric speech-wave arcs to the right of the sun (radii 20/25/30 dp, fading opacity) representing the "speak" dimension. XML-only; no PNG fallbacks needed since `minSdk = 26`.
 
 **WMO weather codes** are mapped to emoji and text in `util/WeatherIcon.kt`. All temperature/wind/precip values in `WeatherData` are stored in the user-selected unit (they come back from Open-Meteo already converted); `WeatherAdvisor` converts back to metric internally for threshold comparisons.
+
+**`HourEntry`** carries `hourLabel`, `tempC`, `icon` (WMO code), `isDay: Boolean`, and `precipChance: Int?`. `isDay` is computed per-hour in `WeatherRepository` via ISO-string comparison (`hourTime >= sunriseStr && hourTime < sunsetStr`) against the day's sunrise/sunset strings from the daily block. `HourlyCard` passes `h.isDay` to `WeatherGlyph` so each hour renders the contextually correct day or night icon.
 
 ## UI theme & branding
 
@@ -113,15 +115,15 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 Helper functions (private, in `WeatherComponents.kt`): `windDirToAngle(dir: String?): Float` maps all 16 compass points to degrees; `windIntensityColor(speed)` and `precipIntensityColor(prob)` return a `Color` from a 5-stop intensity palette. `@Composable` color values (`TextPrimary`, `TextSecondary`) must be captured as local `val`s before entering any Canvas `DrawScope`.
 
-**`TipBanner`:** Left-border annotation style — 4dp accent bar on the left edge, very subtle tint (`fg` at 8–10% alpha), rounded only on the right corners. Reads as editorial context rather than an alert.
+**`TipBanner`:** Left-border annotation style — 4dp accent bar on the left edge, very subtle tint (`fg` at 8–10% alpha), rounded only on the right corners. Reads as editorial context rather than an alert. `TipBanner` composables are **not rendered in the hero section** of `WeatherScreen` — they were removed to eliminate the "multiple summaries with different tinted backgrounds" visual. The single lookahead pill inside `CurrentHeader` is the only hero-area summary.
 
-**`WeatherGlyph`:** Accepts an optional `contentDescription: String?` parameter (defaults to `wmoText(code)`). Pass `null` for decorative instances where adjacent text already carries the meaning.
+**`WeatherGlyph`:** Accepts `isDay: Boolean = true` and an optional `contentDescription: String?` (defaults to `wmoText(code)`). Pass `null` for decorative instances where adjacent text already carries the meaning. `glyphFor(code, isDay)` dispatches WMO codes to night variants when `!isDay`: clear sky → `MOON`, partly cloudy → `CLOUD_MOON`, rain/drizzle → `MOON_RAIN`, snow → `MOON_SNOW`, thunder → `MOON_THUNDER`. Night precipitation glyphs composite a small crescent moon in the upper-left with a shifted cloud and precipitation elements. `drawMoon` uses `PathOperation.Difference` to subtract a shadow circle from the outer circle, producing a clean crescent without the EvenOdd overflow artifact. `drawBolt` is a shared private helper used by both `THUNDER` and `MOON_THUNDER`.
 
 **Section labels:** 11 sp uppercase with `letterSpacing = 0.8.sp` — keep this style consistent across any new sections.
 
 **`CurrentHeader` element order:** location (12 sp, Medium, 2 sp letter-spacing, uppercase) → glyph + condition (Row, 20 dp glyph, 15 sp Normal) → temperature (96 sp, Thin — the undisputed hero) → H/L → feels-like → lookahead pill. The large standalone glyph (76 dp) no longer appears in the hero.
 
-**Lookahead pill (`WeatherData.headline`):** Populated by `WeatherRepository.buildUpcomingHeadline()`. Operates on the raw `HourlyBlock` + `nowIndex` (the exact position of the current hour in the full 7-day API array) so the scan always starts from the true "now" and naturally crosses into the next day. Scans the next 12 raw hourly entries (`nowIndex+1` .. `nowIndex+12`) for the first significant condition change — Thunderstorm, Snow, Rain, Freezing rain, Drizzle, Fog — relative to the current WMO code. Appends a wind note when the next-12-hour max exceeds 40 km/h / 25 mph. Trusts WMO codes directly; only light drizzle (51–57) requires a ≥30% precipitation-probability floor. Falls back to `comparedToYesterday` text when null.
+**Lookahead pill (`WeatherData.headline`):** Populated by `WeatherRepository.buildUpcomingHeadline()`. Returns a non-null `String` — always a meaningful summary. Operates on the raw `HourlyBlock` + `nowIndex` (the exact position of the current hour in the full 7-day API array) so the scan always starts from the true "now" and naturally crosses into the next day. Scans the next 12 raw hourly entries (`nowIndex+1` .. `nowIndex+12`) for the first significant condition change — Thunderstorm, Snow, Rain, Freezing rain, Drizzle, Fog — relative to the current WMO code. Appends a wind note when the next-12-hour max exceeds 40 km/h / 25 mph. Trusts WMO codes directly; only light drizzle (51–57) requires a ≥30% precipitation-probability floor. Falls back to a dominant-condition summary over the next 6 hours (rather than `null`) when no significant change is detected.
 
 **`TipBanner` source data:** Tips are generated by `WeatherRepository.buildTips()`. At night (`isDay = 0`) the tip day switches to the next daily entry so tips reflect upcoming conditions rather than the day just passed. The precipitation probability passed to `buildTips` is always `max(tipDay.precipProbMax, maxPrecipChanceInNext12Hours)` to capture short-range rain even when the daily summary hasn't rolled over yet.
 

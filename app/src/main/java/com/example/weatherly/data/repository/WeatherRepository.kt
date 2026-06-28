@@ -105,11 +105,34 @@ class WeatherRepository(private val context: Context) {
         fun visToUnit(meters: Double): Int =
             if (units == UnitSystem.IMPERIAL) (meters / 1609.34).roundToInt() else (meters / 1000.0).roundToInt()
 
+        // Daily arrays — needed here to determine sunrise/sunset for hourly isDay computation.
+        val dTimes = r.daily?.time ?: emptyList()
+        val dCodes = r.daily?.weatherCode ?: emptyList()
+        val dHighs = r.daily?.tempMax ?: emptyList()
+        val dLows = r.daily?.tempMin ?: emptyList()
+        val dSunrise = r.daily?.sunrise ?: emptyList()
+        val dSunset = r.daily?.sunset ?: emptyList()
+        val dUv = r.daily?.uvIndexMax ?: emptyList()
+        val dPop = r.daily?.precipProbMax ?: emptyList()
+        val dWind = r.daily?.windSpeedMax ?: emptyList()
+        val dPrecip = r.daily?.precipitationSum ?: emptyList()
+
         val hourly = window.map { i ->
+            val hourTime = hourTimes.getOrNull(i) ?: ""
+            val hourDate = if (hourTime.length >= 10) hourTime.substring(0, 10) else ""
+            val dayIdx = dTimes.indexOf(hourDate).takeIf { it >= 0 }
+            val sunriseStr = dayIdx?.let { dSunrise.getOrNull(it) }
+            val sunsetStr = dayIdx?.let { dSunset.getOrNull(it) }
+            val isHourDay = if (sunriseStr != null && sunsetStr != null) {
+                hourTime >= sunriseStr && hourTime < sunsetStr
+            } else {
+                (current?.isDay ?: 1) == 1
+            }
             HourEntry(
-                hourLabel = if (i == nowIndex) "Now" else formatHour(hourTimes[i]),
+                hourLabel = if (i == nowIndex) "Now" else formatHour(hourTime),
                 tempC = r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0,
                 icon = r.hourly?.weatherCode?.getOrNull(i) ?: 0,
+                isDay = isHourDay,
                 precipChance = r.hourly?.precipitationProbability?.getOrNull(i)
             )
         }
@@ -121,17 +144,6 @@ class WeatherRepository(private val context: Context) {
         val hourlyPressure = window.map { (r.hourly?.surfacePressure?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyPrecipProb = window.map { r.hourly?.precipitationProbability?.getOrNull(it) ?: 0 }
         val hourlyAqi = window.map { (air?.hourly?.usAqi?.getOrNull(it) ?: 0.0).roundToInt() }
-
-        val dTimes = r.daily?.time ?: emptyList()
-        val dCodes = r.daily?.weatherCode ?: emptyList()
-        val dHighs = r.daily?.tempMax ?: emptyList()
-        val dLows = r.daily?.tempMin ?: emptyList()
-        val dSunrise = r.daily?.sunrise ?: emptyList()
-        val dSunset = r.daily?.sunset ?: emptyList()
-        val dUv = r.daily?.uvIndexMax ?: emptyList()
-        val dPop = r.daily?.precipProbMax ?: emptyList()
-        val dWind = r.daily?.windSpeedMax ?: emptyList()
-        val dPrecip = r.daily?.precipitationSum ?: emptyList()
 
         val todayDate = currentTime?.substring(0, 10)
         val todayIndex = dTimes.indexOf(todayDate).let {
@@ -240,7 +252,7 @@ class WeatherRepository(private val context: Context) {
         windUnit: String,
         currentIcon: Int,
         units: UnitSystem
-    ): String? {
+    ): String {
         val totalHours = rawHourly.time?.size ?: 0
         val end = minOf(nowIndex + 13, totalHours) // scan nowIndex+1 .. nowIndex+12
         val alreadyRain = currentIcon in 61..82
@@ -280,7 +292,24 @@ class WeatherRepository(private val context: Context) {
                 "$eventDesc expected around $eventTime. Winds up to $maxWind $windUnit."
             eventDesc != null -> "$eventDesc expected around $eventTime."
             maxWind >= windThreshold -> "Winds up to $maxWind $windUnit in the next few hours."
-            else -> null
+            else -> {
+                // Summarise the dominant condition over the next 6 hours.
+                val nextCodes = (nowIndex until minOf(nowIndex + 6, totalHours))
+                    .mapNotNull { rawHourly.weatherCode?.getOrNull(it) }
+                val dominant = nextCodes.groupingBy { it }.eachCount()
+                    .maxByOrNull { it.value }?.key ?: currentIcon
+                when {
+                    dominant == 0 || dominant == 1 -> "Clear skies for the next few hours."
+                    dominant == 2 -> "Partly cloudy for the next few hours."
+                    dominant == 3 -> "Overcast for the next few hours."
+                    dominant in 45..48 -> "Foggy conditions for the next few hours."
+                    dominant in 71..77 || dominant in 85..86 -> "Snow expected over the next few hours."
+                    dominant in 51..57 -> "Light drizzle over the next few hours."
+                    dominant in 61..67 || dominant in 80..82 -> "Rain expected over the next few hours."
+                    dominant in 95..99 -> "Thunderstorm conditions in the next few hours."
+                    else -> "No significant changes in the next few hours."
+                }
+            }
         }
     }
 
