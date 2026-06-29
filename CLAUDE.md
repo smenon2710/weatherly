@@ -31,7 +31,7 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 ## Architecture
 
-**Single-activity, no Navigation component.** `MainActivity` holds a `WeatherViewModel` (activity-scoped so both screens share it) and toggles between `WeatherScreen` and `ChatScreen` via `AnimatedContent` + a `showChat` boolean.
+**Single-activity, three-screen app.** `MainActivity` holds a `WeatherViewModel` (activity-scoped) and dispatches between `WeatherScreen`, `ChatScreen`, and `RadarScreen` via `AnimatedContent` keyed on a private `Screen` enum (`WEATHER`, `CHAT`, `RADAR`). `WeatherViewModel` exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` so `RadarScreen` can center the map on the current weather location without re-fetching.
 
 **Data layer:**
 
@@ -43,14 +43,17 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 | `ForecastCache` | Persists the last successful `WeatherData` as JSON in `SharedPreferences` (`forecast_cache`). `WeatherViewModel.init` loads it synchronously so the app opens instantly offline. Replaced by fresh data on every successful network fetch. |
 | `PreferencesStore` | `SharedPreferences` wrapper for unit system, saved places, selected place, and on-device OpenRouter key/model. |
 | `WeatherAdvisor` | Pure object (no network). Answers six hard-coded intents (UMBRELLA, JACKET, WALKING, DRIVING, HIKING, CLOTHING) locally from the current `WeatherData`. |
+| `MoonCalculator` (`util/`) | Pure object. Computes lunar phase from Julian date arithmetic (reference JD 2451550.260, synodic month 29.530588853 days). Exposes `phase(y,m,d): Double` (0=new, 0.5=full), `phaseName(phase)`, `illuminationPct(phase)`, and `nextEvent(phase): Pair<String,Int>` (label + days). |
 
 **UI layer:**
 
-- `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. On `init`, loads `ForecastCache` synchronously so the screen is never blank on cold start. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. `WeatherUiState.Success` carries a `cachedAt: Long?` timestamp; non-null means the data came from cache and triggers a "Showing data from Xm ago" label. Background refreshes keep existing data visible (only the spinner changes).
+- `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. On `init`, loads `ForecastCache` synchronously so the screen is never blank on cold start. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. `WeatherUiState.Success` carries a `cachedAt: Long?` timestamp; non-null means the data came from cache and triggers a "Showing data from Xm ago" label. Background refreshes keep existing data visible (only the spinner changes). Also exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` set before every repository fetch.
 - `ChatViewModel` — Exposes `messages`, `sending`, and `streamingText: StateFlow<String>`. Accumulates SSE/simulated chunks into `_streamingText`; on completion moves the full text into `_messages`. `clear()` cancels any in-flight stream job.
-- `WeatherScreen` / `ChatScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
+- `WeatherScreen` / `ChatScreen` / `RadarScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
 - `ui/components/` — Reusable Compose functions (header, hourly row, daily list, metric tiles, detail sheets).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.
+
+**`RadarScreen` (`ui/RadarScreen.kt`):** Displays a precipitation radar map using OSMDroid (OpenStreetMap tiles, no API key) with RainViewer free radar overlay. Fetches `https://api.rainviewer.com/public/weather-maps.json` via OkHttp+Moshi, builds a custom `OnlineTileSourceBase` for each radar frame (`$host$path/256/$z/$x/$y/2/1_1.png`), and swaps `TilesOverlay` on frame change. Auto-play cycles frames every 600 ms. Shows a timestamp badge (top-right), a scrubber + play/pause button at the bottom, and a loading spinner while frames are fetched. Map is centered on `WeatherViewModel.lastLatLon`; `DisposableEffect` calls `mapView.onDetach()` on exit. Dependency: `org.osmdroid:osmdroid-android:6.1.18` in `app/build.gradle.kts`; `ACCESS_NETWORK_STATE` permission in manifest; `-keep class org.osmdroid.** { *; }` in ProGuard rules.
 
 **Widget:** `WeatherWidget` (Jetpack Glance) fetches weather independently at system-scheduled update intervals. `WeatherWidgetReceiver` wires it into the manifest (`android:exported="true"` — required for APPWIDGET_UPDATE broadcast delivery). The widget creates its own `WeatherRepository` instance; if a network fetch fails or location is unavailable it falls back to `ForecastCache` so it always shows real data after the first app open. `WeatherViewModel` calls `WeatherWidget().updateAll(getApplication())` after every successful fetch to keep the widget in sync immediately.
 
@@ -94,26 +97,36 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 **`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, daily, metric tiles) use `GlassCard`.
 
-**Metric tile system (`MetricsGrid` in `WeatherComponents.kt`):** Three distinct composables replace the old uniform rectangular tiles:
+**Metric tile system (`MetricsGrid` in `WeatherComponents.kt`):** Four distinct composables:
 
 | Composable | Used for | Visual |
 |---|---|---|
 | `ArcGaugeTile` | UV, AQI, Humidity, Pressure, Visibility | 88dp Canvas arc (240° sweep, 150° start), track + filled portion keyed by `gaugeFraction` in `MetricTileData` |
-| `SparklineTile` | Wind, Feels Like, Precipitation | Area sparkline with vertical gradient fill, "Now" dot at index 0, time axis labels |
-| `SunriseTile` | Sunrise/Sunset | 60dp semicircle arc, sun dot positioned by current hour between rise and set |
+| `SparklineTile` | Wind, Feels Like, Precipitation | Area sparkline with vertical gradient fill, "Now" dot at index 0, time axis labels. Draws a dashed vertical line + "tmrw" label at `MetricChart.dayChangeIndex` when the data spans midnight. |
+| `SunTile` | Sunrise/Sunset | 64dp semicircle arc showing elapsed portion of the day or night (progress-filled), golden-hour glow zones near both horizon endpoints, day-length label. Day mode: arc from sunrise → now → sunset. Night mode: arc from sunset → now → tomorrow's sunrise. |
+| `MoonTile` | Moon Phase | Full-width card with a 72dp Canvas moon-phase illustration on the left and phase name / illumination % / next-event countdown on the right. |
 
-`gaugeFraction` values: UV `(uv/11).coerceIn(0,1)`, AQI `(aqi/200).coerceIn(0,1)`, Humidity `hum/100`, Pressure `((hPa-960)/90).coerceIn(0,1)`, Visibility `(km/max).coerceIn(0,1)` where max is 10 mi or 16 km.
+`MetricsGrid` layout order: UV + AQI row → Humidity + Pressure row → Wind (full-width) → Feels Like (full-width) → Precipitation (full-width) → Sunrise + Visibility row → Moon Phase (full-width).
+
+`gaugeFraction` values: UV `(uv/11).coerceIn(0,1)`, AQI `(aqi/200).coerceIn(0,1)`, Humidity `hum/100`, Pressure `((hPa-960)/90).coerceIn(0,1)`, Visibility `(km/max).coerceIn(0,1)` where max is 10 mi or 16 km. For Moon Phase, `gaugeFraction` stores the phase fraction (0.0 = new moon, 0.5 = full moon) as computed by `MoonCalculator.phase()`.
+
+**`MetricChart.dayChangeIndex`:** `Int?` field on `MetricChart`. Set by `buildMetricTiles` to the index of the first `"12 AM"` label in `d.hourLabels` (null if data doesn't span midnight). Consumed by `SparklineTile` to draw a dashed vertical line at the day boundary, and by `WindDetailContent`, `FeelsLikeDetailContent`, and `PrecipDetailContent` to draw the same marker in their detail-sheet charts. The time-axis label at that index is replaced with `"tmrw"` in accent color.
+
+**`SunTile` data encoding:** `MetricTileData.value` holds the sunrise time string. `MetricTileData.sub` encodes `"Sunset HH:MM|TomorrowRise HH:MM"` — `SunTile` splits on `|` and parses each key-value pair. `parseTimeHour(time: String?)` handles both 24-hour strings and 12-hour AM/PM strings.
+
+**`MoonTile` / `drawMoonPhase`:** `drawMoonPhase(center, r, phase, litCol, darkCol)` is a private `DrawScope` extension in `WeatherComponents.kt`. Draws the illuminated lunar disk using an arc-based path: a semicircle on the lit side closed by an ellipse arc representing the terminator. `termX = r * cos(phase * 2π)` gives the terminator x-offset. Waxing (phase < 0.5): left shadow half-circle + conditional ellipse; waning (phase ≥ 0.5): right shadow half-circle + conditional ellipse. Short-circuits to solid dark disk at new moon (phase < 0.02 or > 0.98) and solid lit disk at full moon (phase 0.48–0.52).
 
 **Detail sheet system (`DetailSheet` sealed interface, `DetailSheetContent`):** Tapping any metric tile opens a bottom sheet. `DetailSheet.Metric` carries optional fields `windDir: String?`, `windGust: String?`, `hourlyActualTemps: List<Int>?` for enriched views. `DetailSheetContent` dispatches on `sheet.title`:
 
 | Title | Composable | Content |
 |---|---|---|
-| `"Wind"` | `WindDetailContent` | Speed/gust row, 164dp compass rose (Canvas tick marks + direction needle via `windDirToAngle()`), color-coded hourly intensity bars via `windIntensityColor()` |
-| `"Feels like"` | `FeelsLikeDetailContent` | Warmer/cooler pill, 160dp dual-line Canvas chart (solid feels-like + dashed actual temp + shaded gap) using `PathEffect.dashPathEffect` |
-| `"Precipitation"` | `PrecipDetailContent` | 128dp color-coded probability bars via `precipIntensityColor()`, dashed 30%/70% threshold guidelines |
+| `"Wind"` | `WindDetailContent` | Speed/gust row, 164dp compass rose (Canvas tick marks + direction needle via `windDirToAngle()`), color-coded hourly intensity bars via `windIntensityColor()`, day-boundary dashed line |
+| `"Feels like"` | `FeelsLikeDetailContent` | Warmer/cooler pill, 160dp dual-line Canvas chart (solid feels-like + dashed actual temp + shaded gap) using `PathEffect.dashPathEffect`, day-boundary dashed line |
+| `"Precipitation"` | `PrecipDetailContent` | 128dp color-coded probability bars via `precipIntensityColor()`, dashed 30%/70% threshold guidelines, day-boundary dashed line |
+| `"Moon Phase"` | `MoonDetailContent` | 110dp moon-phase Canvas illustration, phase name + illumination % + next-event countdown, phase-cycle description paragraph |
 | anything else | `DefaultMetricContent` | Value + description + `MetricBarChart` |
 
-Helper functions (private, in `WeatherComponents.kt`): `windDirToAngle(dir: String?): Float` maps all 16 compass points to degrees; `windIntensityColor(speed)` and `precipIntensityColor(prob)` return a `Color` from a 5-stop intensity palette. `@Composable` color values (`TextPrimary`, `TextSecondary`) must be captured as local `val`s before entering any Canvas `DrawScope`.
+Helper functions (private, in `WeatherComponents.kt`): `windDirToAngle(dir: String?): Float` maps all 16 compass points to degrees; `windIntensityColor(speed)` and `precipIntensityColor(prob)` return a `Color` from a 5-stop intensity palette; `parseTimeHour(time: String?): Float?` handles both 24-hour and AM/PM time strings. `@Composable` color values (`TextPrimary`, `TextSecondary`) must be captured as local `val`s before entering any Canvas `DrawScope`.
 
 **`TipBanner`:** Left-border annotation style — 4dp accent bar on the left edge, very subtle tint (`fg` at 8–10% alpha), rounded only on the right corners. Reads as editorial context rather than an alert. `TipBanner` composables are **not rendered in the hero section** of `WeatherScreen` — they were removed to eliminate the "multiple summaries with different tinted backgrounds" visual. The single lookahead pill inside `CurrentHeader` is the only hero-area summary.
 
@@ -135,3 +148,5 @@ Helper functions (private, in `WeatherComponents.kt`): `windDirToAngle(dir: Stri
 - The 30-minute cache in `WeatherRepository` is in-memory only and scoped to the process. Widget updates bypass the app's ViewModel and create their own `WeatherRepository` instance.
 - OpenRouter key resolution: `PreferencesStore.getOpenRouterKey(buildDefault)` returns the on-device key first, falling back to the build-time `BuildConfig` value. Always pass `BuildConfig.OPENROUTER_API_KEY` as the fallback.
 - Drawable resource names must be all-lowercase (`a-z`, `0-9`, `_`) — Android's AAPT2 rejects uppercase characters.
+- `MetricChart.dayChangeIndex` must be derived from `d.hourLabels.indexOfFirst { it == "12 AM" }.takeIf { it >= 0 }` in `buildMetricTiles` and passed to every `MetricChart` constructor — do not hardcode or omit it.
+- `parseTimeHour` handles both 24-hour (`"18:30"`) and 12-hour AM/PM (`"6:30 PM"`) formats. Always use it when parsing sunrise/sunset strings from `WeatherData` inside a `DrawScope` or Canvas block.
