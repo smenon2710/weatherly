@@ -3,6 +3,8 @@
 
     <!-- Weather lookups + reverse geocoding need the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required by OSMDroid to check connectivity before tile fetches. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Location: COARSE is enough for city-level weather. FINE is optional. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

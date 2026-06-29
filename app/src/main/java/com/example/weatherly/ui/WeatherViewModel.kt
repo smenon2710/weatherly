@@ -56,6 +56,10 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching.asStateFlow()
 
+    /** Last lat/lon used for a weather fetch — for centering the radar map. */
+    private val _lastLatLon = MutableStateFlow<Pair<Double, Double>?>(null)
+    val lastLatLon: StateFlow<Pair<Double, Double>?> = _lastLatLon.asStateFlow()
+
     init {
         // Show the last known forecast immediately so the app never opens to a blank screen.
         forecastCache.load()?.let { (data, ts) ->
@@ -98,6 +102,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     lat = ll.first; lon = ll.second; name = null
                 }
+                _lastLatLon.value = lat to lon
                 repository.getWeather(lat, lon, units, placeName = name, forceRefresh = forceRefresh)
                     .onSuccess {
                     forecastCache.save(it)

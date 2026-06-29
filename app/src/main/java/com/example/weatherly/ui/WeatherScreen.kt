@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -84,7 +85,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun WeatherScreen(
     viewModel: WeatherViewModel = viewModel(),
-    onOpenChat: () -> Unit = {}
+    onOpenChat: () -> Unit = {},
+    onOpenRadar: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
@@ -118,7 +120,8 @@ fun WeatherScreen(
                 isRefreshing = refreshing,
                 onRefresh = { viewModel.refresh() },
                 onOpenLocations = { showLocations = true },
-                onOpenChat = onOpenChat
+                onOpenChat = onOpenChat,
+                onOpenRadar = onOpenRadar
             )
 
         else -> Box(
@@ -305,7 +308,8 @@ fun WeatherContent(
     onRefresh: () -> Unit,
     isRefreshing: Boolean = false,
     onOpenLocations: () -> Unit = {},
-    onOpenChat: () -> Unit = {}
+    onOpenChat: () -> Unit = {},
+    onOpenRadar: () -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
 
@@ -372,22 +376,43 @@ fun WeatherContent(
                                 letterSpacing = 5.sp,
                                 modifier = Modifier.align(Alignment.Center)
                             )
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .size(40.dp)
-                                    .shadow(3.dp, CircleShape, clip = false)
-                                    .clip(CircleShape)
-                                    .background(Cyan)
-                                    .clickable { onOpenChat() },
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Filled.AutoAwesome,
-                                    contentDescription = "Ask the weather assistant",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .shadow(2.dp, CircleShape, clip = false)
+                                        .clip(CircleShape)
+                                        .background(Cyan.copy(alpha = 0.18f))
+                                        .clickable { onOpenRadar() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Radar,
+                                        contentDescription = "Radar map",
+                                        tint = Cyan,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .shadow(3.dp, CircleShape, clip = false)
+                                        .clip(CircleShape)
+                                        .background(Cyan)
+                                        .clickable { onOpenChat() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.AutoAwesome,
+                                        contentDescription = "Ask the weather assistant",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                         Spacer(Modifier.height(8.dp))

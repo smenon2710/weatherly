@@ -48,7 +48,13 @@ data class WeatherData(
 }
 
 /** Data for a metric's hourly bar chart in its detail popup. */
-data class MetricChart(val labels: List<String>, val values: List<Float>, val unit: String)
+data class MetricChart(
+    val labels: List<String>,
+    val values: List<Float>,
+    val unit: String,
+    /** Index where the calendar day changes (i.e. "12 AM" entry). Null when no day boundary in range. */
+    val dayChangeIndex: Int? = null
+)
 
 data class WeatherTip(val emoji: String, val text: String, val tone: TipTone)
 

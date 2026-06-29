@@ -521,6 +521,8 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
                 val accent = data.accent
                 val fillTop = accent.copy(alpha = 0.22f)
                 val fillBot = accent.copy(alpha = 0.03f)
+                val dividerColor = textSecColor.copy(alpha = 0.30f)
+                val dayChangeI = chart.dayChangeIndex
                 Canvas(modifier = Modifier.fillMaxWidth().height(52.dp)) {
                     val values = chart.values
                     val n = values.size
@@ -551,15 +553,34 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
                     drawPath(fillPath, brush = Brush.verticalGradient(listOf(fillTop, fillBot)))
                     drawPath(linePath, color = accent,
                         style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    // "Now" anchor dot
                     drawCircle(color = accent, radius = 3.5.dp.toPx(),
                         center = Offset(xAt(0), yAt(values.first())))
+
+                    // Day-change marker
+                    if (dayChangeI != null && dayChangeI in 1 until n) {
+                        val x = xAt(dayChangeI)
+                        drawLine(
+                            color = dividerColor,
+                            start = Offset(x, 0f), end = Offset(x, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 3f))
+                        )
+                    }
                 }
+                // Label row — inject "Tomorrow" chip at the day-change position
                 if (chart.labels.isNotEmpty()) {
                     val n = chart.labels.size
                     val idxs = listOf(0, n / 3, 2 * n / 3, n - 1).distinct().filter { it in chart.labels.indices }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        idxs.forEach { i -> Text(chart.labels[i], color = textSecColor, fontSize = 10.sp) }
+                        idxs.forEach { i ->
+                            val isTomorrow = dayChangeI != null && i == idxs.firstOrNull { it >= dayChangeI }
+                            Text(
+                                if (isTomorrow) "tmrw" else chart.labels[i],
+                                color = if (isTomorrow) accent.copy(alpha = 0.70f) else textSecColor,
+                                fontSize = 10.sp,
+                                fontWeight = if (isTomorrow) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
@@ -567,18 +588,32 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
     }
 }
 
-/** Sunrise/sunset tile with a sun-arc position indicator. */
+/**
+ * Sun & Moon tile — always relevant.
+ * Day: shows sun position on arc between sunrise and sunset.
+ * Night: shows moon position on arc between today's sunset and tomorrow's sunrise.
+ * The `sub` field encodes "Sunset HH:MM|TomorrowRise HH:MM".
+ */
 @Composable
-fun SunriseTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val sunsetTime = data.sub?.removePrefix("Sunset ")
+fun SunMoonTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val parts = data.sub?.split("|")?.associate {
+        val kv = it.trim().split(" ", limit = 2)
+        kv.getOrElse(0) { "" } to kv.getOrElse(1) { "" }
+    } ?: emptyMap()
+    val sunsetTime = parts["Sunset"]
+    val tomorrowRise = parts["TomorrowRise"]
+
     val accentCapture = data.accent
+    val moonColor = Color(0xFF93A1B8)
     val trackColor = TextSecondary.copy(alpha = 0.15f)
     val textPrimary = TextPrimary
     val textSec = TextSecondary
+
     GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             SectionLabel(data.icon, data.label, data.accent)
             Spacer(Modifier.height(8.dp))
+
             Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.BottomCenter) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val sw = 2.5.dp.toPx()
@@ -587,38 +622,68 @@ fun SunriseTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = 
                     val cy = size.height
                     val arcTL = Offset(cx - r, cy - r)
                     val arcSz = Size(r * 2f, r * 2f)
-                    // Semicircle track
+
                     drawArc(color = trackColor, startAngle = 180f, sweepAngle = 180f,
                         useCenter = false, topLeft = arcTL, size = arcSz,
                         style = Stroke(width = sw, cap = StrokeCap.Round))
-                    // Current hour position
+
                     val cal = Calendar.getInstance()
                     val nowH = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
-                    val riseH = parseTimeHour(data.value)
-                    val setH = parseTimeHour(sunsetTime) ?: riseH?.plus(12f)
-                    val frac = if (riseH != null && setH != null && setH > riseH) {
-                        ((nowH - riseH) / (setH - riseH)).coerceIn(0f, 1f)
-                    } else 0.5f
-                    // arc: 0 = left (rise, 180°), 1 = right (set, 0°)
+
+                    val frac: Float
+                    val dotColor: Color
+                    val dotGlow: Color
+                    if (isDay) {
+                        val riseH = parseTimeHour(data.value)
+                        val setH = parseTimeHour(sunsetTime) ?: riseH?.plus(12f)
+                        frac = if (riseH != null && setH != null && setH > riseH)
+                            ((nowH - riseH) / (setH - riseH)).coerceIn(0f, 1f) else 0.5f
+                        dotColor = accentCapture
+                        dotGlow = accentCapture.copy(alpha = 0.25f)
+                    } else {
+                        // Night arc: left = sunset, right = next sunrise
+                        val setH = parseTimeHour(sunsetTime) ?: 20f
+                        var riseH = parseTimeHour(tomorrowRise) ?: 6f
+                        // Normalize: tomorrow's sunrise is always after sunset
+                        if (riseH <= setH) riseH += 24f
+                        val nowNorm = if (nowH < setH) nowH + 24f else nowH
+                        frac = ((nowNorm - setH) / (riseH - setH)).coerceIn(0f, 1f)
+                        dotColor = moonColor
+                        dotGlow = moonColor.copy(alpha = 0.25f)
+                    }
+
+                    // arc: frac=0 → left (180°), frac=1 → right (0°)
                     val angleDeg = 180.0 - frac * 180.0
                     val angleRad = angleDeg * (PI / 180.0)
-                    val sunX = (cx + r * cos(angleRad)).toFloat()
-                    val sunY = (cy - r * sin(angleRad)).toFloat()
-                    drawCircle(color = accentCapture.copy(alpha = 0.25f), radius = 9.dp.toPx(),
-                        center = Offset(sunX, sunY))
-                    drawCircle(color = accentCapture, radius = 5.dp.toPx(),
-                        center = Offset(sunX, sunY))
+                    val dotX = (cx + r * cos(angleRad)).toFloat()
+                    val dotY = (cy - r * sin(angleRad)).toFloat()
+                    drawCircle(color = dotGlow, radius = 9.dp.toPx(), center = Offset(dotX, dotY))
+                    drawCircle(color = dotColor, radius = 5.dp.toPx(), center = Offset(dotX, dotY))
                 }
             }
+
             Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("↑ rise", color = textSec, fontSize = 10.sp)
-                    Text(data.value, color = textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            if (isDay) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("↑ sunrise", color = textSec, fontSize = 10.sp)
+                        Text(data.value, color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("↓ sunset", color = textSec, fontSize = 10.sp)
+                        Text(sunsetTime ?: "--", color = textSec, fontSize = 14.sp)
+                    }
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("↓ set", color = textSec, fontSize = 10.sp)
-                    Text(sunsetTime ?: "--", color = textSec, fontSize = 15.sp)
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("↓ set", color = textSec, fontSize = 10.sp)
+                        Text(sunsetTime ?: "--", color = textSec, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("↑ rise tmrw", color = textSec, fontSize = 10.sp)
+                        Text(tomorrowRise ?: "--", color = textSec, fontSize = 14.sp)
+                    }
                 }
             }
         }
@@ -692,17 +757,18 @@ fun MetricsGrid(
             }, Modifier.fillMaxWidth())
         }
         m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
-        // Sunrise arc card + Visibility gauge
+        // Sun & Moon arc card + Visibility gauge
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["Sunrise"]?.let { t -> SunriseTile(t, { click(t) }, Modifier.weight(1f)) }
+            m["Sun & Moon"]?.let { t -> SunMoonTile(t, data.isDay, { click(t) }, Modifier.weight(1f)) }
             m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
         }
     }
 }
 
 private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
+    val dayChangeIdx = d.hourLabels.indexOfFirst { it == "12 AM" }.takeIf { it >= 0 }
     fun chart(values: List<Int>, unit: String): MetricChart? =
-        if (values.size >= 2) MetricChart(d.hourLabels, values.map { it.toFloat() }, unit) else null
+        if (values.size >= 2) MetricChart(d.hourLabels, values.map { it.toFloat() }, unit, dayChangeIdx) else null
 
     val uvAdvice = when (d.uvLabel) {
         "Low" -> "Minimal risk — no protection needed."
@@ -733,8 +799,14 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         if (d.aqi != null) chart(d.hourlyAqi, "") else null,
         gaugeFraction = d.aqi?.let { (it / 200f).coerceIn(0f, 1f) }))
 
-    add(MetricTileData(Icons.Filled.WbTwilight, "Sunrise", d.sunrise ?: "--", d.sunset?.let { "Sunset $it" }, Orange,
-        "The sun rises at ${d.sunrise ?: "--"} and sets at ${d.sunset ?: "--"} today."))
+    val tomorrowSunrise = d.daily.getOrNull(1)?.sunrise
+    // sub encodes: "Sunset HH:MM | TomorrowRise HH:MM" so SunMoonTile can parse both
+    val sunMoonSub = listOfNotNull(
+        d.sunset?.let { "Sunset $it" },
+        tomorrowSunrise?.let { "TomorrowRise $it" }
+    ).joinToString("|")
+    add(MetricTileData(Icons.Filled.WbTwilight, "Sun & Moon", d.sunrise ?: "--", sunMoonSub.ifBlank { null }, Orange,
+        "The sun rises at ${d.sunrise ?: "--"} and sets at ${d.sunset ?: "--"} today. Tomorrow's sunrise: ${tomorrowSunrise ?: "--"}."))
     add(MetricTileData(Icons.Filled.Air, "Wind", d.windKmh?.let { "$it ${d.windUnit}" } ?: "--",
         listOfNotNull(d.windDir, d.windGustKmh?.let { "gusts $it" }).joinToString(" · ").ifBlank { null }, Teal,
         "Wind is blowing" + (d.windDir?.let { " from the $it" } ?: "") +
@@ -934,6 +1006,8 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
         val mn = values.minOrNull() ?: 0f
         val mx = values.maxOrNull() ?: 1f
         val rng = (mx - mn).coerceAtLeast(1f)
+        val dayChangeI = chart.dayChangeIndex
+        val divColor = textSec.copy(alpha = 0.30f)
         Canvas(modifier = Modifier.fillMaxWidth().height(72.dp)) {
             val n = values.size
             val gap = 2.5.dp.toPx()
@@ -947,11 +1021,21 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
                     size = Size(barW, barH), cornerRadius = r
                 )
             }
+            if (dayChangeI != null && dayChangeI in 1 until n) {
+                val x = (dayChangeI * (barW + gap)) - gap / 2f
+                drawLine(divColor, Offset(x, 0f), Offset(x, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 3f)))
+            }
         }
         val n = chart.labels.size
         val idxs = listOf(0, n / 4, n / 2, 3 * n / 4, n - 1).distinct().filter { it in chart.labels.indices }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            idxs.forEach { i -> Text(chart.labels[i], color = textSec, fontSize = 11.sp) }
+            idxs.forEach { i ->
+                val isTmrw = dayChangeI != null && i == idxs.firstOrNull { it >= dayChangeI }
+                Text(if (isTmrw) "tmrw" else chart.labels[i], color = textSec, fontSize = 11.sp,
+                    fontWeight = if (isTmrw) FontWeight.SemiBold else FontWeight.Normal)
+            }
         }
         Spacer(Modifier.height(10.dp))
         // Speed legend
@@ -1078,14 +1162,29 @@ private fun FeelsLikeDetailContent(sheet: DetailSheet.Metric) {
             // Now dot
             drawCircle(color = accentCapture, radius = 4.dp.toPx(),
                 center = Offset(xAt(0), yAt(feelsVals.first())))
+
+            // Day-change marker
+            val dayChangeI = sheet.chart?.dayChangeIndex
+            if (dayChangeI != null && dayChangeI in 1 until n) {
+                val x = xAt(dayChangeI)
+                drawLine(dashCapture.copy(alpha = 0.40f), Offset(x, 0f), Offset(x, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 3f)))
+            }
         }
 
         // Time axis
-        sheet.chart?.labels?.let { labels ->
+        sheet.chart?.let { chart ->
+            val labels = chart.labels
+            val dayChangeI = chart.dayChangeIndex
             val ln = labels.size
             val idxs = listOf(0, ln / 4, ln / 2, 3 * ln / 4, ln - 1).distinct().filter { it in labels.indices }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                idxs.forEach { i -> Text(labels[i], color = textSec, fontSize = 11.sp) }
+                idxs.forEach { i ->
+                    val isTmrw = dayChangeI != null && i == idxs.firstOrNull { it >= dayChangeI }
+                    Text(if (isTmrw) "tmrw" else labels[i], color = textSec, fontSize = 11.sp,
+                        fontWeight = if (isTmrw) FontWeight.SemiBold else FontWeight.Normal)
+                }
             }
         }
     }
@@ -1126,32 +1225,34 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
         Spacer(Modifier.height(10.dp))
 
         val values = chart.values
+        val dayChangeI = chart.dayChangeIndex
         Canvas(modifier = Modifier.fillMaxWidth().height(128.dp)) {
             val n = values.size
             val gap = 2.5.dp.toPx()
             val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
             val r = CornerRadius(3.dp.toPx())
 
-            // Threshold annotations at 30% and 70%
             listOf(0.30f, 0.70f).forEach { frac ->
                 val y = size.height * (1f - frac)
-                drawLine(
-                    color = annotCapture,
-                    start = Offset(0f, y), end = Offset(size.width, y),
+                drawLine(annotCapture, Offset(0f, y), Offset(size.width, y),
                     strokeWidth = 0.75.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
-                )
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f)))
             }
 
             values.forEachIndexed { i, prob ->
                 val barH = (prob / 100f) * size.height
                 if (barH > 1.dp.toPx()) {
-                    drawRoundRect(
-                        color = precipIntensityColor(prob),
+                    drawRoundRect(precipIntensityColor(prob),
                         topLeft = Offset(i * (barW + gap), size.height - barH),
-                        size = Size(barW, barH), cornerRadius = r
-                    )
+                        size = Size(barW, barH), cornerRadius = r)
                 }
+            }
+
+            if (dayChangeI != null && dayChangeI in 1 until n) {
+                val x = (dayChangeI * (barW + gap)) - gap / 2f
+                drawLine(annotCapture.copy(alpha = 0.55f), Offset(x, 0f), Offset(x, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 3f)))
             }
         }
 
@@ -1159,7 +1260,11 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
         val n = chart.labels.size
         val idxs = listOf(0, n / 4, n / 2, 3 * n / 4, n - 1).distinct().filter { it in chart.labels.indices }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            idxs.forEach { i -> Text(chart.labels[i], color = textSec, fontSize = 11.sp) }
+            idxs.forEach { i ->
+                val isTmrw = dayChangeI != null && i == idxs.firstOrNull { it >= dayChangeI }
+                Text(if (isTmrw) "tmrw" else chart.labels[i], color = textSec, fontSize = 11.sp,
+                    fontWeight = if (isTmrw) FontWeight.SemiBold else FontWeight.Normal)
+            }
         }
         Spacer(Modifier.height(10.dp))
         Text("— — 30%: possible  ·  70%: likely", color = textSec.copy(alpha = 0.55f), fontSize = 11.sp)

@@ -12,11 +12,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.ui.ChatScreen
+import com.example.weatherly.ui.RadarScreen
 import com.example.weatherly.ui.WeatherScreen
+import com.example.weatherly.ui.WeatherUiState
 import com.example.weatherly.ui.WeatherViewModel
 import com.example.weatherly.ui.theme.WeatherlyTheme
+
+private enum class Screen { WEATHER, CHAT, RADAR }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,30 +29,39 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             WeatherlyTheme {
-                // Activity-scoped so the weather data + selection are shared with chat.
                 val weatherViewModel: WeatherViewModel = viewModel()
-                var showChat by rememberSaveable { mutableStateOf(false) }
+                var screen by rememberSaveable { mutableStateOf(Screen.WEATHER) }
+
+                val latLon by weatherViewModel.lastLatLon.collectAsStateWithLifecycle()
+                val state by weatherViewModel.state.collectAsStateWithLifecycle()
+                val locationName = (state as? WeatherUiState.Success)?.data?.locationName ?: ""
 
                 AnimatedContent(
-                    targetState = showChat,
+                    targetState = screen,
                     label = "screen",
                     transitionSpec = {
-                        if (targetState) {
-                            (slideInHorizontally { it }) togetherWith (slideOutHorizontally { -it / 4 })
+                        if (targetState != Screen.WEATHER) {
+                            slideInHorizontally { it } togetherWith slideOutHorizontally { -it / 4 }
                         } else {
-                            (slideInHorizontally { -it / 4 }) togetherWith (slideOutHorizontally { it })
+                            slideInHorizontally { -it / 4 } togetherWith slideOutHorizontally { it }
                         }
                     }
-                ) { chatOpen ->
-                    if (chatOpen) {
-                        ChatScreen(
-                            weatherViewModel = weatherViewModel,
-                            onBack = { showChat = false }
-                        )
-                    } else {
-                        WeatherScreen(
+                ) { current ->
+                    when (current) {
+                        Screen.WEATHER -> WeatherScreen(
                             viewModel = weatherViewModel,
-                            onOpenChat = { showChat = true }
+                            onOpenChat = { screen = Screen.CHAT },
+                            onOpenRadar = { screen = Screen.RADAR }
+                        )
+                        Screen.CHAT -> ChatScreen(
+                            weatherViewModel = weatherViewModel,
+                            onBack = { screen = Screen.WEATHER }
+                        )
+                        Screen.RADAR -> RadarScreen(
+                            lat = latLon?.first ?: 0.0,
+                            lon = latLon?.second ?: 0.0,
+                            locationName = locationName,
+                            onBack = { screen = Screen.WEATHER }
                         )
                     }
                 }
