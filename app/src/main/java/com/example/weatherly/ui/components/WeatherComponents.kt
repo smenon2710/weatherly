@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Brightness3
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,6 +69,7 @@ import com.example.weatherly.data.model.MetricChart
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
+import com.example.weatherly.util.MoonCalculator
 
 // --- Colours resolved from the active Material 3 colour scheme ---
 val AppBackground: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -589,13 +592,14 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
 }
 
 /**
- * Sun & Moon tile — always relevant.
- * Day: shows sun position on arc between sunrise and sunset.
- * Night: shows moon position on arc between today's sunset and tomorrow's sunrise.
+ * Sun tile — redesigned for clarity.
+ * Shows a progress arc (passed time filled) with golden-hour glow zones near the horizon.
+ * Day: arc from sunrise → now (filled) → sunset.
+ * Night: arc from sunset → now (filled) → tomorrow's sunrise.
  * The `sub` field encodes "Sunset HH:MM|TomorrowRise HH:MM".
  */
 @Composable
-fun SunMoonTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SunTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val parts = data.sub?.split("|")?.associate {
         val kv = it.trim().split(" ", limit = 2)
         kv.getOrElse(0) { "" } to kv.getOrElse(1) { "" }
@@ -603,71 +607,103 @@ fun SunMoonTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modif
     val sunsetTime = parts["Sunset"]
     val tomorrowRise = parts["TomorrowRise"]
 
-    val accentCapture = data.accent
-    val moonColor = Color(0xFF93A1B8)
-    val trackColor = TextSecondary.copy(alpha = 0.15f)
+    val accent = data.accent
+    val moonCol = Color(0xFF93A1B8)
+    val trackCol = TextSecondary.copy(alpha = 0.14f)
+    val goldenCol = Color(0xFFE8A840).copy(alpha = 0.35f)
     val textPrimary = TextPrimary
     val textSec = TextSecondary
 
     GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             SectionLabel(data.icon, data.label, data.accent)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
-            Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.BottomCenter) {
+            Box(modifier = Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.BottomCenter) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val sw = 2.5.dp.toPx()
+                    val sw = 3.dp.toPx()
                     val r = (size.width / 2f - sw).coerceAtMost(size.height - sw)
                     val cx = size.width / 2f
                     val cy = size.height
                     val arcTL = Offset(cx - r, cy - r)
                     val arcSz = Size(r * 2f, r * 2f)
 
-                    drawArc(color = trackColor, startAngle = 180f, sweepAngle = 180f,
-                        useCenter = false, topLeft = arcTL, size = arcSz,
-                        style = Stroke(width = sw, cap = StrokeCap.Round))
-
                     val cal = Calendar.getInstance()
                     val nowH = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
 
                     val frac: Float
-                    val dotColor: Color
-                    val dotGlow: Color
+                    val dotCol: Color
+                    val spanH: Float
+
                     if (isDay) {
-                        val riseH = parseTimeHour(data.value)
-                        val setH = parseTimeHour(sunsetTime) ?: riseH?.plus(12f)
-                        frac = if (riseH != null && setH != null && setH > riseH)
-                            ((nowH - riseH) / (setH - riseH)).coerceIn(0f, 1f) else 0.5f
-                        dotColor = accentCapture
-                        dotGlow = accentCapture.copy(alpha = 0.25f)
+                        val riseH = parseTimeHour(data.value) ?: 6f
+                        val setH  = parseTimeHour(sunsetTime) ?: 18f
+                        spanH = (setH - riseH).coerceAtLeast(0.1f)
+                        frac  = ((nowH - riseH) / spanH).coerceIn(0f, 1f)
+                        dotCol = accent
                     } else {
-                        // Night arc: left = sunset, right = next sunrise
-                        val setH = parseTimeHour(sunsetTime) ?: 20f
+                        val setH  = parseTimeHour(sunsetTime) ?: 20f
                         var riseH = parseTimeHour(tomorrowRise) ?: 6f
-                        // Normalize: tomorrow's sunrise is always after sunset
                         if (riseH <= setH) riseH += 24f
+                        spanH = (riseH - setH).coerceAtLeast(0.1f)
                         val nowNorm = if (nowH < setH) nowH + 24f else nowH
-                        frac = ((nowNorm - setH) / (riseH - setH)).coerceIn(0f, 1f)
-                        dotColor = moonColor
-                        dotGlow = moonColor.copy(alpha = 0.25f)
+                        frac  = ((nowNorm - setH) / spanH).coerceIn(0f, 1f)
+                        dotCol = moonCol
                     }
 
-                    // arc: frac=0 → left (180°), frac=1 → right (0°)
+                    // Golden-hour glow at both horizon ends (first/last 30 min ≈ 0.5/spanH fraction)
+                    val goldenFrac = (0.5f / spanH).coerceAtMost(0.12f)
+                    drawArc(color = goldenCol, startAngle = 180f, sweepAngle = goldenFrac * 180f,
+                        useCenter = false, topLeft = arcTL, size = arcSz,
+                        style = Stroke(width = sw * 1.5f, cap = StrokeCap.Round))
+                    drawArc(color = goldenCol, startAngle = 360f - goldenFrac * 180f, sweepAngle = goldenFrac * 180f,
+                        useCenter = false, topLeft = arcTL, size = arcSz,
+                        style = Stroke(width = sw * 1.5f, cap = StrokeCap.Round))
+
+                    // Track (dim full arc behind progress)
+                    drawArc(color = trackCol, startAngle = 180f, sweepAngle = 180f,
+                        useCenter = false, topLeft = arcTL, size = arcSz,
+                        style = Stroke(width = sw, cap = StrokeCap.Round))
+
+                    // Progress arc — elapsed portion of the day or night
+                    if (frac > 0.005f) {
+                        drawArc(
+                            color = dotCol.copy(alpha = 0.55f),
+                            startAngle = 180f, sweepAngle = frac * 180f,
+                            useCenter = false, topLeft = arcTL, size = arcSz,
+                            style = Stroke(width = sw, cap = StrokeCap.Round)
+                        )
+                    }
+
+                    // Dot at current position
                     val angleDeg = 180.0 - frac * 180.0
                     val angleRad = angleDeg * (PI / 180.0)
                     val dotX = (cx + r * cos(angleRad)).toFloat()
                     val dotY = (cy - r * sin(angleRad)).toFloat()
-                    drawCircle(color = dotGlow, radius = 9.dp.toPx(), center = Offset(dotX, dotY))
-                    drawCircle(color = dotColor, radius = 5.dp.toPx(), center = Offset(dotX, dotY))
+                    drawCircle(color = dotCol.copy(alpha = 0.28f), radius = 10.dp.toPx(), center = Offset(dotX, dotY))
+                    drawCircle(color = dotCol, radius = 5.dp.toPx(), center = Offset(dotX, dotY))
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
+
             if (isDay) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                // Day length calculation
+                val riseH = parseTimeHour(data.value)
+                val setH  = parseTimeHour(sunsetTime)
+                val dayLenText = if (riseH != null && setH != null && setH > riseH) {
+                    val totalMin = ((setH - riseH) * 60).toInt()
+                    "${totalMin / 60}h ${totalMin % 60}m daylight"
+                } else null
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom) {
                     Column {
                         Text("↑ sunrise", color = textSec, fontSize = 10.sp)
                         Text(data.value, color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    if (dayLenText != null) {
+                        Text(dayLenText, color = textSec, fontSize = 10.sp, modifier = Modifier.padding(bottom = 2.dp))
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("↓ sunset", color = textSec, fontSize = 10.sp)
@@ -675,13 +711,14 @@ fun SunMoonTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modif
                     }
                 }
             } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom) {
                     Column {
-                        Text("↓ set", color = textSec, fontSize = 10.sp)
-                        Text(sunsetTime ?: "--", color = textSec, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("↓ tonight", color = textSec, fontSize = 10.sp)
+                        Text(sunsetTime ?: "--", color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("↑ rise tmrw", color = textSec, fontSize = 10.sp)
+                        Text("↑ tomorrow", color = textSec, fontSize = 10.sp)
                         Text(tomorrowRise ?: "--", color = textSec, fontSize = 14.sp)
                     }
                 }
@@ -690,12 +727,101 @@ fun SunMoonTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modif
     }
 }
 
+/**
+ * Moon tile — full-width, self-contained.
+ * Draws the current lunar phase as an illuminated-disk Canvas illustration.
+ * Phase, illumination %, and days to next Full/New Moon are computed from the current date.
+ * `data.gaugeFraction` carries the phase fraction (0=new, 0.5=full) set by buildMetricTiles.
+ */
+@Composable
+fun MoonTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val phase = (data.gaugeFraction ?: 0f).toDouble()
+    val litCol  = Color(0xFFE0D8BC)
+    val darkCol = Color(0xFF1A2230)
+    val accent  = data.accent
+    val textPrimary = TextPrimary
+    val textSec = TextSecondary
+
+    GlassCard(modifier = modifier, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Moon phase illustration
+            Canvas(modifier = Modifier.size(72.dp)) {
+                val r = size.minDimension / 2f - 2.dp.toPx()
+                drawMoonPhase(center, r, phase.toFloat(), litCol, darkCol)
+                // Thin rim for definition
+                drawCircle(color = accent.copy(alpha = 0.18f), radius = r,
+                    style = Stroke(width = 1.dp.toPx()))
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(data.value, color = textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(data.sub ?: "", color = textSec, fontSize = 13.sp)
+                // Next event — second sentence of description
+                val nextEvt = data.description.split(". ").getOrNull(1)?.trimEnd('.')
+                if (!nextEvt.isNullOrBlank()) {
+                    Text(nextEvt, color = accent, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Draws the illuminated portion of the moon disk for the given phase (0=new, 0.5=full, 1=new).
+ * Uses an arc-based path: a semicircle on the lit side closed by an ellipse (the terminator).
+ * The terminator semi-width = r * |cos(phase * 2π)|, giving a crescent for phases near 0/1
+ * and a gibbous shape for phases near 0.5.
+ */
+private fun DrawScope.drawMoonPhase(center: Offset, r: Float, phase: Float, litCol: Color, darkCol: Color) {
+    val cx = center.x; val cy = center.y
+    val circR = Rect(cx - r, cy - r, cx + r, cy + r)
+
+    if (phase < 0.02f || phase > 0.98f) { drawCircle(darkCol, r, center); return }
+    if (phase in 0.48f..0.52f)          { drawCircle(litCol,  r, center); return }
+
+    drawCircle(litCol, r, center)
+
+    val termX = r * cos(phase * 2 * PI).toFloat()   // positive = right of centre
+    val eW    = kotlin.math.abs(termX)
+    val ellR  = Rect(cx - eW, cy - r, cx + eW, cy + r)
+
+    val shadowPath = Path()
+    if (phase < 0.5f) {
+        // Waxing: lit right → shadow on left
+        shadowPath.moveTo(cx, cy - r)
+        shadowPath.arcTo(circR, -90f, -180f, false)   // CCW: top → left → bottom
+        if (eW > 0.5f) {
+            val sweep = if (termX >= 0f) -180f else 180f
+            shadowPath.arcTo(ellR, 90f, sweep, false)  // bottom → top via terminator
+        } else shadowPath.lineTo(cx, cy - r)
+    } else {
+        // Waning: lit left → shadow on right
+        shadowPath.moveTo(cx, cy - r)
+        shadowPath.arcTo(circR, -90f, 180f, false)    // CW: top → right → bottom
+        if (eW > 0.5f) {
+            val sweep = if (termX >= 0f) 180f else -180f
+            shadowPath.arcTo(ellR, 90f, sweep, false)
+        } else shadowPath.lineTo(cx, cy - r)
+    }
+    shadowPath.close()
+    drawPath(shadowPath, darkCol)
+}
+
 private fun parseTimeHour(time: String?): Float? {
     if (time == null || time == "--") return null
-    val parts = time.split(":")
-    val h = parts.getOrNull(0)?.toFloatOrNull() ?: return null
-    val m = parts.getOrNull(1)?.toFloatOrNull() ?: 0f
-    return h + m / 60f
+    val clean = time.trim().uppercase()
+    val isPM = clean.endsWith("PM")
+    val isAM = clean.endsWith("AM")
+    val numeric = clean.removeSuffix("PM").removeSuffix("AM").trim()
+    val parts = numeric.split(":")
+    val h = parts.getOrNull(0)?.trim()?.toFloatOrNull() ?: return null
+    val m = parts.getOrNull(1)?.trim()?.toFloatOrNull() ?: 0f
+    var hour = h + m / 60f
+    if (isPM && h < 12f) hour += 12f
+    if (isAM && h == 12f) hour -= 12f  // 12 AM = midnight
+    return hour
 }
 
 sealed interface DetailSheet {
@@ -757,11 +883,13 @@ fun MetricsGrid(
             }, Modifier.fillMaxWidth())
         }
         m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
-        // Sun & Moon arc card + Visibility gauge
+        // Sun tile + Visibility gauge
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["Sun & Moon"]?.let { t -> SunMoonTile(t, data.isDay, { click(t) }, Modifier.weight(1f)) }
+            m["Sunrise"]?.let { t -> SunTile(t, data.isDay, { click(t) }, Modifier.weight(1f)) }
             m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
         }
+        // Moon phase — full width
+        m["Moon Phase"]?.let { t -> MoonTile(t, { click(t) }, Modifier.fillMaxWidth()) }
     }
 }
 
@@ -800,13 +928,24 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         gaugeFraction = d.aqi?.let { (it / 200f).coerceIn(0f, 1f) }))
 
     val tomorrowSunrise = d.daily.getOrNull(1)?.sunrise
-    // sub encodes: "Sunset HH:MM | TomorrowRise HH:MM" so SunMoonTile can parse both
-    val sunMoonSub = listOfNotNull(
+    // sub encodes: "Sunset HH:MM|TomorrowRise HH:MM" so SunTile can parse both
+    val sunSub = listOfNotNull(
         d.sunset?.let { "Sunset $it" },
         tomorrowSunrise?.let { "TomorrowRise $it" }
     ).joinToString("|")
-    add(MetricTileData(Icons.Filled.WbTwilight, "Sun & Moon", d.sunrise ?: "--", sunMoonSub.ifBlank { null }, Orange,
+    add(MetricTileData(Icons.Filled.WbTwilight, "Sunrise", d.sunrise ?: "--", sunSub.ifBlank { null }, Orange,
         "The sun rises at ${d.sunrise ?: "--"} and sets at ${d.sunset ?: "--"} today. Tomorrow's sunrise: ${tomorrowSunrise ?: "--"}."))
+
+    val cal = java.util.Calendar.getInstance()
+    val moonPhase = MoonCalculator.phase(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+    val moonName = MoonCalculator.phaseName(moonPhase)
+    val moonIllum = MoonCalculator.illuminationPct(moonPhase)
+    val (nextEventName, nextEventDays) = MoonCalculator.nextEvent(moonPhase)
+    val nextEventStr = if (nextEventDays == 0) "$nextEventName tonight" else "$nextEventName in $nextEventDays day${if (nextEventDays == 1) "" else "s"}"
+    add(MetricTileData(Icons.Filled.Brightness3, "Moon Phase", moonName, "$moonIllum% illuminated", Purple,
+        "$moonName · $moonIllum% illuminated. $nextEventStr.",
+        gaugeFraction = moonPhase.toFloat()))
+
     add(MetricTileData(Icons.Filled.Air, "Wind", d.windKmh?.let { "$it ${d.windUnit}" } ?: "--",
         listOfNotNull(d.windDir, d.windGustKmh?.let { "gusts $it" }).joinToString(" · ").ifBlank { null }, Teal,
         "Wind is blowing" + (d.windDir?.let { " from the $it" } ?: "") +
@@ -1272,6 +1411,55 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
 }
 
 @Composable
+private fun MoonDetailContent(sheet: DetailSheet.Metric) {
+    val cal = java.util.Calendar.getInstance()
+    val moonPhase = MoonCalculator.phase(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+    val litCol  = Color(0xFFE0D8BC)
+    val darkCol = Color(0xFF1A2230)
+    val textPrimary = TextPrimary
+    val textSec = TextSecondary
+    val accent = sheet.accent
+
+    SectionLabel(sheet.icon, sheet.title, accent)
+    Spacer(Modifier.height(20.dp))
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Canvas(modifier = Modifier.size(110.dp)) {
+            val r = size.minDimension / 2f - 3.dp.toPx()
+            drawCircle(color = darkCol.copy(alpha = 0.35f), radius = r + 3.dp.toPx())
+            drawMoonPhase(center, r, moonPhase.toFloat(), litCol, darkCol)
+            drawCircle(color = accent.copy(alpha = 0.22f), radius = r, style = Stroke(width = 1.5.dp.toPx()))
+        }
+        Spacer(Modifier.width(24.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(sheet.value, color = textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            // description = "PhaseName · XX% illuminated. Next event."
+            val illumPart = sheet.description.substringAfter("·").trim().substringBefore(".").trim()
+            if (illumPart.isNotBlank()) Text(illumPart, color = textSec, fontSize = 14.sp)
+            val nextEvent = sheet.description.split(". ").getOrNull(1)?.trimEnd('.')
+            if (!nextEvent.isNullOrBlank()) {
+                Text(nextEvent, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+
+    Spacer(Modifier.height(22.dp))
+
+    // Phase cycle description
+    val phaseDesc = when {
+        moonPhase < 0.0625 || moonPhase >= 0.9375 -> "The moon is not visible tonight. New moons mark the start of the lunar cycle and often bring darker, star-filled skies."
+        moonPhase < 0.1875 -> "A thin crescent is visible in the western sky after sunset. The lit sliver grows each night."
+        moonPhase < 0.3125 -> "Half of the moon is illuminated. The right side is lit in the northern hemisphere. Expect moderate tidal ranges."
+        moonPhase < 0.4375 -> "More than half the moon is lit. The full disk is approaching; expect brighter nights."
+        moonPhase < 0.5625 -> "The moon is fully illuminated, rising at sunset and setting at sunrise. The brightest nights of the month."
+        moonPhase < 0.6875 -> "The lit area is now shrinking from the right. The moon rises after sunset and sets after sunrise."
+        moonPhase < 0.8125 -> "The left side is now lit. The moon rises around midnight and is high in the morning sky."
+        else               -> "A thin crescent in the eastern sky before sunrise. The cycle is nearly complete."
+    }
+    Text(phaseDesc, color = textSec, fontSize = 14.sp, lineHeight = 21.sp)
+}
+
+@Composable
 fun DetailSheetContent(sheet: DetailSheet) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
         when (sheet) {
@@ -1279,6 +1467,7 @@ fun DetailSheetContent(sheet: DetailSheet) {
                 "Wind"          -> WindDetailContent(sheet)
                 "Feels like"    -> FeelsLikeDetailContent(sheet)
                 "Precipitation" -> PrecipDetailContent(sheet)
+                "Moon Phase"    -> MoonDetailContent(sheet)
                 else            -> DefaultMetricContent(sheet)
             }
             is DetailSheet.Day -> {
