@@ -2,6 +2,7 @@ package com.example.weatherly.ui
 
 import android.view.ViewGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -235,15 +237,18 @@ fun RadarScreen(
                 val label = remember(ts) {
                     SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts * 1000))
                 }
+                val badgeShape = RoundedCornerShape(14.dp)
+                val badgeStroke = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.55f))
+                        .clip(badgeShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, badgeStroke, badgeShape)
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(label, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

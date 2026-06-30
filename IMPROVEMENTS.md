@@ -77,18 +77,16 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 29 | Weather-change push notification | 1–2 days |
 | 30 | Share current weather | half-day |
 
-### Pending — Design Upgrades (same aesthetic, higher craft)
+### Completed — Design Upgrades (2026-06-30)
 
-Documented 2026-06-30. None break existing palette, type scale, or component structure.
-
-| # | Title | Effort | Impact |
-|---|---|---|---|
-| D1 | Time-of-day hero gradient tinting | 1 h | High |
-| D2 | Hourly strip edge fade (scroll affordance) | 30 min | Medium |
-| D3 | Sparkline "Now" dot — slow pulse animation | 30 min | Low–Medium |
-| D4 | Chat empty state with example prompts | 1 h | High (AI positioning) |
-| D5 | Daily forecast temperature range bar | 2 h | High |
-| D6 | Radar timestamp badge — GlassCard styling | 30 min | Low |
+| # | Title | Impact |
+|---|---|---|
+| D1 | Time-of-day hero gradient tinting | High |
+| D2 | Hourly strip edge fade (scroll affordance) | Medium |
+| D3 | Sparkline "Now" dot — slow pulse animation | Low–Medium |
+| D4 | Chat empty state with example prompts + hasKey note | High (AI positioning) |
+| D5 | Daily forecast temperature range bar | High — was already implemented |
+| D6 | Radar timestamp badge — GlassCard styling | Low |
 
 ### Deferred
 

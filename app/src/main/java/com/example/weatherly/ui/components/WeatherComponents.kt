@@ -1,5 +1,11 @@
 package com.example.weatherly.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
@@ -42,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +61,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.PathEffect
@@ -125,7 +134,14 @@ fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
         else ->
             if (isDark) Color(0xFF141C24) else Color(0xFFC8D2DC)
     }
-    return listOf(sky, base)
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val tintedSky = when (hour) {
+        in 5..6   -> lerp(sky, Color(0xFFE8936A), 0.18f)  // dawn — warm apricot
+        in 17..18 -> lerp(sky, Color(0xFFD4A44C), 0.15f)  // golden hour — amber
+        in 19..20 -> lerp(sky, Color(0xFFA0668A), 0.20f)  // dusk — dusty violet
+        else      -> sky
+    }
+    return listOf(tintedSky, base)
 }
 
 // Soft tinted pill — light pastels in light mode, dark tints with contrasting text in dark mode.
@@ -290,29 +306,51 @@ fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
                 Text("H:$high°  L:$low°", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             }
             Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                items(data.hourly) { h ->
-                    val isNow = h.hourLabel == "Now"
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            h.hourLabel,
-                            color = if (isNow) TextPrimary else TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
-                        h.precipChance?.takeIf { it > 0 }?.let {
-                            Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            val listState = rememberLazyListState()
+            val cardSurface = MaterialTheme.colorScheme.surface
+            Box(modifier = Modifier.fillMaxWidth()) {
+                LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    items(data.hourly) { h ->
+                        val isNow = h.hourLabel == "Now"
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                h.hourLabel,
+                                color = if (isNow) TextPrimary else TextSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
+                            h.precipChance?.takeIf { it > 0 }?.let {
+                                Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "${h.tempC}°",
+                                color = if (isNow) TextPrimary else TextSecondary,
+                                fontSize = 16.sp,
+                                fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "${h.tempC}°",
-                            color = if (isNow) TextPrimary else TextSecondary,
-                            fontSize = 16.sp,
-                            fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
-                        )
                     }
+                }
+                // Right fade — always shown as scroll affordance
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(28.dp)
+                        .fillMaxHeight()
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, cardSurface)))
+                )
+                // Left fade — only when scrolled past the first item
+                if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(20.dp)
+                            .fillMaxHeight()
+                            .background(Brush.horizontalGradient(listOf(cardSurface, Color.Transparent)))
+                    )
                 }
             }
         }
@@ -516,6 +554,14 @@ fun ArcGaugeTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier =
 @Composable
 fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val textSecColor = TextSecondary
+    val infiniteTransition = rememberInfiniteTransition(label = "nowPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "pulse"
+    )
     GlassCard(modifier = modifier, onClick = onClick) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth(),
@@ -565,6 +611,9 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
                     drawPath(fillPath, brush = Brush.verticalGradient(listOf(fillTop, fillBot)))
                     drawPath(linePath, color = accent,
                         style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    val capturedPulse = pulseScale
+                    drawCircle(color = accent.copy(alpha = 0.28f), radius = 3.5.dp.toPx() * capturedPulse,
+                        center = Offset(xAt(0), yAt(values.first())))
                     drawCircle(color = accent, radius = 3.5.dp.toPx(),
                         center = Offset(xAt(0), yAt(values.first())))
 

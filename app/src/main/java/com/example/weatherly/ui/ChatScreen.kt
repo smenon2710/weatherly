@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -153,7 +154,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (messages.isEmpty()) {
-                    item { EmptyState() }
+                    item { EmptyState(hasKey = chatViewModel.hasKey, onQueryClick = { input = it }) }
                 }
                 itemsIndexed(messages) { _, msg -> MessageBubble(msg) }
                 if (sending) {
@@ -236,7 +237,7 @@ private fun ChatHeader(subtitle: String, onBack: () -> Unit, onNewChat: () -> Un
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(hasKey: Boolean, onQueryClick: (String) -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -249,6 +250,38 @@ private fun EmptyState() {
             "Tap a quick question below, or type your own.",
             color = TextSecondary, fontSize = 13.sp
         )
+        Spacer(Modifier.height(20.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                "Best day this week for a long run?",
+                "Packing for 4 days — what should I bring?",
+                "What should I wear today?"
+            ).forEach { query ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .clickable { onQueryClick(query) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("\"$query\"", color = TextSecondary, fontSize = 14.sp)
+                }
+            }
+        }
+        if (!hasKey) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Tip: add your OpenRouter key to enable AI replies.",
+                color = TextSecondary.copy(alpha = 0.60f),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
     }
 }
 
