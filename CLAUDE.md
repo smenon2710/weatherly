@@ -103,7 +103,7 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 |---|---|---|
 | `ArcGaugeTile` | UV, AQI, Humidity, Pressure, Visibility | 88dp Canvas arc (240° sweep, 150° start), track + filled portion keyed by `gaugeFraction` in `MetricTileData` |
 | `SparklineTile` | Wind, Feels Like, Precipitation | Area sparkline with vertical gradient fill, "Now" dot at index 0, time axis labels. Draws a dashed vertical line + "tmrw" label at `MetricChart.dayChangeIndex` when the data spans midnight. |
-| `SunTile` | Sunrise/Sunset | 64dp semicircle arc showing elapsed portion of the day or night (progress-filled), golden-hour glow zones near both horizon endpoints, day-length label. Day mode: arc from sunrise → now → sunset. Night mode: arc from sunset → now → tomorrow's sunrise. |
+| `SunTile` | Sunrise/Sunset | Flexible-height semicircle arc (min 64dp, scales with card) showing elapsed portion of the day or night (progress-filled), golden-hour glow zones near both horizon endpoints. Day mode: arc from sunrise → now → sunset; sunrise/sunset times shown below. Night mode: arc from sunset → now → tomorrow's sunrise; tonight/tomorrow times shown below. The Sunrise+Visibility row uses `Modifier.height(IntrinsicSize.Max)` + `fillMaxHeight()` so both cards match the taller one's height and the arc grows proportionally. |
 | `MoonTile` | Moon Phase | Full-width card with a 72dp Canvas moon-phase illustration on the left and phase name / illumination % / next-event countdown on the right. |
 
 `MetricsGrid` layout order: UV + AQI row → Humidity + Pressure row → Wind (full-width) → Feels Like (full-width) → Precipitation (full-width) → Sunrise + Visibility row → Moon Phase (full-width).

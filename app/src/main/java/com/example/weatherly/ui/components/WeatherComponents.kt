@@ -10,12 +10,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -470,7 +474,11 @@ fun ArcGaugeTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier =
     val textColor = TextPrimary
     val textSecColor = TextSecondary
     GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             SectionLabel(data.icon, data.label, data.accent)
             Spacer(Modifier.height(8.dp))
             val fraction = (data.gaugeFraction ?: 0f).coerceIn(0f, 1f)
@@ -616,11 +624,11 @@ fun SunTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modifier:
     val textSec = TextSecondary
 
     GlassCard(modifier = modifier, onClick = onClick, corner = 22.dp) {
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             SectionLabel(data.icon, data.label, data.accent)
             Spacer(Modifier.height(6.dp))
 
-            Box(modifier = Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.BottomCenter) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 64.dp), contentAlignment = Alignment.BottomCenter) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val sw = 3.dp.toPx()
                     val r = (size.width / 2f - sw).coerceAtMost(size.height - sw)
@@ -689,38 +697,31 @@ fun SunTile(data: MetricTileData, isDay: Boolean, onClick: () -> Unit, modifier:
             Spacer(Modifier.height(6.dp))
 
             if (isDay) {
-                // Day length calculation
-                val riseH = parseTimeHour(data.value)
-                val setH  = parseTimeHour(sunsetTime)
-                val dayLenText = if (riseH != null && setH != null && setH > riseH) {
-                    val totalMin = ((setH - riseH) * 60).toInt()
-                    "${totalMin / 60}h ${totalMin % 60}m daylight"
-                } else null
-
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom) {
                     Column {
-                        Text("↑ sunrise", color = textSec, fontSize = 10.sp)
-                        Text(data.value, color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    if (dayLenText != null) {
-                        Text(dayLenText, color = textSec, fontSize = 10.sp, modifier = Modifier.padding(bottom = 2.dp))
+                        Text("↑ sunrise", color = textSec, fontSize = 10.sp, maxLines = 1)
+                        Text(data.value, color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("↓ sunset", color = textSec, fontSize = 10.sp)
-                        Text(sunsetTime ?: "--", color = textSec, fontSize = 14.sp)
+                        Text("↓ sunset", color = textSec, fontSize = 10.sp, maxLines = 1)
+                        Text(sunsetTime ?: "--", color = textSec, fontSize = 14.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             } else {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom) {
                     Column {
-                        Text("↓ tonight", color = textSec, fontSize = 10.sp)
-                        Text(sunsetTime ?: "--", color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("↓ tonight", color = textSec, fontSize = 10.sp, maxLines = 1)
+                        Text(sunsetTime ?: "--", color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("↑ tomorrow", color = textSec, fontSize = 10.sp)
-                        Text(tomorrowRise ?: "--", color = textSec, fontSize = 14.sp)
+                        Text("↑ tomorrow", color = textSec, fontSize = 10.sp, maxLines = 1)
+                        Text(tomorrowRise ?: "--", color = textSec, fontSize = 14.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -884,10 +885,11 @@ fun MetricsGrid(
             }, Modifier.fillMaxWidth())
         }
         m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
-        // Sun tile + Visibility gauge
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["Sunrise"]?.let { t -> SunTile(t, data.isDay, { click(t) }, Modifier.weight(1f)) }
-            m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+        // Sun tile + Visibility gauge — IntrinsicSize.Max ensures equal card heights;
+        // fillMaxHeight lets each tile fill to the taller one.
+        Row(modifier = Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["Sunrise"]?.let { t -> SunTile(t, data.isDay, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
+            m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
         }
         // Moon phase — full width
         m["Moon Phase"]?.let { t -> MoonTile(t, { click(t) }, Modifier.fillMaxWidth()) }
