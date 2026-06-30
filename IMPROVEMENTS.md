@@ -77,6 +77,19 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 29 | Weather-change push notification | 1–2 days |
 | 30 | Share current weather | half-day |
 
+### Pending — Design Upgrades (same aesthetic, higher craft)
+
+Documented 2026-06-30. None break existing palette, type scale, or component structure.
+
+| # | Title | Effort | Impact |
+|---|---|---|---|
+| D1 | Time-of-day hero gradient tinting | 1 h | High |
+| D2 | Hourly strip edge fade (scroll affordance) | 30 min | Medium |
+| D3 | Sparkline "Now" dot — slow pulse animation | 30 min | Low–Medium |
+| D4 | Chat empty state with example prompts | 1 h | High (AI positioning) |
+| D5 | Daily forecast temperature range bar | 2 h | High |
+| D6 | Radar timestamp badge — GlassCard styling | 30 min | Low |
+
 ### Deferred
 
 | # | Title | Note |
@@ -819,3 +832,137 @@ There is no way to share conditions with another person (e.g. "It's 31° and par
 | `DayEntry.precipSumMm` | `DayEntry.precipSum` |
 
 Touches ~15 files. Use IDE rename refactoring (not find-replace) to catch all usages. Review `WeatherAdvisor`'s internal `toC()` / `toKmh()` conversions after the rename.
+
+---
+
+## Design Upgrades ⬜ Pending
+
+### D1. Time-of-day hero gradient tinting
+
+**What:** The condition gradient (`conditionGradient` in `WeatherComponents.kt`) already adapts to WMO code + `isDay`. Add a time-of-day warm/cool tint blended into the first stop so the hero changes subtly through the day. Dawn and dusk are the highest-anxiety weather-check moments — lean into them visually.
+
+**Tint map (blend at ~15–20% alpha over the existing condition color):**
+
+| Hour | Tint | Hex |
+|---|---|---|
+| 5–7 AM (dawn) | warm apricot | `#E8936A` at 18% |
+| 7–17 (day) | no tint | — |
+| 17–19 (golden hour) | amber | `#D4A44C` at 15% |
+| 19–21 (dusk) | dusty violet | `#A0668A` at 20% |
+| 21–5 (night) | already handled by `isDay = false` | — |
+
+**Implementation:** In `conditionGradient`, read `Calendar.HOUR_OF_DAY`, pick the tint color + alpha, and use `lerp(baseColor, tintColor, alpha)` for the first gradient stop. No new parameters needed. `lerp` is in `androidx.compose.ui.graphics.lerp`.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt`
+
+---
+
+### D2. Hourly strip edge fade (scroll affordance)
+
+**What:** The `LazyRow` in `HourlyCard` hard-clips at the card edge, giving no cue that more hours are scrollable. Wrap the `LazyRow` in a `Box` and overlay a `Brush.horizontalGradient` from `AppBackground → transparent` on the right edge (24dp wide) and a mirror fade on the left once scrolled past item 0.
+
+**Implementation:**
+```kotlin
+Box(modifier = Modifier.fillMaxWidth()) {
+    LazyRow(...) { ... }
+    // Right fade
+    Box(modifier = Modifier
+        .align(Alignment.CenterEnd)
+        .width(28.dp).fillMaxHeight()
+        .background(Brush.horizontalGradient(listOf(Color.Transparent, AppBackground))))
+    // Left fade — only show after scroll
+    if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+        Box(modifier = Modifier
+            .align(Alignment.CenterStart)
+            .width(20.dp).fillMaxHeight()
+            .background(Brush.horizontalGradient(listOf(AppBackground, Color.Transparent))))
+    }
+}
+```
+
+Use `rememberLazyListState()` and pass it to `LazyRow`. `AppBackground` must be captured as a local val before the lambda.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt` (`HourlyCard`)
+
+---
+
+### D3. Sparkline "Now" dot — slow pulse animation
+
+**What:** The filled circle at index 0 on each `SparklineTile` marks the present moment but is static. A gentle scale + alpha pulse (1.0 → 1.4 → 1.0 over ~2.4 s, infinite) reads as "live data" without distracting from the chart.
+
+**Implementation:** In `SparklineTile`'s Canvas block, the now-dot is drawn with `drawCircle`. Hoist the dot draw out of the Canvas into an overlay `Box`, or — easier — animate a `scale` value via `rememberInfiniteTransition` and pass it into the Canvas as a captured val (Compose will recompose the Canvas on each animation frame):
+
+```kotlin
+val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+val pulseScale by infiniteTransition.animateFloat(
+    initialValue = 1f, targetValue = 1.4f,
+    animationSpec = infiniteRepeatable(
+        animation = tween(1200, easing = FastOutSlowInEasing),
+        repeatMode = RepeatMode.Reverse
+    ), label = "pulse"
+)
+// Inside Canvas:
+drawCircle(color = accent.copy(alpha = 0.28f), radius = 3.5.dp.toPx() * pulseScale,
+    center = Offset(xAt(0), yAt(values.first())))
+drawCircle(color = accent, radius = 3.5.dp.toPx(),
+    center = Offset(xAt(0), yAt(values.first())))
+```
+
+Respect `LocalReduceMotion` (skip animation if user has reduced motion enabled):
+```kotlin
+val reduceMotion = LocalReduceMotion.current
+val pulseScale = if (reduceMotion) 1f else /* animated value */
+```
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt` (`SparklineTile`)
+
+---
+
+### D4. Chat empty state with example prompts
+
+**What:** `ChatScreen` shows blank space above the suggestion chips when no conversation has started. Users don't know what to ask an AI in a weather app. Two or three example queries in italic `TextSecondary` — removed as soon as the first message is sent — teach users the AI's real value (planning + context queries, not "will it rain?").
+
+**Example prompts to show:**
+- *"Best day this week for a long run?"*
+- *"I'm flying out Saturday — what's the weather like at my destination?"*
+- *"Packing for 4 days in Boston — what should I bring?"*
+
+**Implementation:** In `ChatScreen`, when `messages.isEmpty() && streamingText.isEmpty()`, show a `Column` centered in the message area with these strings as `Text(style = TextStyle(fontStyle = FontStyle.Italic), color = TextSecondary, fontSize = 14.sp)`. Wrap each in a `clickable` that populates the input field.
+
+Also: check `viewModel.hasKey` here. If false, show an additional note: *"Tip: add your OpenRouter key in Settings to enable AI replies."* This surfaces the key-entry gap (currently `hasKey` is defined in `ChatViewModel` but never checked in the UI).
+
+**File:** `app/src/main/java/com/example/weatherly/ui/ChatScreen.kt`
+
+---
+
+### D5. Daily forecast temperature range bar
+
+**What:** `DailyCard` rows show H/L as text (e.g., `H: 31°  L: 18°`). Without week context, users can't tell if today's high is near the weekly peak or trough. A 28–32dp wide horizontal bar per row — scaled to `weekMin`/`weekMax` on `WeatherData` — with the day's L→H range filled in the accent color gives instant week-level temperature context at a glance.
+
+**Data available:** `WeatherData.weekMinC` and `WeatherData.weekMaxC` are already on the model (same-unit caveat: they match the current unit system). `DayEntry.highC` and `DayEntry.lowC` are the per-day endpoints.
+
+**Visual:** A `Canvas` element 28dp wide × 14dp tall, positioned between the day label and the H/L text. Track: `TextSecondary` at 15% alpha, rounded caps. Filled range: accent color at 70% alpha, also rounded. Scale: `((value - weekMin) / (weekMax - weekMin)).coerceIn(0f, 1f)`.
+
+**Implementation note:** `DayEntry` currently receives the data — `weekMin`/`weekMax` need to be passed into `DailyCard` or propagated down. Since `WeatherData` is already passed to `MetricsGrid` and `DailyCard`, this is straightforward. Pass `data.weekMinC` and `data.weekMaxC` into `DailyCard` → `DailyRow`.
+
+**Files:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt` (`DailyCard`, `DailyRow`)
+
+---
+
+### D6. Radar timestamp badge — GlassCard styling
+
+**What:** The timestamp badge in `RadarScreen` (top-right corner showing the frame's UTC time) is currently a plain styled `Box` with a hardcoded background. It reads like a debug overlay rather than a polished UI element.
+
+**Change:** Replace the custom background with a `GlassCard`-style surface — same shadow, border, and `colorScheme.surface` fill as the metric tiles — at a smaller `corner = 14.dp` and `padding = 8.dp`. One line of change in `RadarScreen.kt`. The badge will then visually belong to the same design system as the rest of the app.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/RadarScreen.kt`
+
+---
+
+## AI Assistant — Strategic Note (2026-06-30)
+
+Average weather app session: **60–90 seconds, 3–5 sessions/day.** Sessions are too short for a conversational interface to be the primary interaction model — which is why the local `WeatherAdvisor` chips (zero latency, zero API cost) should handle the daily-use questions.
+
+The AI's job is the **weekly planning query**: *"What's the best day for a BBQ this week?"*, *"I'm hiking Saturday — what gear do I need?"* These require multi-day synthesis and personal context that no chart can answer. The name "SkySpeak" makes AI load-bearing to the brand — removing it would create a bigger problem than keeping it.
+
+**One fix needed before ship:** `ChatViewModel.hasKey` is defined but `ChatScreen` never checks it. A user with no API key hits a dead chat input with no explanation. Fix this as part of D4 (empty state) or item 25 (key-entry settings UI).
