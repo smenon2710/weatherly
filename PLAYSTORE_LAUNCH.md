@@ -1,6 +1,6 @@
 # Weatherly — Play Store Launch Guide
 
-> Merged from Claude + AGY notes. Solo developer, cost-efficient path.
+> Solo developer, cost-efficient path.
 
 ---
 
