@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — SkySpeak</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    line-height: 1.6;
+    color: #1a2530;
+    background: #f4f1eb;
+  }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .updated { color: #6b7280; font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 19px; margin-top: 36px; border-bottom: 1px solid #ddd6c9; padding-bottom: 6px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { text-align: left; padding: 8px 10px; border: 1px solid #ddd6c9; font-size: 14px; }
+  th { background: #eae5da; }
+  a { color: #6b86a3; }
+  code { background: #eae5da; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  footer { margin-top: 48px; color: #6b7280; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy — SkySpeak</h1>
+<p class="updated">Last updated: July 1, 2026</p>
+
+<p>
+  SkySpeak: Premium Weather Chat ("SkySpeak", "the app") is a weather application
+  developed by an independent solo developer. This policy explains what data the
+  app accesses, how it is used, and who it is shared with. SkySpeak has no backend
+  server of its own — it is a purely client-side app that talks directly to the
+  third-party services listed below.
+</p>
+
+<h2>Information the app accesses</h2>
+<table>
+  <tr><th>Data</th><th>Why</th><th>Leaves your device?</th></tr>
+  <tr>
+    <td>Precise / approximate location</td>
+    <td>To fetch weather, air quality, and radar data for where you are</td>
+    <td>Yes — sent to Open-Meteo and RainViewer as coordinates (see below)</td>
+  </tr>
+  <tr>
+    <td>City search text</td>
+    <td>To let you look up weather for a different location</td>
+    <td>Yes — sent to Open-Meteo's geocoding service</td>
+  </tr>
+  <tr>
+    <td>Chat messages you type to the AI assistant</td>
+    <td>To answer your question using an AI model</td>
+    <td>Only if you've configured an OpenRouter API key — see below</td>
+  </tr>
+  <tr>
+    <td>Unit preference, saved places, forecast cache</td>
+    <td>To remember your settings and show data instantly on next open</td>
+    <td>No — stored only in local on-device storage</td>
+  </tr>
+</table>
+
+<p>
+  SkySpeak does not require an account, does not use analytics or crash-reporting
+  SDKs, and does not contain advertising of any kind.
+</p>
+
+<h2>Third-party services</h2>
+<p>Because SkySpeak has no backend of its own, the data above is sent directly from your device to these services:</p>
+<ul>
+  <li>
+    <strong><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></strong>
+    — receives your location coordinates to return forecast, air quality, and
+    location-search results. See <a href="https://open-meteo.com/en/terms" target="_blank" rel="noopener">Open-Meteo's terms</a>.
+  </li>
+  <li>
+    <strong><a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a></strong> and
+    <strong><a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a></strong>
+    — receive approximate map-tile coordinates to display the precipitation radar map.
+  </li>
+  <li>
+    <strong><a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a></strong>
+    — only contacted if you enter your own OpenRouter API key in the app's chat
+    screen, or if the developer's build includes one. When active, the text you
+    type into the AI chat (plus your current forecast, used as context for the
+    answer) is sent to OpenRouter and forwarded to the underlying AI model to
+    generate a response. If you never open the chat screen or never configure a
+    key, no chat data is ever sent anywhere. See
+    <a href="https://openrouter.ai/privacy" target="_blank" rel="noopener">OpenRouter's privacy policy</a>.
+  </li>
+</ul>
+<p>
+  SkySpeak does not sell your data, and does not share it with any party for
+  advertising or marketing purposes.
+</p>
+
+<h2>Data stored on your device</h2>
+<p>The following is kept only in the app's local storage on your phone and never transmitted to the developer:</p>
+<ul>
+  <li>Your selected unit system (metric/imperial) and saved locations</li>
+  <li>The most recent successful forecast, cached so the app opens instantly offline</li>
+  <li>Your OpenRouter API key, if you choose to enter one (stored locally; only sent to OpenRouter itself when you send a chat message)</li>
+</ul>
+<p>
+  Uninstalling the app removes all of this data. There is no cloud account or
+  sync, so there is nothing for the developer to delete on your behalf beyond
+  what already lives only on your device.
+</p>
+
+<h2>Children's privacy</h2>
+<p>
+  SkySpeak is a general-audience weather utility and is not directed at children.
+  It does not knowingly collect personal information from children under 13.
+</p>
+
+<h2>Changes to this policy</h2>
+<p>
+  This policy may be updated as the app changes. The "Last updated" date at the
+  top of this page will reflect the most recent revision. Continued use of the
+  app after a change constitutes acceptance of the updated policy.
+</p>
+
+<h2>Contact</h2>
+<p>
+  Questions about this policy or your data can be sent to
+  <a href="mailto:sujithkumar.v.menon@gmail.com">sujithkumar.v.menon@gmail.com</a>.
+</p>
+
+<footer>
+  SkySpeak: Premium Weather Chat &middot; <a href="https://github.com/smenon2710/weatherly" target="_blank" rel="noopener">github.com/smenon2710/weatherly</a>
+</footer>
+
+</body>
+</html>
