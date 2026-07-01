@@ -73,9 +73,13 @@ import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.ui.components.Amber
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.Coral
 import com.example.weatherly.ui.components.Cyan
+import com.example.weatherly.ui.components.Green
+import com.example.weatherly.ui.components.Purple
+import com.example.weatherly.ui.components.Teal
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
 import com.example.weatherly.ui.components.WeatherGlyph
@@ -90,6 +94,15 @@ private val Suggestions = listOf(
     Suggestion("🥾 Hiking", "Is today a good day for hiking?", AdviceIntent.HIKING),
     Suggestion("👕 What to wear", "What should I wear today?", AdviceIntent.CLOTHING)
 )
+
+private fun suggestionTint(intent: AdviceIntent): Color = when (intent) {
+    AdviceIntent.UMBRELLA -> Cyan
+    AdviceIntent.JACKET   -> Purple
+    AdviceIntent.WALKING  -> Green
+    AdviceIntent.DRIVING  -> Amber
+    AdviceIntent.HIKING   -> Teal
+    AdviceIntent.CLOTHING -> Coral
+}
 
 @Composable
 fun ChatScreen(
@@ -383,11 +396,12 @@ private fun SuggestionRow(onPick: (Suggestion) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(Suggestions) { s ->
+            val tint = suggestionTint(s.intent)
             AssistChip(
                 onClick = { onPick(s) },
                 label = { Text(s.label) },
                 colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = tint.copy(alpha = 0.14f),
                     labelColor = TextPrimary
                 )
             )

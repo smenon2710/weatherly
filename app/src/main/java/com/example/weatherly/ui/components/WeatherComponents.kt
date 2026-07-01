@@ -893,6 +893,28 @@ sealed interface DetailSheet {
 }
 
 @Composable
+private fun PrimaryStatCell(data: MetricTileData, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick).padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            data.label.uppercase(),
+            color = TextSecondary, fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(data.value, color = data.accent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        data.sub?.let {
+            Text(
+                it, color = TextSecondary, fontSize = 11.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 fun MetricsGrid(
     data: WeatherData,
     onMetricClick: (DetailSheet.Metric) -> Unit,
@@ -905,26 +927,25 @@ fun MetricsGrid(
         onMetricClick(DetailSheet.Metric(t.icon, t.accent, t.label, t.value, t.description, t.chart))
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Arc gauges: UV + AQI
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["UV Index"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
-            m["Air Quality"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+
+        // ── Primary compact strip: UV | Humidity | Wind ───────────────────────
+        GlassCard(Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                m["UV Index"]?.let { t -> PrimaryStatCell(t, Modifier.weight(1f)) { click(t) } }
+                m["Humidity"]?.let { t -> PrimaryStatCell(t, Modifier.weight(1f)) { click(t) } }
+                m["Wind"]?.let { t ->
+                    PrimaryStatCell(t, Modifier.weight(1f)) {
+                        onMetricClick(DetailSheet.Metric(
+                            t.icon, t.accent, t.label, t.value, t.description, t.chart,
+                            windDir = data.windDir,
+                            windGust = data.windGustKmh?.let { "$it ${data.windUnit}" },
+                        ))
+                    }
+                }
+            }
         }
-        // Arc gauges: Humidity + Pressure
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["Humidity"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
-            m["Pressure"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
-        }
-        // Sparklines: Wind, Feels Like, Precipitation — each with its own rich detail payload
-        m["Wind"]?.let { t ->
-            SparklineTile(t, onClick = {
-                onMetricClick(DetailSheet.Metric(
-                    t.icon, t.accent, t.label, t.value, t.description, t.chart,
-                    windDir = data.windDir,
-                    windGust = data.windGustKmh?.let { "$it ${data.windUnit}" },
-                ))
-            }, Modifier.fillMaxWidth())
-        }
+
+        // ── Core sparklines: Feels Like + Precipitation ───────────────────────
         m["Feels like"]?.let { t ->
             SparklineTile(t, onClick = {
                 onMetricClick(DetailSheet.Metric(
@@ -934,13 +955,20 @@ fun MetricsGrid(
             }, Modifier.fillMaxWidth())
         }
         m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
-        // Sun tile + Visibility gauge — IntrinsicSize.Max ensures equal card heights;
-        // fillMaxHeight lets each tile fill to the taller one.
+
+        // ── Atmosphere: AQI + Pressure ────────────────────────────────────────
+        SectionLabel(Icons.Filled.Air, "Atmosphere", Teal)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["Air Quality"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+            m["Pressure"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+        }
+
+        // ── Sky: Sunrise + Visibility + Moon Phase ────────────────────────────
+        SectionLabel(Icons.Filled.WbTwilight, "Sky", Orange)
         Row(modifier = Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             m["Sunrise"]?.let { t -> SunTile(t, data.isDay, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
             m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
         }
-        // Moon phase — full width
         m["Moon Phase"]?.let { t -> MoonTile(t, { click(t) }, Modifier.fillMaxWidth()) }
     }
 }

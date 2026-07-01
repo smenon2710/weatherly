@@ -50,6 +50,7 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 - `WeatherViewModel` — `AndroidViewModel` exposing `StateFlow<WeatherUiState>`. On `init`, loads `ForecastCache` synchronously so the screen is never blank on cold start. Handles location resolution (falls back to `LocationProvider` when no place is selected), unit switching, city search, and pull-to-refresh. `WeatherUiState.Success` carries a `cachedAt: Long?` timestamp; non-null means the data came from cache and triggers a "Showing data from Xm ago" label. Background refreshes keep existing data visible (only the spinner changes). Also exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` set before every repository fetch.
 - `ChatViewModel` — Exposes `messages`, `sending`, and `streamingText: StateFlow<String>`. Accumulates SSE/simulated chunks into `_streamingText`; on completion moves the full text into `_messages`. `clear()` cancels any in-flight stream job. `hasKey: Boolean` is a `get()` property that returns true when an API key is available (on-device or build-time).
 - `ChatScreen` empty state — when `messages.isEmpty()`, shows three tappable example query rows (each calls `onQueryClick` to populate the input field). When `chatViewModel.hasKey` is false, appends a subdued "Tip: add your OpenRouter key" note.
+- `ChatScreen` suggestion chips — six `AssistChip`s in a `LazyRow` above the input field. `suggestionTint(intent: AdviceIntent): Color` (private, non-composable) maps each intent to a distinct accent: UMBRELLA → Cyan, JACKET → Purple, WALKING → Green, DRIVING → Amber, HIKING → Teal, CLOTHING → Coral. Each chip gets `containerColor = tint.copy(alpha = 0.14f)` so chip domains read at a glance without being visually loud.
 - `WeatherScreen` / `ChatScreen` / `RadarScreen` — Compose screens consuming the ViewModel via `collectAsStateWithLifecycle`.
 - `ui/components/` — Reusable Compose functions (header, hourly row, daily list, metric tiles, detail sheets).
 - `ui/theme/` — Material 3 color scheme, typography, `WeatherlyTheme`.
@@ -98,16 +99,17 @@ Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and
 
 **`GlassCard` (`ui/components/WeatherComponents.kt`):** The shared card wrapper. Shadow adapts per theme: `1 dp` in light (airy), `6 dp` in dark (depth). Border opacity likewise adapts. All major content sections (hourly, daily, metric tiles) use `GlassCard`.
 
-**Metric tile system (`MetricsGrid` in `WeatherComponents.kt`):** Four distinct composables:
+**Metric tile system (`MetricsGrid` in `WeatherComponents.kt`):** Five distinct composables:
 
 | Composable | Used for | Visual |
 |---|---|---|
-| `ArcGaugeTile` | UV, AQI, Humidity, Pressure, Visibility | 88dp Canvas arc (240° sweep, 150° start), track + filled portion keyed by `gaugeFraction` in `MetricTileData` |
-| `SparklineTile` | Wind, Feels Like, Precipitation | Area sparkline with vertical gradient fill, animated "Now" dot at index 0 (slow pulse: scale 1.0→1.4, 1.2 s, reverse, via `rememberInfiniteTransition` at the top of the composable — declared unconditionally before `GlassCard`; captured as `capturedPulse` before the Canvas block), time axis labels. Draws a dashed vertical line + "tmrw" label at `MetricChart.dayChangeIndex` when the data spans midnight. |
+| `PrimaryStatCell` | UV Index, Humidity, Wind (compact strip) | Equal-weight column inside a single top `GlassCard`: label at 10sp SemiBold uppercase, value at 22sp Bold in accent color, optional sub at 11sp `TextSecondary`. Each cell is individually `clickable` and opens the full detail sheet. |
+| `ArcGaugeTile` | AQI, Pressure, Visibility | 88dp Canvas arc (240° sweep, 150° start), track + filled portion keyed by `gaugeFraction` in `MetricTileData` |
+| `SparklineTile` | Feels Like, Precipitation | Area sparkline with vertical gradient fill, animated "Now" dot at index 0 (slow pulse: scale 1.0→1.4, 1.2 s, reverse, via `rememberInfiniteTransition` at the top of the composable — declared unconditionally before `GlassCard`; captured as `capturedPulse` before the Canvas block), time axis labels. Draws a dashed vertical line + "tmrw" label at `MetricChart.dayChangeIndex` when the data spans midnight. |
 | `SunTile` | Sunrise/Sunset | Flexible-height semicircle arc (min 64dp, scales with card) showing elapsed portion of the day or night (progress-filled), golden-hour glow zones near both horizon endpoints. Day mode: arc from sunrise → now → sunset; sunrise/sunset times shown below. Night mode: arc from sunset → now → tomorrow's sunrise; tonight/tomorrow times shown below. The Sunrise+Visibility row uses `Modifier.height(IntrinsicSize.Max)` + `fillMaxHeight()` so both cards match the taller one's height and the arc grows proportionally. |
 | `MoonTile` | Moon Phase | Full-width card with a 72dp Canvas moon-phase illustration on the left and phase name / illumination % / next-event countdown on the right. |
 
-`MetricsGrid` layout order: UV + AQI row → Humidity + Pressure row → Wind (full-width) → Feels Like (full-width) → Precipitation (full-width) → Sunrise + Visibility row → Moon Phase (full-width).
+`MetricsGrid` layout order: primary compact strip (UV | Humidity | Wind, single `GlassCard`) → Feels Like (SparklineTile, full-width) → Precipitation (SparklineTile, full-width) → `SectionLabel` "ATMOSPHERE" (Air icon, Teal) → AQI + Pressure row (ArcGaugeTiles) → `SectionLabel` "SKY" (WbTwilight icon, Orange) → Sunrise + Visibility row → Moon Phase (full-width).
 
 `gaugeFraction` values: UV `(uv/11).coerceIn(0,1)`, AQI `(aqi/200).coerceIn(0,1)`, Humidity `hum/100`, Pressure `((hPa-960)/90).coerceIn(0,1)`, Visibility `(km/max).coerceIn(0,1)` where max is 10 mi or 16 km. For Moon Phase, `gaugeFraction` stores the phase fraction (0.0 = new moon, 0.5 = full moon) as computed by `MoonCalculator.phase()`.
 

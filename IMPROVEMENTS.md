@@ -42,7 +42,9 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | # | Title |
 |---|---|
 | 10 | Offline last-known forecast (`ForecastCache` + stale label) |
+| 22 | Chat suggestion chips: semantic colour tinting (2026-07-01) |
 | 23 | ChatScreen: compact weather context strip |
+| 24 | MetricsGrid: primary compact strip + grouped secondary sections (2026-07-01) |
 | 26 | `WeatherGlyph` accessibility content descriptions |
 | 27 | `TipBanner`: left-border annotation style |
 | 31 | 12-hour lookahead headline under temperature (`buildUpcomingHeadline`) |
@@ -65,9 +67,7 @@ Fixes and features ordered by effort. Items within each tier are independent.
 
 | # | Title | Effort |
 |---|---|---|
-| 22 | Chat suggestion chips: semantic colour tinting | 1 h |
-| 24 | MetricsGrid: primary strip + grouped secondary | 2 h |
-| 25 | In-app OpenRouter key + model settings UI | 2–3 h (security trade-off — deferred) |
+| 25 | In-app OpenRouter key + model settings UI | 2–3 h (security trade-off — deferred; use `EncryptedSharedPreferences` when implemented) |
 
 ### Pending — Priority 3 (larger scope)
 
