@@ -102,6 +102,8 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | L6 | Release build verified end-to-end on-device (installed via `adb -t` due to an unrelated Android Studio baseline-profile deploy bug) — loads, renders, and the donation link works in the actual signed release build |
 | L7 | Fixed Data Safety table inconsistency: location sharing with Open-Meteo was previously marked "No", contradicting `docs/privacy.html` |
 | L8 | Drafted Play Console content: detailed Data Safety form answers, app title/short/full description (character counts verified) — see `PLAYSTORE_LAUNCH.md` |
+| B3 | Fix: `RadarScreen`'s header/back button was completely invisible (drawn over by the native `MapView`) in every release build, though still tappable underneath — a real dead-end-screen bug, not just a screenshot issue. Root cause: `MapView`'s own drawing bled past its Compose-measured bounds (confirmed via `uiautomator dump` — the view's layout bounds were correct, only its painted content overflowed). Fixed with `Modifier.clipToBounds()` on the map's `Box`. Also removed a redundant manual `layoutParams` assignment in the `AndroidView` factory (a known Compose interop anti-pattern) that turned out not to be the actual cause |
+| L9 | Captured Play Store screenshots (Weather, Chat, Radar) from a release build running on an emulator |
 
 ### Deferred
 

@@ -1,6 +1,5 @@
 package com.example.weatherly.ui
 
-import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -206,14 +206,13 @@ fun RadarScreen(
         }
 
         // Map
-        Box(modifier = Modifier.weight(1f)) {
+        // clipToBounds() is required: MapView's own drawing can bleed past its
+        // measured bounds and paint over the header row above, even though its
+        // layout bounds (verified via uiautomator) are otherwise correct.
+        Box(modifier = Modifier.weight(1f).clipToBounds()) {
             AndroidView(
                 factory = { ctx ->
                     MapView(ctx).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         controller.setZoom(8.0)
