@@ -12,3 +12,13 @@ OPENROUTER_API_KEY=
 # rotate over time — check https://openrouter.ai/models (filter: Free) and copy
 # the exact ":free" slug. "openrouter/free" auto-picks an available free model.
 OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free
+
+# --- Release signing ---------------------------------------------------------
+# Only needed to build a *release* AAB/APK. Generate the keystore once with:
+#   keytool -genkey -v -keystore weatherly-release.jks -alias weatherly \
+#     -keyalg RSA -keysize 2048 -validity 10000
+# Run it from the project root so weatherly-release.jks lands there (gitignored).
+# Back up the .jks file and these passwords somewhere durable — if you lose
+# either, you can never publish an update to the same Play Store listing.
+STORE_PASSWORD=
+KEY_PASSWORD=

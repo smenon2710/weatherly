@@ -180,7 +180,7 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [x] Change `applicationId` away from `com.example.*` (`io.github.smenon2710.skyspeak`)
 - [x] Add `isShrinkResources = true` to release build type
 - [x] Move `logging-interceptor` to `debugImplementation`
-- [ ] Generate release keystore, back it up securely, wire into Gradle
+- [x] Generate release keystore, back it up securely, wire into Gradle
 - [x] Write and host privacy policy (GitHub Pages — https://smenon2710.github.io/weatherly/privacy.html)
 - [x] Decide on monetization model (donation model — Razorpay Payment Page link added)
 - [ ] Build signed AAB (not APK)

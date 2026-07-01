@@ -34,8 +34,20 @@ android {
         buildConfigField("String", "OPENROUTER_MODEL", "\"$openRouterModel\"")
     }
 
+    // Release keystore lives at the project root (weatherly-release.jks), gitignored.
+    // STORE_PASSWORD / KEY_PASSWORD come from local.properties — never committed.
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("weatherly-release.jks")
+            storePassword = localProps.getProperty("STORE_PASSWORD")
+            keyAlias = "weatherly"
+            keyPassword = localProps.getProperty("KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
