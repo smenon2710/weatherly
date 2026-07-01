@@ -183,7 +183,7 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [x] Generate release keystore, back it up securely, wire into Gradle
 - [x] Write and host privacy policy (GitHub Pages — https://smenon2710.github.io/weatherly/privacy.html)
 - [x] Decide on monetization model (donation model — Razorpay Payment Page link added)
-- [ ] Build signed AAB (not APK)
+- [x] Build signed AAB (not APK)
 - [ ] Create Play Console account ($25)
 - [ ] Fill out Data Safety form
 - [ ] Complete content rating questionnaire
