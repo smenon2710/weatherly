@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import java.util.Calendar
 import kotlin.math.PI
 import kotlin.math.cos
@@ -1587,9 +1588,22 @@ private fun DetailRow(label: String, value: String) {
 
 @Composable
 fun AttributionFooter(textColor: Color, modifier: Modifier = Modifier) {
-    Text(
-        "Weather data by Open-Meteo.com (CC BY 4.0)",
-        color = textColor.copy(alpha = 0.7f), fontSize = 12.sp, textAlign = TextAlign.Center,
-        modifier = modifier.fillMaxWidth().padding(vertical = 16.dp)
-    )
+    val uriHandler = LocalUriHandler.current
+    val accent = MaterialTheme.colorScheme.primary
+    Column(
+        modifier = modifier.fillMaxWidth().padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            "Weather data by Open-Meteo.com (CC BY 4.0)",
+            color = textColor.copy(alpha = 0.7f), fontSize = 12.sp, textAlign = TextAlign.Center
+        )
+        Text(
+            "☕ Support the developer",
+            color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clickable { uriHandler.openUri("https://rzp.io/rzp/umJ9Ygcm") }
+        )
+    }
 }

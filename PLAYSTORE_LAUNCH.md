@@ -145,8 +145,10 @@ In Android Studio: **Build → Generate Signed Bundle / APK → Android App Bund
 
 Open-Meteo's free tier is **non-commercial use only**. If you charge for the app, run ads, or accept in-app purchases, you must buy a commercial API plan starting at **$29/month**.
 
+**Decision: Option A (donation model).** The app stays free with no paywalled features, so it remains within Open-Meteo's non-commercial terms. A "☕ Support the developer" link was added to `AttributionFooter` (`ui/components/WeatherComponents.kt`) pointing to a Razorpay Payment Page (`https://rzp.io/rzp/umJ9Ygcm`) — a hosted donation link, not the in-app Checkout SDK, so no backend or API keys were introduced into the client.
+
 ### Option A — Donation model (stay free, $0/month)
-List the app for free, add a donation link (Ko-Fi or Buy Me a Coffee) in the Settings screen. Because no features are paywalled and the app remains free, you stay within Open-Meteo's non-commercial terms. Recommended for a solo launch.
+List the app for free, add a donation link (Ko-Fi, Buy Me a Coffee, or a Razorpay Payment Page) in the app. Because no features are paywalled and the app remains free, you stay within Open-Meteo's non-commercial terms. Recommended for a solo launch.
 
 ### Option B — Paid download ($0.99–$1.49 one-time)
 Charge a one-time fee. You must buy the $29/month Open-Meteo commercial plan. After Google's 15% cut you need roughly **30–40 new downloads per month just to break even** — hard to sustain without marketing.
@@ -180,7 +182,7 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [x] Move `logging-interceptor` to `debugImplementation`
 - [ ] Generate release keystore, back it up securely, wire into Gradle
 - [x] Write and host privacy policy (GitHub Pages — https://smenon2710.github.io/weatherly/privacy.html)
-- [ ] Decide on monetization model (donation / paid / free) before submitting
+- [x] Decide on monetization model (donation model — Razorpay Payment Page link added)
 - [ ] Build signed AAB (not APK)
 - [ ] Create Play Console account ($25)
 - [ ] Fill out Data Safety form
