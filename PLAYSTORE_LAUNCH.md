@@ -88,13 +88,15 @@ KEY_PASSWORD=your_key_password
 
 ### 4. Data Safety Form (Play Console)
 
-Fill out in Play Console → Store listing → Data safety:
+Fill out in Play Console → Store listing → Data safety. Summary (see the detailed draft answers below for the full form flow):
 
 | Data type | Collected | Shared with third parties | Purpose |
 |---|---|---|---|
-| Approximate location | Yes | No | Core feature — weather for current location |
-| Precise location | Yes | No | Core feature |
-| User queries (chat) | Optional | Yes (OpenRouter) | AI assistant, only when user provides a key |
+| Approximate location | Yes | Yes (Open-Meteo, to fetch the forecast) | App functionality |
+| Precise location | Yes | Yes (Open-Meteo, to fetch the forecast) | App functionality |
+| User queries (chat) | Optional | Yes (OpenRouter), only when a key is configured | App functionality |
+
+*(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`.)*
 
 ---
 
