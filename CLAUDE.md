@@ -29,6 +29,15 @@ OPENROUTER_MODEL=openrouter/free   # optional override; any OpenRouter model ID 
 
 Both values are injected at build time into `BuildConfig.OPENROUTER_API_KEY` and `BuildConfig.OPENROUTER_MODEL`. If no key is present at build time, users can enter one directly in the chat screen; it is stored in `SharedPreferences` via `PreferencesStore`.
 
+## Play Store launch status
+
+The app is mid-launch-prep as of 2026-07-01. Full checklist, decisions, and rationale live in `PLAYSTORE_LAUNCH.md` — **read that file before resuming launch work**, don't rely on this summary alone. Quick orientation:
+
+- Done: `applicationId` migration, release keystore + signing config (`local.properties` also needs `STORE_PASSWORD`/`KEY_PASSWORD` for release builds — see `local.properties.template`), privacy policy (hosted, GitHub Pages), donation-model monetization decision, signed AAB build verified end-to-end on a real release build, Play Console account created and paid.
+- Store assets (icon, feature graphic, 3 screenshots) are committed in `store_assets/` — see `render_feature_graphic.py` there for how the feature graphic was generated (reproducible, no Android Studio needed).
+- Still open: actually filling out the Data Safety form and content rating questionnaire in Play Console, and submitting for review. Draft answers for both are already written in `PLAYSTORE_LAUNCH.md` — this is copy-paste work in the Console UI, not something further code changes can finish.
+- Two real bugs were found and fixed during this launch-testing pass (not just launch-prep busywork): a loading-flash on `WeatherScreen` re-composition, and `RadarScreen`'s header/back button being invisible (see `IMPROVEMENTS.md`, entries B1–B3, for root causes — both are the kind of thing that could regress if touched carelessly).
+
 ## Architecture
 
 **Single-activity, three-screen app.** `MainActivity` holds a `WeatherViewModel` (activity-scoped) and dispatches between `WeatherScreen`, `ChatScreen`, and `RadarScreen` via `AnimatedContent` keyed on a private `Screen` enum (`WEATHER`, `CHAT`, `RADAR`). `WeatherViewModel` exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` so `RadarScreen` can center the map on the current weather location without re-fetching.
