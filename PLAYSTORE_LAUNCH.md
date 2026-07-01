@@ -98,6 +98,73 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 *(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`.)*
 
+<details>
+<summary>Detailed draft answers, matching Play Console's actual form flow (expand)</summary>
+
+**Note:** Google's exact wording/categories shift between Console versions — treat this as a starting draft to copy from, not a guarantee it matches pixel-for-pixel. Cross-check against the live form before submitting.
+
+**Top-level questions:**
+- *Does your app collect or share any of the required user data types?* → **Yes**
+- *Is all of the user data collected by your app encrypted in transit?* → **Yes** (every API call — Open-Meteo, OpenRouter, RainViewer/OSM tiles — goes over HTTPS)
+- *Do you provide a way for users to request that their data be deleted?* → **No account exists, so there's no server-side data tied to a user identity to delete.** All app data (cache, preferences, on-device API key) lives in local app storage and is removed on uninstall. If Console requires an affirmative answer here, note in the form that data deletion is handled via app uninstall since no account/backend exists.
+
+**Per data type:**
+
+| Data type | Collected? | Shared? | Purpose | Optional? | Ephemeral? |
+|---|---|---|---|---|---|
+| Approximate location | Yes | Yes — Open-Meteo | App functionality | No (core feature; app is unusable without it unless a manual city is picked) | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's own retention policy |
+| Precise location | Yes | Yes — Open-Meteo | App functionality | No | Same as above |
+| Other user-generated content *(free-form chat text)* | Yes, only if the user opens AI chat and a key is configured | Yes — OpenRouter (and whichever model OpenRouter routes to) | App functionality | Yes — the quick-suggest chips work without any chat text ever being sent | No |
+
+**Data types with no data to declare (leave unchecked):** Personal info (name/email/etc. — never collected), Financial info (the donation link opens an external Razorpay page in the browser; the app itself never collects or processes payment details), Health & fitness, Photos/videos, Audio, Contacts, Calendar, Messages (SMS/email), Web browsing history, Device/other IDs, App info & performance (no analytics or crash-reporting SDK in the codebase).
+
+</details>
+
+---
+
+## Store Listing Content (Draft)
+
+Character counts verified — safe to paste directly into Play Console.
+
+**App title** (30 char limit): `SkySpeak: Premium Weather Chat` — exactly 30 characters.
+
+**Short description** (80 char limit, 78 used):
+```
+Ad-free forecasts, live radar, and an AI weather assistant. No account needed.
+```
+
+**Full description** (4000 char limit, ~2030 used):
+```
+SkySpeak is a clean, ad-free weather app built for people who just want accurate forecasts without the clutter — plus an AI assistant for the planning questions a forecast alone can't answer.
+
+WHAT YOU GET
+• Current conditions, next 24 hours, and a 7-day forecast in one glance
+• A hero display that visually shifts with the sky — clear blue, rain slate, thunder indigo, snow white-blue — so conditions read at a glance
+• Live precipitation radar with play/pause and a frame scrubber
+• Air quality, pressure, visibility, wind, humidity, sunrise/sunset, and moon phase — all in one screen
+• A home-screen widget that adapts its layout to size and time of day
+• Works offline: your last forecast is cached, so the app never opens to a blank screen
+
+AI WEATHER ASSISTANT
+Quick-tap questions like "Do I need an umbrella?" or "Should I wear a jacket?" are answered instantly, on-device, using your actual forecast — no account, no network call, no cost. For more open-ended planning questions — "Best day this week for a long run?", "What should I pack for a weekend trip?" — the assistant uses your forecast as context to give a real answer, not just raw numbers.
+
+PRIVACY BY DESIGN
+• No account or sign-up required
+• No ads, no ad SDK, no tracking for advertising purposes
+• No analytics or crash-reporting SDKs
+• Your location is used only to fetch your forecast — never sold or shared for marketing
+• Full privacy policy available in-app and on our website
+
+ABOUT THE DATA
+Forecasts come from Open-Meteo, a free and open weather data provider. The precipitation radar uses OpenStreetMap tiles with a RainViewer overlay. Both are shown with attribution at the bottom of the screen.
+
+SkySpeak is free to use with no paywalled features. If you find it useful, an optional "Support the developer" link is available — entirely optional, never required.
+
+Whether you're deciding what to wear this morning or planning a weekend outdoors, SkySpeak gives you the forecast and the judgment to go with it.
+```
+
+**Category:** Weather
+
 ---
 
 ## Small Fixes Before Submitting
@@ -187,8 +254,8 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [x] Decide on monetization model (donation model — Razorpay Payment Page link added)
 - [x] Build signed AAB (not APK)
 - [ ] Create Play Console account ($25)
-- [ ] Fill out Data Safety form
+- [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
 - [ ] Complete content rating questionnaire
-- [ ] Upload store listing assets (icon, feature graphic, screenshots)
-- [ ] Set category to Weather, write short + full description
+- [ ] Upload store listing assets (icon, feature graphic, screenshots — still need to be created)
+- [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
 - [ ] Submit for review (typically 1–3 days for a first submission)

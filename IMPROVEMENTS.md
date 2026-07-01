@@ -99,6 +99,9 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | B1 | Fix: `WeatherScreen`'s permission-launcher callback was calling a cold `load()` on every screen re-composition (cold start, and every return from Chat/Radar), flashing visible content back to a full loading spinner before the refetch completed |
 | L5 | Release keystore generated and wired into `app/build.gradle.kts` signingConfigs (`STORE_PASSWORD`/`KEY_PASSWORD` from gitignored `local.properties`) |
 | B2 | Fix: `bundleRelease` failed with "Unresolved reference 'logging'" — the `if (BuildConfig.DEBUG)` guard around `HttpLoggingInterceptor` in `NetworkModule` doesn't stop the *import* from being compiled, and `logging-interceptor` is a debug-only dependency. Fixed with a `src/debug`/`src/release` source-set split (`addDebugLogging()` extension in `DebugLogging.kt`) |
+| L6 | Release build verified end-to-end on-device (installed via `adb -t` due to an unrelated Android Studio baseline-profile deploy bug) — loads, renders, and the donation link works in the actual signed release build |
+| L7 | Fixed Data Safety table inconsistency: location sharing with Open-Meteo was previously marked "No", contradicting `docs/privacy.html` |
+| L8 | Drafted Play Console content: detailed Data Safety form answers, app title/short/full description (character counts verified) — see `PLAYSTORE_LAUNCH.md` |
 
 ### Deferred
 
