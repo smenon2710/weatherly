@@ -198,7 +198,7 @@ In Android Studio: **Build → Generate Signed Bundle / APK → Android App Bund
 
 | Asset | Spec | Free tool |
 |---|---|---|
-| App icon | 512×512 PNG | Canva / draw.io, or screenshot from emulator |
+| App icon | 512×512 PNG | ✅ Done — `store_assets/ic_launcher_512.png`, rendered from the same vector design as the adaptive launcher icon |
 | Feature graphic | 1024×500 PNG | Canva free tier |
 | Phone screenshots | 2–8, min 1080px tall | Android emulator camera button |
 | Short description | ≤80 characters | — |
@@ -256,6 +256,6 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [ ] Create Play Console account ($25)
 - [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
 - [ ] Complete content rating questionnaire
-- [ ] Upload store listing assets (3 screenshots captured — Weather/Chat/Radar; icon export and feature graphic still needed)
+- [ ] Upload store listing assets (3 screenshots + 512×512 icon in `store_assets/` — feature graphic still needed)
 - [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
 - [ ] Submit for review (typically 1–3 days for a first submission)
