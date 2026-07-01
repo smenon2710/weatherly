@@ -256,6 +256,6 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [ ] Create Play Console account ($25)
 - [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
 - [ ] Complete content rating questionnaire
-- [ ] Upload store listing assets (icon, feature graphic, screenshots — still need to be created)
+- [ ] Upload store listing assets (3 screenshots captured — Weather/Chat/Radar; icon export and feature graphic still needed)
 - [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
 - [ ] Submit for review (typically 1–3 days for a first submission)
