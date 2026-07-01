@@ -145,7 +145,7 @@ In Android Studio: **Build → Generate Signed Bundle / APK → Android App Bund
 
 Open-Meteo's free tier is **non-commercial use only**. If you charge for the app, run ads, or accept in-app purchases, you must buy a commercial API plan starting at **$29/month**.
 
-**Decision: Option A (donation model).** The app stays free with no paywalled features, so it remains within Open-Meteo's non-commercial terms. A "☕ Support the developer" link was added to `AttributionFooter` (`ui/components/WeatherComponents.kt`) pointing to a Razorpay Payment Page (`https://rzp.io/rzp/umJ9Ygcm`) — a hosted donation link, not the in-app Checkout SDK, so no backend or API keys were introduced into the client.
+**Decision: Option A (donation model).** The app stays free with no paywalled features, so it remains within Open-Meteo's non-commercial terms. A "☕ Support the developer" link was added to `AttributionFooter` (`ui/components/WeatherComponents.kt`), pointing to a hosted Razorpay Payment Page rather than the in-app Checkout SDK — no backend or API keys were introduced into the client. The destination link itself is not duplicated in documentation; it lives only in the app source.
 
 ### Option A — Donation model (stay free, $0/month)
 List the app for free, add a donation link (Ko-Fi, Buy Me a Coffee, or a Razorpay Payment Page) in the app. Because no features are paywalled and the app remains free, you stay within Open-Meteo's non-commercial terms. Recommended for a solo launch.

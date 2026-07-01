@@ -88,6 +88,16 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | D5 | Daily forecast temperature range bar | High — was already implemented |
 | D6 | Radar timestamp badge — GlassCard styling | Low |
 
+### Completed — Launch Prep & Fixes (2026-07-01)
+
+| # | Title |
+|---|---|
+| L1 | `applicationId` changed off `com.example.*` for Play Store eligibility (`io.github.smenon2710.skyspeak`); Kotlin namespace/package intentionally left unchanged |
+| L2 | Privacy policy written and hosted via GitHub Pages (`docs/privacy.html`) |
+| L3 | Monetization decided: donation model — in-app "Support the developer" link added to `AttributionFooter`, keeps the app within Open-Meteo's non-commercial free tier |
+| L4 | Consolidated three overlapping Play Store launch docs into one `PLAYSTORE_LAUNCH.md` |
+| B1 | Fix: `WeatherScreen`'s permission-launcher callback was calling a cold `load()` on every screen re-composition (cold start, and every return from Chat/Radar), flashing visible content back to a full loading spinner before the refetch completed |
+
 ### Deferred
 
 | # | Title | Note |

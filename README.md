@@ -1,17 +1,23 @@
-# Weatherly
+# SkySpeak: Premium Weather Chat
+
+*(formerly Weatherly — the repo and Kotlin package name still say `weatherly`)*
 
 A clean, ad-free weather app for Pixel (and any Android phone), built with
 Kotlin + Jetpack Compose. Weather data comes from **Open-Meteo** — free for
 non-commercial use, no API key, no sign-up.
 
 There is no ad SDK anywhere in this project; "ad-free" is simply the default
-state of your own app.
+state of your own app. The app is free with no paywalled features; an optional
+in-app donation link supports the developer if you'd like to.
 
 ## Features
 - Current conditions, next 24 hours, and a 7-day forecast in a single API call
-- Condition-responsive hero gradient — the background shifts tone to match the sky (clear blue, rain slate, thunder indigo, snow white-blue)
+- Condition-responsive hero gradient — the background shifts tone to match the sky (clear blue, rain slate, thunder indigo, snow white-blue), with a subtle time-of-day tint at dawn/golden hour/dusk
+- Precipitation radar map (OpenStreetMap + RainViewer, no API key) with play/pause and a frame scrubber
+- Home-screen widget with size-aware layouts, chrono-dynamic content (morning/daytime/night), and Material You dynamic colors
 - Automatic location via FusedLocationProvider + on-device reverse geocoding
 - Pull-to-refresh, plus quiet auto-refresh on resume and every 30 minutes
+- Offline-first: the last successful forecast is cached so the app never opens to a blank screen
 - Built-in AI weather assistant (OpenRouter) that answers practical questions
   like "can I jog this evening?" using your actual forecast as context
 - Material 3 UI with full light/dark theme support and Compose previews
@@ -48,23 +54,28 @@ far beyond personal needs; this app also caches results for 30 minutes in memory
 ## Project structure
 ```
 app/src/main/java/com/example/weatherly/
-├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat screens
+├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat/Radar screens
 ├─ data/
 │  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models
 │  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter) + network module
 │  ├─ repository/   # WeatherRepository + ChatRepository (weather-aware prompts)
-│  └─ prefs/        # unit/place selection + on-device OpenRouter key/model
+│  └─ prefs/        # unit/place selection, on-device OpenRouter key/model, forecast cache
 ├─ location/        # FusedLocationProvider wrapper
 ├─ ui/
-│  ├─ WeatherViewModel.kt / WeatherScreen.kt   # pull-to-refresh + chat entry
+│  ├─ WeatherViewModel.kt / WeatherScreen.kt   # pull-to-refresh + chat/radar entry
 │  ├─ ChatViewModel.kt / ChatScreen.kt         # AI assistant
+│  ├─ RadarScreen.kt                           # OSMDroid + RainViewer precipitation radar
 │  ├─ Previews.kt   # @Preview composables with sample data
-│  ├─ components/   # Header, hourly row, daily list, attribution
+│  ├─ components/   # Header, hourly row, daily list, metric tiles, attribution
 │  └─ theme/        # Colors, type, Material 3 theme
-└─ util/            # WMO weather-code -> emoji + text
+├─ widget/          # Jetpack Glance home-screen widget
+└─ util/            # WMO weather-code -> emoji + text, moon-phase calculator
 ```
+
+See `CLAUDE.md` for full architecture details.
 
 ## Notes
 - Conditions use WMO weather codes (Open-Meteo's format); see `util/WeatherIcon.kt`.
 - Library versions are recent stable picks; bump them if Android Studio suggests.
 - minSdk 26; compileSdk/targetSdk 35.
+- Play Store submission status and checklist: see `PLAYSTORE_LAUNCH.md`.
