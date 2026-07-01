@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-SkySpeak: Premium Weather Chat is an Android weather app (Kotlin + Jetpack Compose) that pulls forecast data from Open-Meteo (no API key) and optionally uses OpenRouter for an AI chat assistant. The app was formerly named Weatherly; the package name (`com.example.weatherly`) and all Kotlin class names retain the `Weatherly` prefix until the pre-launch application ID migration.
+SkySpeak: Premium Weather Chat is an Android weather app (Kotlin + Jetpack Compose) that pulls forecast data from Open-Meteo (no API key) and optionally uses OpenRouter for an AI chat assistant. The app was formerly named Weatherly. The Play Store `applicationId` is `io.github.smenon2710.skyspeak`, but the Kotlin `namespace`, package (`com.example.weatherly`), and all `Weatherly`-prefixed class names are intentionally left unchanged — Google Play only requires `applicationId` to be unique, not the internal package name, so this was a low-risk one-line change rather than a full source-tree rename.
 
 ## Build & run
 

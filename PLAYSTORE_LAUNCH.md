@@ -175,9 +175,9 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 
 ## Launch Checklist
 
-- [ ] Change `applicationId` away from `com.example.*`
-- [ ] Add `isShrinkResources = true` to release build type
-- [ ] Move `logging-interceptor` to `debugImplementation`
+- [x] Change `applicationId` away from `com.example.*` (`io.github.smenon2710.skyspeak`)
+- [x] Add `isShrinkResources = true` to release build type
+- [x] Move `logging-interceptor` to `debugImplementation`
 - [ ] Generate release keystore, back it up securely, wire into Gradle
 - [ ] Write and host privacy policy (GitHub Pages)
 - [ ] Decide on monetization model (donation / paid / free) before submitting
