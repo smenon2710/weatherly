@@ -113,7 +113,7 @@ implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 ```
 
-Also guard the interceptor setup in `NetworkModule` with `if (BuildConfig.DEBUG) { ... }`.
+**Important:** a runtime `if (BuildConfig.DEBUG) { ... }` guard around the interceptor setup is *not* enough — the `okhttp3.logging.HttpLoggingInterceptor` import itself still needs to resolve at compile time, and it won't exist on the release classpath once the dependency is `debugImplementation`-only. This breaks `bundleRelease`/`assembleRelease` with an "Unresolved reference" error. The actual fix is a `src/debug` / `src/release` source-set split — see `NetworkModule`'s `addDebugLogging()` extension in `data/remote/DebugLogging.kt` (debug: adds the interceptor; release: no-op, never imports the class at all).
 
 ---
 
