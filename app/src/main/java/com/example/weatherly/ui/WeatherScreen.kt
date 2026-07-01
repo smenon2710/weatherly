@@ -101,7 +101,15 @@ fun WeatherScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) viewModel.load() else viewModel.onPermissionDenied()
+        if (granted) {
+            // Already-granted permission resolves near-instantly here, including on every
+            // return from Chat/Radar (WeatherScreen re-enters composition each time). Use a
+            // background load when content is already on screen so it isn't wiped by a full
+            // Loading state, mirroring the ON_RESUME effect below.
+            viewModel.load(background = state is WeatherUiState.Success)
+        } else {
+            viewModel.onPermissionDenied()
+        }
     }
 
     LaunchedEffect(Unit) {
