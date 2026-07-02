@@ -122,6 +122,31 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 ---
 
+### 4a. Remaining "App content" Declarations (Play Console)
+
+The rest of the items under Play Console → Policy → App content, beyond Data safety and Content rating above. Same caveat as the Data Safety draft: Google's exact wording shifts between Console versions — cross-check against the live form.
+
+| Section | Answer |
+|---|---|
+| Set privacy policy | `https://smenon2710.github.io/weatherly/privacy.html` |
+| Sign-in details | No — app doesn't require sign-in (no account system exists anywhere in the codebase) |
+| Ads | No — app doesn't contain ads (no ad SDK anywhere in the project) |
+| Target audience | 18 and over only; explicitly **not** designed for or targeting children under 13 — keeps the app out of Google Play Families Policy, which this app isn't built to comply with (no COPPA handling, collects location) |
+| Government apps | No |
+| Financial features | No — the donation link opens an external Razorpay page in the device browser; the app itself never handles payment details, loans, crypto, or in-app transactions |
+| Health | No |
+| Category | Weather |
+| Contact details | Email: developer's contact address (see account details); phone/website optional |
+
+**Content rating questionnaire** (separate flow, IARC-based):
+- Category: Utility/Productivity/Reference — not Games
+- Violence, sexual content, profanity, controlled substances, gambling: None
+- User-generated content shared with other users: No — chat text is private per-user, sent only to OpenRouter for processing, never shown to or shared with other app users
+- Shares user's location: Yes — with a third party (Open-Meteo) for app functionality, not for social/advertising purposes
+- Expected outcome: **Everyone**
+
+---
+
 ## Store Listing Content (Draft)
 
 Character counts verified — safe to paste directly into Play Console.
@@ -270,10 +295,10 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 - [x] Create Play Console account ($25, paid, identity verification complete)
 - [x] Create app entry in Play Console (package name `io.github.smenon2710.skyspeak`) — now on "Finish setting up your app" dashboard
 - [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
-- [ ] Complete content rating questionnaire
+- [ ] Complete content rating questionnaire (draft answers ready — see App Content Declarations, §4a)
 - [x] Store listing assets ready in `store_assets/` — 3 screenshots (1280×2560, 2:1, no alpha), 512×512 icon, 1024×500 feature graphic — verified against Play Console upload spec (upload to Play Console still needed)
 - [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
-- [ ] Finish remaining "Finish setting up your app" declarations (ads, target audience, app access)
+- [ ] Finish remaining "Finish setting up your app" declarations — privacy policy URL, sign-in details, ads, target audience, government apps, financial features, health, contact details (draft answers ready — see App Content Declarations, §4a)
 - [ ] Upload signed AAB to Internal testing track, sanity-check install
 - [ ] Promote to Closed testing with ≥20 opted-in testers, run for 14 continuous days (see Release Track Requirements above)
 - [ ] Apply for / confirm Production access unlocked
