@@ -244,6 +244,20 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 
 ---
 
+## Release Track Requirements (New Developer Accounts)
+
+Since late 2023, Google requires **new personal developer accounts** to run a **closed test with at least 20 opted-in testers for 14 continuous days** before Production access is granted. This account was just created and identity-verified, so it almost certainly applies — Console will not offer a direct path to Production until this gate is cleared, regardless of how complete the store listing is.
+
+**Practical sequence:**
+1. **"Finish setting up your app"** checklist on the app dashboard — bundles Data safety, content rating, app content declarations (ads, target audience, news/government apps), and store listing. Do this first; it gates everything else.
+2. **Internal testing track** — upload the signed AAB here first. No review wait, instant availability, good for a final sanity check (e.g. your own email) before wider eyes see it.
+3. **Closed testing track** — same AAB, add a tester list of ≥20 opted-in emails (a Google Group works), let it run 14 continuous days. This is the actual gate for Production.
+4. **Production** — once Console shows production access unlocked, promote the tested release and submit for review.
+
+This means realistic public availability is **~2+ weeks out**, not a few days, once the store listing itself is finished — budget for the mandatory closed-testing window.
+
+---
+
 ## Launch Checklist
 
 - [x] Change `applicationId` away from `com.example.*` (`io.github.smenon2710.skyspeak`)
@@ -254,8 +268,13 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 - [x] Decide on monetization model (donation model — Razorpay Payment Page link added)
 - [x] Build signed AAB (not APK)
 - [x] Create Play Console account ($25, paid, identity verification complete)
+- [x] Create app entry in Play Console (package name `io.github.smenon2710.skyspeak`) — now on "Finish setting up your app" dashboard
 - [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
 - [ ] Complete content rating questionnaire
 - [x] Store listing assets ready in `store_assets/` — 3 screenshots (1280×2560, 2:1, no alpha), 512×512 icon, 1024×500 feature graphic — verified against Play Console upload spec (upload to Play Console still needed)
 - [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
-- [ ] Submit for review (typically 1–3 days for a first submission)
+- [ ] Finish remaining "Finish setting up your app" declarations (ads, target audience, app access)
+- [ ] Upload signed AAB to Internal testing track, sanity-check install
+- [ ] Promote to Closed testing with ≥20 opted-in testers, run for 14 continuous days (see Release Track Requirements above)
+- [ ] Apply for / confirm Production access unlocked
+- [ ] Promote to Production and submit for review (typically 1–3 days)
