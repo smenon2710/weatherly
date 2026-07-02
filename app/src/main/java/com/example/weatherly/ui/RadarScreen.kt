@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -120,6 +121,7 @@ fun RadarScreen(
     var frameIndex by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
+    var retryTrigger by remember { mutableIntStateOf(0) }
 
     // Map reference for overlay swapping
     var mapView by remember { mutableStateOf<MapView?>(null) }
@@ -131,7 +133,8 @@ fun RadarScreen(
     }
 
     // Fetch radar frames from RainViewer
-    LaunchedEffect(Unit) {
+    LaunchedEffect(retryTrigger) {
+        loading = true
         withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
@@ -228,6 +231,16 @@ fun RadarScreen(
                     color = Cyan,
                     modifier = Modifier.align(Alignment.Center)
                 )
+            } else if (frames.isEmpty()) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Couldn't load radar", color = TextSecondary, fontSize = 13.sp)
+                    TextButton(onClick = { retryTrigger++ }) {
+                        Text("Retry", color = Cyan)
+                    }
+                }
             }
 
             // Frame timestamp badge

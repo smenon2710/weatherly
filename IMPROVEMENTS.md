@@ -105,6 +105,12 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | B3 | Fix: `RadarScreen`'s header/back button was completely invisible (drawn over by the native `MapView`) in every release build, though still tappable underneath — a real dead-end-screen bug, not just a screenshot issue. Root cause: `MapView`'s own drawing bled past its Compose-measured bounds (confirmed via `uiautomator dump` — the view's layout bounds were correct, only its painted content overflowed). Fixed with `Modifier.clipToBounds()` on the map's `Box`. Also removed a redundant manual `layoutParams` assignment in the `AndroidView` factory (a known Compose interop anti-pattern) that turned out not to be the actual cause |
 | L9 | Captured Play Store screenshots (Weather, Chat, Radar) from a release build running on an emulator |
 
+### Completed — Internal Testing Fixes (2026-07-02)
+
+| # | Title |
+|---|---|
+| B4 | Fix: `RadarScreen` playback controls (play/pause button, scrubber, timestamp badge) silently failed to render whenever the RainViewer frames fetch failed — found by an internal tester whose map tiles loaded fine but no controls ever appeared. First pass added a `retryTrigger` state re-keying the fetch `LaunchedEffect` plus a "Couldn't load radar / Retry" state in the map `Box`, since the fetch's `catch (_: Exception) { }` gave no visible signal of failure. Retest showed the fetch failing consistently for every tester, pointing at the release build itself rather than network flakiness — **actual root cause**: `RainViewerResponse`/`RadarFrames`/`RadarFrame` are `@JsonClass` Moshi models defined locally in `RadarScreen.kt` (`com.example.weatherly.ui` package), outside `data.model.**`, the only package `proguard-rules.pro` had a keep rule for. R8 (`isMinifyEnabled = true` in release) stripped them, breaking Moshi's reflective `KotlinJsonAdapterFactory` adapter at runtime in every release build — this was very likely the true cause of the original "play button not visible" report too, not just this retest. Fixed with a package-agnostic `-keep @com.squareup.moshi.JsonClass class * { *; }` rule so no Moshi model anywhere in the codebase can silently break this way again. The retry UI from the first pass stays as a legitimate defensive fallback for genuine network failures |
+
 ### Deferred
 
 | # | Title | Note |
