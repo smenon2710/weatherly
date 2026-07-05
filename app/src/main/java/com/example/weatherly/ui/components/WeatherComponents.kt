@@ -1603,7 +1603,7 @@ fun AttributionFooter(textColor: Color, modifier: Modifier = Modifier) {
             color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
             modifier = Modifier
                 .padding(top = 6.dp)
-                .clickable { uriHandler.openUri("https://rzp.io/rzp/umJ9Ygcm") }
+                .clickable { uriHandler.openUri("https://rzp.io/rzp/fxxMYsm") }
         )
     }
 }
