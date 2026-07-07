@@ -294,12 +294,12 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 - [x] Build signed AAB (not APK)
 - [x] Create Play Console account ($25, paid, identity verification complete)
 - [x] Create app entry in Play Console (package name `io.github.smenon2710.skyspeak`) — now on "Finish setting up your app" dashboard
-- [ ] Fill out Data Safety form (draft answers ready — see detailed section above)
-- [ ] Complete content rating questionnaire (draft answers ready — see App Content Declarations, §4a)
+- [x] Fill out Data Safety form (completed via "Finish setting up your app" flow)
+- [x] Complete content rating questionnaire (completed via "Finish setting up your app" flow — outcome: Everyone)
 - [x] Store listing assets ready in `store_assets/` — 3 screenshots (1280×2560, 2:1, no alpha), 512×512 icon, 1024×500 feature graphic — verified against Play Console upload spec (upload to Play Console still needed)
-- [ ] Set category to Weather, write short + full description (draft copy ready — see Store Listing Content above)
-- [ ] Finish remaining "Finish setting up your app" declarations — privacy policy URL, sign-in details, ads, target audience, government apps, financial features, health, contact details (draft answers ready — see App Content Declarations, §4a)
-- [ ] Upload signed AAB to Internal testing track, sanity-check install
-- [ ] Promote to Closed testing with ≥20 opted-in testers, run for 14 continuous days (see Release Track Requirements above)
+- [x] Set category to Weather, write short + full description (completed via "Finish setting up your app" flow)
+- [x] Finish remaining "Finish setting up your app" declarations — privacy policy URL, sign-in details, ads, target audience, government apps, financial features, health, contact details
+- [x] Upload signed AAB to Internal testing track, sanity-check install — caught and fixed two real bugs this way (B4 in `IMPROVEMENTS.md`: silently-failing radar screen from a ProGuard/Moshi interaction; a stale Razorpay payment link)
+- [ ] **In progress:** Closed testing started 2026-07-07 via track with Google Group `skyspeak-testers` as the tester list — recruiting toward ≥20 opted-in testers; 14-continuous-day clock runs from when the 20th tester opts in, not from track creation (see Release Track Requirements above)
 - [ ] Apply for / confirm Production access unlocked
 - [ ] Promote to Production and submit for review (typically 1–3 days)
