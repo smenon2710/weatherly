@@ -42,6 +42,8 @@ applicationId = "com.sujith.weatherly"   // or io.github.yourhandle.weatherly
 2. Create `docs/privacy.html` in your repo, enable GitHub Pages → becomes `https://yourusername.github.io/weatherly/privacy`. Free.
 3. Paste the URL into Play Console → Store listing → Privacy policy.
 
+**Constraint discovered 2026-07-13: this repo must stay public.** GitHub Pages does not serve sites from private repositories on the Free plan — briefly making this repo private (for pre-launch confidentiality) took the privacy policy URL offline while it was live in the Play Console closed-testing listing, and the Pages configuration itself was cleared (not just paused), requiring a manual re-creation via the API (`POST /repos/{owner}/{repo}/pages`) after reverting back to public. **Do not flip this repo to private again while the privacy policy URL is referenced in Play Console**, unless one of these is done first: (a) split `docs/privacy.html` into its own small dedicated public repo and update the Play Console privacy policy URL to point there, or (b) upgrade to GitHub Pro (~$4/month), which allows Pages to serve from private repos.
+
 ---
 
 ### 3. Release Signing Keystore
