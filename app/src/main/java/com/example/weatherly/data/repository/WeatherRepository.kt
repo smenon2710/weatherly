@@ -293,20 +293,29 @@ class WeatherRepository(private val context: Context) {
             eventDesc != null -> "$eventDesc expected around $eventTime."
             maxWind >= windThreshold -> "Winds up to $maxWind $windUnit in the next few hours."
             else -> {
-                // Summarise the dominant condition over the next 6 hours.
+                // Summarise the dominant condition over the next 6 hours, but only when one
+                // condition actually has a real majority (>=60%) — a bare plurality (e.g. 3 of 6
+                // hours, tied with something else) isn't a confident enough basis to assert a
+                // specific condition, and previously produced misleading headlines like "Clear
+                // skies" during genuinely mixed stretches.
                 val nextCodes = (nowIndex until minOf(nowIndex + 6, totalHours))
                     .mapNotNull { rawHourly.weatherCode?.getOrNull(it) }
-                val dominant = nextCodes.groupingBy { it }.eachCount()
-                    .maxByOrNull { it.value }?.key ?: currentIcon
-                when {
-                    dominant == 0 || dominant == 1 -> "Clear skies for the next few hours."
-                    dominant == 2 -> "Partly cloudy for the next few hours."
-                    dominant == 3 -> "Overcast for the next few hours."
-                    dominant in 45..48 -> "Foggy conditions for the next few hours."
-                    dominant in 71..77 || dominant in 85..86 -> "Snow expected over the next few hours."
-                    dominant in 51..57 -> "Light drizzle over the next few hours."
-                    dominant in 61..67 || dominant in 80..82 -> "Rain expected over the next few hours."
-                    dominant in 95..99 -> "Thunderstorm conditions in the next few hours."
+                val counts = nextCodes.groupingBy { it }.eachCount()
+                val topEntry = counts.maxByOrNull { it.value }
+                val hasClearMajority = nextCodes.isNotEmpty() &&
+                    topEntry != null &&
+                    topEntry.value.toDouble() / nextCodes.size >= 0.6
+                if (!hasClearMajority) {
+                    "Mixed conditions over the next few hours."
+                } else when (topEntry!!.key) {
+                    0, 1 -> "Clear skies for the next few hours."
+                    2 -> "Partly cloudy for the next few hours."
+                    3 -> "Overcast for the next few hours."
+                    in 45..48 -> "Foggy conditions for the next few hours."
+                    in 71..77, in 85..86 -> "Snow expected over the next few hours."
+                    in 51..57 -> "Light drizzle over the next few hours."
+                    in 61..67, in 80..82 -> "Rain expected over the next few hours."
+                    in 95..99 -> "Thunderstorm conditions in the next few hours."
                     else -> "No significant changes in the next few hours."
                 }
             }

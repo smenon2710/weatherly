@@ -339,14 +339,17 @@ fun WeatherContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // App bar row: three equal-weight slots (leading / wordmark / trailing) so the
-                        // wordmark stays centered regardless of how much content sits on either side.
+                        // App bar row: standard toolbar idiom — leading/trailing icon groups size to
+                        // their own content, and only the wordmark gets weight(1f), so it always gets
+                        // whatever width is left over rather than being capped to a fixed fraction of
+                        // the screen (an earlier equal-weight-on-all-three-slots version capped the
+                        // wordmark to exactly 1/3 of the screen width, which was narrow enough to wrap
+                        // "skyspeak" onto a second line on some phones).
                         // Icons are grouped by function, not by which side has room: Locations + Settings
                         // are both "configuration" actions (plain icon, low visual weight, matching each
                         // other); Radar + Chat are "feature" actions (tinted/filled chips, higher weight).
                         // Putting Settings in the right-hand chip group would give a once-in-a-while
-                        // action the same visual prominence as the app's primary CTA, and crowds the
-                        // wordmark on narrow screens.
+                        // action the same visual prominence as the app's primary CTA.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -354,17 +357,18 @@ fun WeatherContent(
                                 .padding(top = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = onOpenLocations) {
-                                        Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
-                                    }
-                                    IconButton(onClick = onOpenSettings) {
-                                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Cyan)
-                                    }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = onOpenLocations) {
+                                    Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
+                                }
+                                IconButton(onClick = onOpenSettings) {
+                                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Cyan)
                                 }
                             }
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 // Two-tone wordmark: "sky" recedes, "speak" steps forward
                                 val skyColor = TextSecondary
                                 val speakColor = TextPrimary
@@ -375,46 +379,45 @@ fun WeatherContent(
                                     },
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Light,
-                                    letterSpacing = 5.sp
+                                    letterSpacing = 5.sp,
+                                    maxLines = 1
                                 )
                             }
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .shadow(2.dp, CircleShape, clip = false)
+                                        .clip(CircleShape)
+                                        .background(Cyan.copy(alpha = 0.18f))
+                                        .clickable { onOpenRadar() },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .shadow(2.dp, CircleShape, clip = false)
-                                            .clip(CircleShape)
-                                            .background(Cyan.copy(alpha = 0.18f))
-                                            .clickable { onOpenRadar() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Radar,
-                                            contentDescription = "Radar map",
-                                            tint = Cyan,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .shadow(3.dp, CircleShape, clip = false)
-                                            .clip(CircleShape)
-                                            .background(Cyan)
-                                            .clickable { onOpenChat() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.AutoAwesome,
-                                            contentDescription = "Ask the weather assistant",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        Icons.Filled.Radar,
+                                        contentDescription = "Radar map",
+                                        tint = Cyan,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .shadow(3.dp, CircleShape, clip = false)
+                                        .clip(CircleShape)
+                                        .background(Cyan)
+                                        .clickable { onOpenChat() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.AutoAwesome,
+                                        contentDescription = "Ask the weather assistant",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                         }
