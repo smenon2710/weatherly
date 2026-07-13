@@ -421,7 +421,7 @@ fun DailyCard(
                 ) {
                     Text(day.dayLabel, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(52.dp))
                     Column(
-                        modifier = Modifier.width(36.dp),
+                        modifier = Modifier.width(36.dp).height(40.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         WeatherGlyph(code = day.icon, size = 24.dp)

@@ -68,6 +68,7 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | # | Title | Effort |
 |---|---|---|
 | 25 | In-app OpenRouter key + model settings UI | 2–3 h (security trade-off — deferred; use `EncryptedSharedPreferences` when implemented) |
+| 36 | Manual theme toggle: Light / Dark / System | 3–4 h |
 
 ### Pending — Priority 3 (larger scope)
 
@@ -76,6 +77,9 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 28 | Localization: replace hardcoded strings with `strings.xml` | 1–2 days |
 | 29 | Weather-change push notification | 1–2 days |
 | 30 | Share current weather | half-day |
+| 33 | Onboarding walkthrough for new users | 1–2 days |
+| 34 | Play Store screenshot text overlays | half-day (asset work, not app code) |
+| 35 | "Rate this app" prompt in settings | half-day — Play In-App Review API |
 
 ### Completed — Design Upgrades (2026-06-30)
 
@@ -116,6 +120,7 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | # | Title |
 |---|---|
 | B5 | Fix: Play Console flagged "deprecated APIs or parameters for edge-to-edge" against release 5 (1.0.4). Root cause: `android:windowSoftInputMode="adjustResize"` on `MainActivity` in `AndroidManifest.xml`, left over from before `enableEdgeToEdge()` was adopted. On API 35, edge-to-edge apps are expected to handle the IME via `WindowInsets` directly — `ChatScreen.kt` already did this correctly via `.imePadding()` — so the manifest attribute was both redundant and the actual deprecated parameter being flagged. Fixed by removing the attribute entirely; no other screen has a text input, so nothing else depended on it. Also bumped `androidx.glance:glance-appwidget` 1.1.0 → 1.1.1 in `app/build.gradle.kts`, since 1.1.0 transitively pulled in `glance-appwidget-proto`/`glance-appwidget-external-protobuf` versions affected by CVE-2024-7254 (the "critical note" Play Console surfaced under Technical quality) — 1.1.1 is the patched release. Also added `ndk { debugSymbolLevel = "FULL" }` to the release build type so future signed AABs automatically bundle native debug symbols, resolving a separate (non-blocking) Play Console notice about missing symbol files for crash/ANR analysis. `versionCode`/`versionName` bumped 5/1.0.4 → 6/1.0.5 to ship these fixes as a new release to the existing `skyspeak-testers` closed-testing track (does not reset the 14-day tester clock). |
+| B6 | Fix: uneven row spacing in the 7-day forecast list, found via direct visual review (2026-07-13). Root cause: in `DailyCard` (`WeatherComponents.kt`), each day's icon column is a plain `Column` (no fixed height) containing the `WeatherGlyph` plus, on precipitation/fog days, an extra `"$it%"` text below it. Since `Row` height is driven by its tallest child, rows with the extra percentage text render taller than rows without one, even though every row shares the same `padding(vertical = 8.dp)` — breaking the list's vertical rhythm. Fixed by giving the icon column a fixed `height(40.dp)`, so every row is the same height regardless of whether the percentage text renders. |
 
 ### Deferred
 
@@ -749,6 +754,14 @@ Nine tiles at identical visual weight (118dp `GlassCard`) presents everything as
 
 ---
 
+### 36. Manual theme toggle (Light / Dark / System)
+
+**Source:** External tester feedback (2026-07-13, `Testers Community` report) flagged "no dark mode" as missing — inaccurate, since the app has had a fully system-aware dark theme since item 6. The real gap the tester was reacting to: there's no explicit in-app toggle, only automatic system-theme following (`isSystemInDarkTheme()` in `WeatherlyTheme`), so a tester who never changed their device-level theme setting would never see it and could reasonably conclude dark mode "doesn't exist." Standard apps offer an explicit Light/Dark/System three-way choice independent of the OS setting — worth adding for discoverability, not because dark mode itself is missing.
+
+**Approach:** Add a persisted `ThemePreference` (LIGHT/DARK/SYSTEM) to `PreferencesStore`. `WeatherlyTheme`'s `darkTheme` parameter resolves from the stored preference (falling back to `isSystemInDarkTheme()` when SYSTEM is selected) instead of always reading the system value directly. Exposing the toggle needs a settings surface — natural to bundle into the same Settings screen as items 25 and 35 rather than building three separate entry points.
+
+---
+
 ### 26. `WeatherGlyph` accessibility content descriptions
 
 **Problem**
@@ -836,6 +849,30 @@ There is no way to share conditions with another person (e.g. "It's 31° and par
 **Approach:** Add a share `IconButton` in the `WeatherContent` header row (alongside the existing locations and chat buttons). On tap, build a plain-text summary from `WeatherData` and fire `Intent.ACTION_SEND`. No new dependency needed.
 
 **File:** `app/src/main/java/com/example/weatherly/ui/WeatherScreen.kt`
+
+---
+
+### 33. Onboarding walkthrough for new users
+
+**Source:** External tester feedback (2026-07-13, `Testers Community` report). No first-launch walkthrough or tooltips exist today — a new user opens straight into the live weather screen with no guidance on chat/radar/widget.
+
+**Approach:** A brief interactive first-launch sequence (2–3 screens) highlighting the AI chat assistant and radar, with a skip option. Persist "seen" state in `PreferencesStore` so it only shows once. Genuine scope item, not a quick fix — sequence alongside items 25/35/36 if a Settings screen is built (could add a "Replay walkthrough" entry there too).
+
+---
+
+### 34. Play Store screenshot text overlays
+
+**Source:** External tester feedback (2026-07-13). Current screenshots (`store_assets/screenshot-0{1,2,3}-*.png`, per the L9 entry above) already show real app screens (Weather/Chat/Radar), not generic mockups — the tester report's framing was slightly off — but adding concise text overlays ("Live precipitation radar", "AI assistant grounded in your forecast") would still make them more effective on the store listing.
+
+**Approach:** Pure asset work — re-render the three screenshots with a short text callout per image, same tooling as `store_assets/render_feature_graphic.py`. No app code changes; re-upload to Play Console store listing when ready.
+
+---
+
+### 35. "Rate this app" prompt in settings
+
+**Source:** External tester feedback (2026-07-13). No in-app path exists to prompt for a Play Store rating.
+
+**Approach:** Use the Play Core **In-App Review API** (`com.google.android.play:review-ktx`) rather than a raw settings link — it lets Google throttle/gate the prompt per its own quota rules instead of showing every time. Trigger after a positive interaction (e.g., a completed AI chat exchange), not on cold start. Needs the same Settings screen as items 25/36 to also offer a manual "Rate the app" entry point for users who want to rate anytime, not just when prompted.
 
 ---
 
