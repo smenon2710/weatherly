@@ -26,8 +26,8 @@ android {
         applicationId = "io.github.smenon2710.skyspeak"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = 6
+        versionName = "1.0.5"
 
         // Surfaced to code via BuildConfig.OPENROUTER_API_KEY / OPENROUTER_MODEL.
         buildConfigField("String", "OPENROUTER_API_KEY", "\"$openRouterApiKey\"")
@@ -54,6 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 
@@ -105,7 +108,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Home-screen widget (Jetpack Glance)
-    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
 
     // Map (OSMDroid — OpenStreetMap, no API key required)
     implementation("org.osmdroid:osmdroid-android:6.1.18")

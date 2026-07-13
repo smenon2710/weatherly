@@ -300,6 +300,6 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 - [x] Set category to Weather, write short + full description (completed via "Finish setting up your app" flow)
 - [x] Finish remaining "Finish setting up your app" declarations — privacy policy URL, sign-in details, ads, target audience, government apps, financial features, health, contact details
 - [x] Upload signed AAB to Internal testing track, sanity-check install — caught and fixed two real bugs this way (B4 in `IMPROVEMENTS.md`: silently-failing radar screen from a ProGuard/Moshi interaction; a stale Razorpay payment link)
-- [ ] **In progress:** Closed testing started 2026-07-07 via track with Google Group `skyspeak-testers` as the tester list — recruiting toward ≥20 opted-in testers; 14-continuous-day clock runs from when the 20th tester opts in, not from track creation (see Release Track Requirements above)
+- [ ] **In progress:** Closed testing started 2026-07-07 via track with Google Group `skyspeak-testers` as the tester list. 20-tester threshold cleared — 25 testers opted in as of 2026-07-13, continuously enrolled for 6 days. 14-continuous-day clock is running; ETA for completion ~2026-07-21 (see Release Track Requirements above)
 - [ ] Apply for / confirm Production access unlocked
 - [ ] Promote to Production and submit for review (typically 1–3 days)
