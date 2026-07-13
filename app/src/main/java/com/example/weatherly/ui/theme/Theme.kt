@@ -5,7 +5,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+
+/**
+ * Resolved light/dark state of the currently applied theme. Composables that
+ * branch on dark mode for anything other than `MaterialTheme.colorScheme`
+ * (shadow depth, gradient tones, tinted pill colours, etc.) must read this
+ * instead of `isSystemInDarkTheme()` directly — otherwise a manual
+ * Light/Dark override in Settings would apply the chosen colour scheme while
+ * these details kept following the raw system setting, producing a
+ * mismatched UI.
+ */
+val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
 private val LightColors = lightColorScheme(
     primary          = Color(0xFF6B86A3),
@@ -32,9 +45,11 @@ fun WeatherlyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = AppTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColors else LightColors,
+            typography = AppTypography,
+            content = content
+        )
+    }
 }

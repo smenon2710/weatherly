@@ -8,7 +8,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -84,6 +83,7 @@ import com.example.weatherly.data.model.MetricChart
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
+import com.example.weatherly.ui.theme.LocalIsDarkTheme
 import com.example.weatherly.util.MoonCalculator
 
 // --- Colours resolved from the active Material 3 colour scheme ---
@@ -117,7 +117,7 @@ private fun tempColor(c: Int): Color = when {
  */
 @Composable
 fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalIsDarkTheme.current
     val base = MaterialTheme.colorScheme.background
     val sky = when {
         code in 95..99 ->
@@ -148,7 +148,7 @@ fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
 // Soft tinted pill — light pastels in light mode, dark tints with contrasting text in dark mode.
 @Composable
 private fun tipColors(tone: TipTone): Pair<Color, Color> {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalIsDarkTheme.current
     return when (tone) {
         TipTone.HOT ->
             if (isDark) Color(0xFF2C1A06) to Color(0xFFE8BE7A)
@@ -182,7 +182,7 @@ fun GlassCard(
     corner: Dp = 22.dp,
     content: @Composable () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalIsDarkTheme.current
     val surface = MaterialTheme.colorScheme.surface
     // Light mode: soft 1dp shadow keeps cards airy; dark mode: 6dp lifts them off the background.
     val elevation = if (isDark) 6.dp else 1.dp
@@ -269,7 +269,7 @@ fun CurrentHeader(
 @Composable
 fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
     val (_, fg) = tipColors(tip.tone)
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalIsDarkTheme.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -321,9 +321,14 @@ fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
                                 fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
                             )
                             Spacer(Modifier.height(8.dp))
-                            WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
-                            h.precipChance?.takeIf { it > 0 }?.let {
-                                Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Column(
+                                modifier = Modifier.height(40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
+                                h.precipChance?.takeIf { it > 0 }?.let {
+                                    Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                }
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
@@ -419,7 +424,15 @@ fun DailyCard(
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(day.dayLabel, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(52.dp))
+                    Text(
+                        day.dayLabel,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.width(56.dp)
+                    )
                     Column(
                         modifier = Modifier.width(36.dp).height(40.dp),
                         horizontalAlignment = Alignment.CenterHorizontally

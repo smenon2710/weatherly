@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weatherly.data.model.SavedPlace
+import com.example.weatherly.data.model.ThemePreference
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.ForecastCache
@@ -42,6 +43,9 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _units = MutableStateFlow(prefs.getUnitSystem())
     val units: StateFlow<UnitSystem> = _units.asStateFlow()
+
+    private val _themePreference = MutableStateFlow(prefs.getThemePreference())
+    val themePreference: StateFlow<ThemePreference> = _themePreference.asStateFlow()
 
     private val _places = MutableStateFlow(prefs.getPlaces())
     val places: StateFlow<List<SavedPlace>> = _places.asStateFlow()
@@ -161,6 +165,11 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         _units.value = units
         prefs.setUnitSystem(units)
         load(forceRefresh = true)
+    }
+
+    fun setThemePreference(preference: ThemePreference) {
+        _themePreference.value = preference
+        prefs.setThemePreference(preference)
     }
 
     fun search(query: String) {

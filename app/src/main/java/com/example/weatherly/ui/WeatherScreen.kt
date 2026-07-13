@@ -26,10 +26,10 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +65,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.data.model.SavedPlace
-import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.AttributionFooter
@@ -86,11 +85,11 @@ import kotlinx.coroutines.delay
 fun WeatherScreen(
     viewModel: WeatherViewModel = viewModel(),
     onOpenChat: () -> Unit = {},
-    onOpenRadar: () -> Unit = {}
+    onOpenRadar: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
-    val units by viewModel.units.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
@@ -129,7 +128,8 @@ fun WeatherScreen(
                 onRefresh = { viewModel.refresh() },
                 onOpenLocations = { showLocations = true },
                 onOpenChat = onOpenChat,
-                onOpenRadar = onOpenRadar
+                onOpenRadar = onOpenRadar,
+                onOpenSettings = onOpenSettings
             )
 
         else -> Box(
@@ -166,12 +166,10 @@ fun WeatherScreen(
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             LocationsSheet(
-                units = units,
                 selected = selected,
                 places = places,
                 searchResults = searchResults,
                 searching = searching,
-                onUnits = viewModel::setUnits,
                 onSearch = viewModel::search,
                 onAdd = { viewModel.addPlace(it); showLocations = false },
                 onUseCurrent = { viewModel.selectCurrentLocation(); showLocations = false },
@@ -184,12 +182,10 @@ fun WeatherScreen(
 
 @Composable
 private fun LocationsSheet(
-    units: UnitSystem,
     selected: SavedPlace?,
     places: List<SavedPlace>,
     searchResults: List<SavedPlace>,
     searching: Boolean,
-    onUnits: (UnitSystem) -> Unit,
     onSearch: (String) -> Unit,
     onAdd: (SavedPlace) -> Unit,
     onUseCurrent: () -> Unit,
@@ -210,22 +206,6 @@ private fun LocationsSheet(
             .padding(horizontal = 20.dp)
             .padding(bottom = 28.dp)
     ) {
-        Text("Units", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FilterChip(
-                selected = units == UnitSystem.METRIC,
-                onClick = { onUnits(UnitSystem.METRIC) },
-                label = { Text("°C · km/h") }
-            )
-            FilterChip(
-                selected = units == UnitSystem.IMPERIAL,
-                onClick = { onUnits(UnitSystem.IMPERIAL) },
-                label = { Text("°F · mph") }
-            )
-        }
-
-        Spacer(Modifier.height(20.dp))
         Text("Add a city", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
@@ -317,7 +297,8 @@ fun WeatherContent(
     isRefreshing: Boolean = false,
     onOpenLocations: () -> Unit = {},
     onOpenChat: () -> Unit = {},
-    onOpenRadar: () -> Unit = {}
+    onOpenRadar: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
 
@@ -358,68 +339,82 @@ fun WeatherContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // App bar row: locations · wordmark · chat
-                        Box(
+                        // App bar row: three equal-weight slots (leading / wordmark / trailing) so the
+                        // wordmark stays centered regardless of how much content sits on either side.
+                        // Icons are grouped by function, not by which side has room: Locations + Settings
+                        // are both "configuration" actions (plain icon, low visual weight, matching each
+                        // other); Radar + Chat are "feature" actions (tinted/filled chips, higher weight).
+                        // Putting Settings in the right-hand chip group would give a once-in-a-while
+                        // action the same visual prominence as the app's primary CTA, and crowds the
+                        // wordmark on narrow screens.
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(76.dp)
-                                .padding(top = 4.dp)
+                                .height(56.dp)
+                                .padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = onOpenLocations,
-                                modifier = Modifier.align(Alignment.CenterStart)
-                            ) {
-                                Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
-                            }
-                            // Two-tone wordmark: "sky" recedes, "speak" steps forward
-                            val skyColor = TextSecondary
-                            val speakColor = TextPrimary
-                            Text(
-                                buildAnnotatedString {
-                                    withStyle(SpanStyle(color = skyColor)) { append("sky") }
-                                    withStyle(SpanStyle(color = speakColor)) { append("speak") }
-                                },
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Light,
-                                letterSpacing = 5.sp,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                            Row(
-                                modifier = Modifier.align(Alignment.CenterEnd),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .shadow(2.dp, CircleShape, clip = false)
-                                        .clip(CircleShape)
-                                        .background(Cyan.copy(alpha = 0.18f))
-                                        .clickable { onOpenRadar() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Radar,
-                                        contentDescription = "Radar map",
-                                        tint = Cyan,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = onOpenLocations) {
+                                        Icon(Icons.Filled.Place, contentDescription = "Locations", tint = Cyan)
+                                    }
+                                    IconButton(onClick = onOpenSettings) {
+                                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Cyan)
+                                    }
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .shadow(3.dp, CircleShape, clip = false)
-                                        .clip(CircleShape)
-                                        .background(Cyan)
-                                        .clickable { onOpenChat() },
-                                    contentAlignment = Alignment.Center
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                // Two-tone wordmark: "sky" recedes, "speak" steps forward
+                                val skyColor = TextSecondary
+                                val speakColor = TextPrimary
+                                Text(
+                                    buildAnnotatedString {
+                                        withStyle(SpanStyle(color = skyColor)) { append("sky") }
+                                        withStyle(SpanStyle(color = speakColor)) { append("speak") }
+                                    },
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Light,
+                                    letterSpacing = 5.sp
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Filled.AutoAwesome,
-                                        contentDescription = "Ask the weather assistant",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .shadow(2.dp, CircleShape, clip = false)
+                                            .clip(CircleShape)
+                                            .background(Cyan.copy(alpha = 0.18f))
+                                            .clickable { onOpenRadar() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Radar,
+                                            contentDescription = "Radar map",
+                                            tint = Cyan,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .shadow(3.dp, CircleShape, clip = false)
+                                            .clip(CircleShape)
+                                            .background(Cyan)
+                                            .clickable { onOpenChat() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.AutoAwesome,
+                                            contentDescription = "Ask the weather assistant",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

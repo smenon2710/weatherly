@@ -2,6 +2,7 @@ package com.example.weatherly.data.prefs
 
 import android.content.Context
 import com.example.weatherly.data.model.SavedPlace
+import com.example.weatherly.data.model.ThemePreference
 import com.example.weatherly.data.model.UnitSystem
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -59,6 +60,10 @@ class PreferencesStore(context: Context) {
         }.apply()
     }
 
+    /** Whether an effective key is configured, without exposing its value to callers. */
+    fun hasOpenRouterKey(buildDefault: String): Boolean =
+        getOpenRouterKey(buildDefault).isNotBlank()
+
     fun getOpenRouterModel(buildDefault: String): String =
         prefs.getString(KEY_OR_MODEL, null)?.takeIf { it.isNotBlank() } ?: buildDefault
 
@@ -73,11 +78,22 @@ class PreferencesStore(context: Context) {
         if (Locale.getDefault().country in setOf("US", "LR", "MM")) UnitSystem.IMPERIAL
         else UnitSystem.METRIC
 
+    // --- Appearance ---------------------------------------------------------
+    fun getThemePreference(): ThemePreference =
+        prefs.getString(KEY_THEME, null)?.let {
+            runCatching { ThemePreference.valueOf(it) }.getOrNull()
+        } ?: ThemePreference.SYSTEM
+
+    fun setThemePreference(preference: ThemePreference) {
+        prefs.edit().putString(KEY_THEME, preference.name).apply()
+    }
+
     companion object {
         private const val KEY_UNITS = "units"
         private const val KEY_PLACES = "places"
         private const val KEY_SELECTED = "selected"
         private const val KEY_OR_KEY = "openrouter_key"
         private const val KEY_OR_MODEL = "openrouter_model"
+        private const val KEY_THEME = "theme_preference"
     }
 }

@@ -63,12 +63,27 @@ Fixes and features ordered by effort. Items within each tier are independent.
 |---|---|
 | 11 | Adaptive launcher icon (warm-gold sun on deep navy, XML only — minSdk 26) |
 
-### Pending — Priority 2 (medium effort, meaningful UX improvement)
+### Completed — Settings Screen (2026-07-13)
 
-| # | Title | Effort |
-|---|---|---|
-| 25 | In-app OpenRouter key + model settings UI | 2–3 h (security trade-off — deferred; use `EncryptedSharedPreferences` when implemented) |
-| 36 | Manual theme toggle: Light / Dark / System | 3–4 h |
+| # | Title |
+|---|---|
+| 25 | In-app OpenRouter key + model settings UI — new `SettingsScreen.kt`/`SettingsViewModel.kt`. The key field never displays the stored secret (see B9 below); model field is a plain editable override. Both backed by `PreferencesStore` |
+| 35 | "Rate this app" entry point — deep-links to the Play Store listing (`market://details`, falling back to the web listing) rather than the In-App Review API, per Google's own guidance that manual settings buttons should link directly to the Store listing |
+| 36 | Manual theme toggle: Light / Dark / System — new `ThemePreference` enum persisted via `PreferencesStore`, `WeatherViewModel.themePreference`/`setThemePreference()`, resolved into `WeatherlyTheme`'s `darkTheme` param in `MainActivity`. Also introduced `LocalIsDarkTheme` (`ui/theme/Theme.kt`) and switched `GlassCard`, `conditionGradient`, `tipColors`, and `TipBanner` (`WeatherComponents.kt`) from `isSystemInDarkTheme()` to that CompositionLocal — without this, a manual Light/Dark override would apply the chosen colour scheme while shadows/gradients/tinted pills kept following the raw system setting |
+
+Entry point: a new gear icon in `WeatherScreen`'s header row (alongside Radar/Chat).
+
+### Completed — On-Device Testing Follow-ups (2026-07-13)
+
+Found by testing the Settings screen build on a physical phone.
+
+| # | Title |
+|---|---|
+| — | Header crowding — the app-bar row (`WeatherContent` in `WeatherScreen.kt`) was rearranged after invoking the `frontend-design` skill. Root cause was hierarchy, not just spacing: adding a third right-side icon (Settings) gave a rarely-used action the same visual weight as the primary Chat CTA, and crowded the centered wordmark on narrow screens. Fixed by grouping icons by function instead of by which side had room — Locations + Settings are both "configuration" actions (plain icon, left side, matching each other's low visual weight); Radar + Chat stay as tinted/filled "feature" chips (right side). Also switched the row from `Box` + `Alignment.align()` to a proper 3-slot equal-weight `Row`, so the wordmark stays centered regardless of icon count on either side going forward |
+| 2 (follow-up) | Units moved from the Locations bottom sheet into Settings, alongside the theme toggle — `LocationsSheet` no longer takes `units`/`onUnits`; `WeatherViewModel.units`/`setUnits` are now wired directly into `SettingsScreen` from `MainActivity` |
+| B7 | Fix: same class of bug as B6, in `HourlyCard` (`WeatherComponents.kt`) instead of `DailyCard` — each hour's icon+precipitation-percentage `Column` had no fixed height, so hours with a shown percentage pushed the temperature text below them further down than hours without one, breaking alignment across the strip. Fixed with the same `height(40.dp)` treatment as B6 |
+| B8 | Fix: "Today" label in `DailyCard` mid-word wrapped onto two lines ("Toda" / "y") inside its fixed `width(52.dp)` — "Today" (5 letters) is wider than the 3-letter weekday abbreviations (`EEE` format) the same column normally holds. Fixed with `maxLines = 1` + `TextOverflow.Ellipsis`, and widened the column slightly (52dp → 56dp) so "Today" now fits without truncation |
+| B9 | Security fix: the OpenRouter API key field in Settings originally prefilled with the actual stored key (masked, with a reveal toggle) — meaning anyone with the phone unlocked could reveal and copy out a key that isn't theirs. Redesigned so the field is always empty and only ever holds a *new* value about to be saved; `SettingsViewModel.hasOpenRouterKey` exposes only whether a key exists, never its value. Added an explicit "Remove saved key" action (`PreferencesStore.setOpenRouterKey("")` via `removeOpenRouterKey()`) since Save no longer treats a blank field as "clear the key" |
 
 ### Pending — Priority 3 (larger scope)
 
@@ -79,7 +94,6 @@ Fixes and features ordered by effort. Items within each tier are independent.
 | 30 | Share current weather | half-day |
 | 33 | Onboarding walkthrough for new users | 1–2 days |
 | 34 | Play Store screenshot text overlays | half-day (asset work, not app code) |
-| 35 | "Rate this app" prompt in settings | half-day — Play In-App Review API |
 
 ### Completed — Design Upgrades (2026-06-30)
 
