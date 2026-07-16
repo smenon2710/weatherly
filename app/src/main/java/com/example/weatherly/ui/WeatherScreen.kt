@@ -448,10 +448,6 @@ fun WeatherContent(
                     // placed above the hero), consistency with the rest of the app turned out to
                     // matter more than standing out. Active alerts render above any resolved
                     // notices, since an ongoing hazard is more important than an acknowledgment.
-                    resolvedAlerts.forEach { resolved ->
-                        Spacer(Modifier.height(12.dp))
-                        ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
-                    }
                     if (data.alerts.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
                         AlertBannerList(
@@ -459,6 +455,10 @@ fun WeatherContent(
                             onAlertClick = { sheet = DetailSheet.Alert(it) },
                             onMoreClick = { sheet = DetailSheet.AlertList(it) }
                         )
+                    }
+                    resolvedAlerts.forEach { resolved ->
+                        Spacer(Modifier.height(12.dp))
+                        ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
                     }
                     Spacer(Modifier.height(12.dp))
                     HourlyCard(data)
