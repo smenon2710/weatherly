@@ -370,6 +370,25 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
  * system notifications use, so this label still matters for avoiding that mistaken-identity read
  * even now that the card lives in the ordinary card list rather than above the hero.
  */
+/**
+ * A concise, single-line, never-truncated stand-in for NWS's own (often long) headline prose —
+ * e.g. "3:45 PM – Tomorrow, 12:00 AM". NWS legitimately issues multiple same-named advisories for
+ * one point (day-by-day reissuance, or overlapping zone coverage for border locations), and the
+ * raw headline text is the only thing that visually distinguished them before this — but at 1-2
+ * lines before ellipsizing, the "until X" time that actually differs between them was often the
+ * exact part that got cut off, making genuinely different advisories look like duplicates.
+ */
+private fun alertTimeWindow(alert: WeatherAlert): String? {
+    val eff = alert.effectiveLabel
+    val exp = alert.expiresLabel
+    return when {
+        eff != null && exp != null -> "$eff – $exp"
+        exp != null -> "Until $exp"
+        eff != null -> "Since $eff"
+        else -> null
+    }
+}
+
 @Composable
 fun AlertBannerList(
     alerts: List<WeatherAlert>,
@@ -405,8 +424,9 @@ fun AlertBannerList(
                         fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
                     )
                     Text(
-                        primary.headline, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
+                        alertTimeWindow(primary) ?: primary.headline,
+                        color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }
                 Spacer(Modifier.width(4.dp))

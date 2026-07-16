@@ -28,6 +28,7 @@ import kotlin.coroutines.suspendCoroutine
 import java.text.SimpleDateFormat
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -341,9 +342,22 @@ class WeatherRepository(private val context: Context) {
     // NWS timestamps are ISO-8601 with a UTC offset (e.g. "2026-07-16T14:00:00-05:00"),
     // a different shape than Open-Meteo's local "yyyy-MM-dd'T'HH:mm" — java.time handles the
     // offset directly and is available unconditionally since minSdk 26 meets its API floor.
+    // Time-only (no date) was ambiguous: two alerts effective/expiring at the same clock time on
+    // different days (a real, observed case — NWS can issue same-named advisories day after day
+    // for one location) rendered as literally identical text, e.g. "3:45 PM" for both, with no
+    // way to tell them apart short of opening each one's full detail sheet. Day context is now
+    // always included except for "today," where it would just be visual noise.
     private fun formatNwsTime(iso: String?): String? = iso?.let {
         try {
-            OffsetDateTime.parse(it).format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
+            val dt = OffsetDateTime.parse(it)
+            val today = OffsetDateTime.now(dt.offset).toLocalDate()
+            val timePart = dt.format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
+            when (ChronoUnit.DAYS.between(today, dt.toLocalDate())) {
+                0L -> timePart
+                1L -> "Tomorrow, $timePart"
+                -1L -> "Yesterday, $timePart"
+                else -> dt.format(DateTimeFormatter.ofPattern("MMM d, h:mm a", Locale.getDefault()))
+            }
         } catch (e: Exception) {
             null
         }
