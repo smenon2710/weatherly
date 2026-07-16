@@ -14,6 +14,7 @@ in-app donation link supports the developer if you'd like to.
 - Current conditions, next 24 hours, and a 7-day forecast in a single API call
 - Condition-responsive hero gradient — the background shifts tone to match the sky (clear blue, rain slate, thunder indigo, snow white-blue), with a subtle time-of-day tint at dawn/golden hour/dusk
 - Precipitation radar map (OpenStreetMap + RainViewer, no API key) with play/pause and a frame scrubber
+- Official National Weather Service advisories (severe warnings, watches, air quality alerts — US locations only), no API key, shown with severity-colored cards and full detail sheets
 - Home-screen widget with size-aware layouts, chrono-dynamic content (morning/daytime/night), and Material You dynamic colors
 - Automatic location via FusedLocationProvider + on-device reverse geocoding
 - Pull-to-refresh, plus quiet auto-refresh on resume and every 30 minutes
@@ -51,13 +52,17 @@ CC BY 4.0 licence, which requires attribution. The app shows an attribution
 footer to satisfy this. Free non-commercial use allows up to ~10,000 calls/day,
 far beyond personal needs; this app also caches results for 30 minutes in memory.
 
+Weather advisories are provided by the National Weather Service
+(https://api.weather.gov), a free public U.S. government API — no key, no
+attribution requirement (public domain), US locations only.
+
 ## Project structure
 ```
 app/src/main/java/com/example/weatherly/
 ├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat/Radar screens
 ├─ data/
-│  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models
-│  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter) + network module
+│  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models, NWS alert models
+│  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter, NWS) + network module
 │  ├─ repository/   # WeatherRepository + ChatRepository (weather-aware prompts)
 │  └─ prefs/        # unit/place selection, on-device OpenRouter key/model, forecast cache
 ├─ location/        # FusedLocationProvider wrapper

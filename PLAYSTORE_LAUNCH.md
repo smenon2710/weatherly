@@ -90,15 +90,17 @@ KEY_PASSWORD=your_key_password
 
 ### 4. Data Safety Form (Play Console)
 
+**⚠️ Drifted from the live Console submission (found 2026-07-16, not yet re-submitted):** the checklist below marks this form as already filled out, but that submission predates the NWS weather-alerts feature (`api.weather.gov`), which also now receives location coordinates on every fetch. The table below and `docs/privacy.html` have been corrected to reflect actual current app behavior — **the live Play Console Data Safety form itself still needs to be manually updated to match** (this file and the hosted policy are documentation, not the actual submission; only re-editing the form in Console fixes the real compliance gap).
+
 Fill out in Play Console → Store listing → Data safety. Summary (see the detailed draft answers below for the full form flow):
 
 | Data type | Collected | Shared with third parties | Purpose |
 |---|---|---|---|
-| Approximate location | Yes | Yes (Open-Meteo, to fetch the forecast) | App functionality |
-| Precise location | Yes | Yes (Open-Meteo, to fetch the forecast) | App functionality |
+| Approximate location | Yes | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
+| Precise location | Yes | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
 | User queries (chat) | Optional | Yes (OpenRouter), only when a key is configured | App functionality |
 
-*(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`.)*
+*(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`. Updated again 2026-07-16 to add the National Weather Service as a third recipient of location data, added when the weather-alerts feature shipped.)*
 
 <details>
 <summary>Detailed draft answers, matching Play Console's actual form flow (expand)</summary>
@@ -107,15 +109,15 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 **Top-level questions:**
 - *Does your app collect or share any of the required user data types?* → **Yes**
-- *Is all of the user data collected by your app encrypted in transit?* → **Yes** (every API call — Open-Meteo, OpenRouter, RainViewer/OSM tiles — goes over HTTPS)
+- *Is all of the user data collected by your app encrypted in transit?* → **Yes** (every API call — Open-Meteo, OpenRouter, RainViewer/OSM tiles, National Weather Service — goes over HTTPS)
 - *Do you provide a way for users to request that their data be deleted?* → **No account exists, so there's no server-side data tied to a user identity to delete.** All app data (cache, preferences, on-device API key) lives in local app storage and is removed on uninstall. If Console requires an affirmative answer here, note in the form that data deletion is handled via app uninstall since no account/backend exists.
 
 **Per data type:**
 
 | Data type | Collected? | Shared? | Purpose | Optional? | Ephemeral? |
 |---|---|---|---|---|---|
-| Approximate location | Yes | Yes — Open-Meteo | App functionality | No (core feature; app is unusable without it unless a manual city is picked) | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's own retention policy |
-| Precise location | Yes | Yes — Open-Meteo | App functionality | No | Same as above |
+| Approximate location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | No (core feature; app is unusable without it unless a manual city is picked) | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's/NWS's own retention policy |
+| Precise location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | No | Same as above |
 | Other user-generated content *(free-form chat text)* | Yes, only if the user opens AI chat and a key is configured | Yes — OpenRouter (and whichever model OpenRouter routes to) | App functionality | Yes — the quick-suggest chips work without any chat text ever being sent | No |
 
 **Data types with no data to declare (leave unchecked):** Personal info (name/email/etc. — never collected), Financial info (the donation link opens an external Razorpay page in the browser; the app itself never collects or processes payment details), Health & fitness, Photos/videos, Audio, Contacts, Calendar, Messages (SMS/email), Web browsing history, Device/other IDs, App info & performance (no analytics or crash-reporting SDK in the codebase).
@@ -144,7 +146,7 @@ The rest of the items under Play Console → Policy → App content, beyond Data
 - Category: Utility/Productivity/Reference — not Games
 - Violence, sexual content, profanity, controlled substances, gambling: None
 - User-generated content shared with other users: No — chat text is private per-user, sent only to OpenRouter for processing, never shown to or shared with other app users
-- Shares user's location: Yes — with a third party (Open-Meteo) for app functionality, not for social/advertising purposes
+- Shares user's location: Yes — with third parties (Open-Meteo; National Weather Service for U.S. locations) for app functionality, not for social/advertising purposes
 - Expected outcome: **Everyone**
 
 ---
@@ -160,7 +162,7 @@ Character counts verified — safe to paste directly into Play Console.
 Ad-free forecasts, live radar, and an AI weather assistant. No account needed.
 ```
 
-**Full description** (4000 char limit, ~2030 used):
+**Full description** (4000 char limit, ~2230 used):
 ```
 SkySpeak is a clean, ad-free weather app built for people who just want accurate forecasts without the clutter — plus an AI assistant for the planning questions a forecast alone can't answer.
 
@@ -169,6 +171,7 @@ WHAT YOU GET
 • A hero display that visually shifts with the sky — clear blue, rain slate, thunder indigo, snow white-blue — so conditions read at a glance
 • Live precipitation radar with play/pause and a frame scrubber
 • Air quality, pressure, visibility, wind, humidity, sunrise/sunset, and moon phase — all in one screen
+• Official National Weather Service advisories — severe warnings, watches, and air quality alerts — shown clearly at a glance (U.S. locations)
 • A home-screen widget that adapts its layout to size and time of day
 • Works offline: your last forecast is cached, so the app never opens to a blank screen
 
@@ -183,7 +186,7 @@ PRIVACY BY DESIGN
 • Full privacy policy available in-app and on our website
 
 ABOUT THE DATA
-Forecasts come from Open-Meteo, a free and open weather data provider. The precipitation radar uses OpenStreetMap tiles with a RainViewer overlay. Both are shown with attribution at the bottom of the screen.
+Forecasts come from Open-Meteo, a free and open weather data provider, attributed at the bottom of the weather screen. The precipitation radar uses OpenStreetMap tiles with a RainViewer overlay. Weather advisories come from the National Weather Service, the official U.S. government forecasting agency.
 
 SkySpeak is free to use with no paywalled features. If you find it useful, an optional "Support the developer" link is available — entirely optional, never required.
 
@@ -296,7 +299,7 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 - [x] Build signed AAB (not APK)
 - [x] Create Play Console account ($25, paid, identity verification complete)
 - [x] Create app entry in Play Console (package name `io.github.smenon2710.skyspeak`) — now on "Finish setting up your app" dashboard
-- [x] Fill out Data Safety form (completed via "Finish setting up your app" flow)
+- [x] Fill out Data Safety form (completed via "Finish setting up your app" flow) — **⚠️ re-open and update 2026-07-16: needs the National Weather Service added as a location-sharing third party, see section 4 above**
 - [x] Complete content rating questionnaire (completed via "Finish setting up your app" flow — outcome: Everyone)
 - [x] Store listing assets ready in `store_assets/` — 3 screenshots (1280×2560, 2:1, no alpha), 512×512 icon, 1024×500 feature graphic — verified against Play Console upload spec (upload to Play Console still needed)
 - [x] Set category to Weather, write short + full description (completed via "Finish setting up your app" flow)
