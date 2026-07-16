@@ -350,9 +350,12 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
  * beneath it instead of stacking every alert at full height, so 2-3 concurrent advisories don't
  * push the whole hero off the first screen. Renders nothing when [alerts] is empty.
  *
- * Deliberately full-bleed and square (no side margin, no corner rounding) — every other surface
- * in the app (GlassCard, chips, buttons) is soft and rounded, so this is the one place that
- * breaks that language on purpose: it reads as a system-level notice, not a content card.
+ * Built on the same [GlassCard] every other surface in the app uses (same corner radius, shadow,
+ * and border treatment per theme) — only the fill color changes, by severity. An earlier version
+ * was deliberately full-bleed and square to read as a "system notice," but that broke the app's
+ * otherwise consistently soft, rounded visual language badly enough that it read as foreign
+ * rather than intentional. Urgency now comes from color and top-of-screen position alone, the
+ * same way the rest of the app differentiates content without changing its shape language.
  */
 @Composable
 fun AlertBannerList(
@@ -364,43 +367,45 @@ fun AlertBannerList(
     if (alerts.isEmpty()) return
     val primary = alerts.first()
     val (bg, fg) = alertColors(primary.severity)
-    Column(modifier = modifier.fillMaxWidth().background(bg)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onAlertClick(primary) }
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Filled.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    primary.event.uppercase(), color = fg, fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
-                )
-                Text(
-                    primary.headline, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            Icon(
-                Icons.Filled.ChevronRight, contentDescription = "View advisory details",
-                tint = fg.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)
-            )
-        }
-        val extraCount = alerts.size - 1
-        if (extraCount > 0) {
-            Text(
-                "+$extraCount more advisor${if (extraCount == 1) "y" else "ies"}",
-                color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+    GlassCard(modifier = modifier.fillMaxWidth(), fill = bg) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(fg.copy(alpha = 0.08f))
-                    .clickable { onMoreClick(alerts) }
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+                    .clickable { onAlertClick(primary) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        primary.event.uppercase(), color = fg, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
+                    )
+                    Text(
+                        primary.headline, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Filled.ChevronRight, contentDescription = "View advisory details",
+                    tint = fg.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)
+                )
+            }
+            val extraCount = alerts.size - 1
+            if (extraCount > 0) {
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = fg.copy(alpha = 0.18f))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "+$extraCount more advisor${if (extraCount == 1) "y" else "ies"}",
+                    color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onMoreClick(alerts) }
+                )
+            }
         }
     }
 }

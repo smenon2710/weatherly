@@ -329,13 +329,14 @@ fun WeatherContent(
                     .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Official NWS advisories — sits on the plain background, above the hero, so it
-                // reads as a distinct "official notice" layer rather than blending into the
-                // condition gradient or the casual local TipBanners further down.
+                // Official NWS advisories — a GlassCard like every other section, so it reads as
+                // part of the app rather than a bolted-on system banner; sits above the hero so
+                // it's still the first thing seen, with urgency carried by color, not shape.
                 if (data.alerts.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
                     AlertBannerList(
                         alerts = data.alerts,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         onAlertClick = { sheet = DetailSheet.Alert(it) },
                         onMoreClick = { sheet = DetailSheet.AlertList(it) }
                     )
