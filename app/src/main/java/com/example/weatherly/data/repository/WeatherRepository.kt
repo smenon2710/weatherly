@@ -4,13 +4,17 @@ import android.content.Context
 import android.location.Geocoder
 import android.os.Build
 import com.example.weatherly.data.model.AirQualityResponse
+import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.HourlyBlock
+import com.example.weatherly.data.model.NwsAlertProperties
+import com.example.weatherly.data.model.NwsAlertsResponse
 import com.example.weatherly.data.model.OpenMeteoResponse
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.UnitSystem
+import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.data.remote.NetworkModule
@@ -22,6 +26,8 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import java.text.SimpleDateFormat
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -36,6 +42,7 @@ class WeatherRepository(private val context: Context) {
     private val api = NetworkModule.api
     private val geocodingApi = NetworkModule.geocodingApi
     private val airQualityApi = NetworkModule.airQualityApi
+    private val nwsApi = NetworkModule.nwsApi
 
     private data class Cached(val key: String, val data: WeatherData, val timestamp: Long)
     private var memoryCache: Cached? = null
@@ -55,7 +62,7 @@ class WeatherRepository(private val context: Context) {
             }
         }
         try {
-            val (forecast, air) = coroutineScope {
+            val (forecast, air, alerts) = coroutineScope {
                 val f = async {
                     api.getForecast(
                         latitude = lat, longitude = lon,
@@ -65,10 +72,15 @@ class WeatherRepository(private val context: Context) {
                     )
                 }
                 val a = async { runCatching { airQualityApi.get(lat, lon) }.getOrNull() }
-                f.await() to a.await()
+                // NWS is US-only and has no key of its own; a failure or an out-of-coverage
+                // point (empty features list) must never fail the overall weather fetch.
+                val n = async {
+                    runCatching { nwsApi.getActiveAlerts("%.4f,%.4f".format(Locale.US, lat, lon)) }.getOrNull()
+                }
+                Triple(f.await(), a.await(), n.await())
             }
             val name = placeName ?: reverseGeocode(lat, lon)
-            val data = mapToWeatherData(forecast, air, name, units)
+            val data = mapToWeatherData(forecast, air, alerts, name, units)
             memoryCache = Cached(cacheKey, data, now)
             Result.success(data)
         } catch (e: Exception) {
@@ -88,6 +100,7 @@ class WeatherRepository(private val context: Context) {
     private fun mapToWeatherData(
         r: OpenMeteoResponse,
         air: AirQualityResponse?,
+        alerts: NwsAlertsResponse?,
         locationName: String,
         units: UnitSystem
     ): WeatherData {
@@ -242,8 +255,98 @@ class WeatherRepository(private val context: Context) {
             hourlyPressure = hourlyPressure,
             hourlyPrecipProb = hourlyPrecipProb,
             hourlyAqi = hourlyAqi,
-            daily = daily
+            daily = daily,
+            alerts = mapAlerts(alerts)
         )
+    }
+
+    private fun mapAlerts(response: NwsAlertsResponse?): List<WeatherAlert> {
+        val severityOrder = listOf(
+            AlertSeverity.EXTREME, AlertSeverity.SEVERE, AlertSeverity.MODERATE,
+            AlertSeverity.MINOR, AlertSeverity.UNKNOWN
+        )
+        return response?.features.orEmpty()
+            .mapNotNull { it.properties }
+            // "Actual" excludes Test/Exercise/Draft products NWS also publishes through this feed.
+            .filter { it.status == "Actual" }
+            .distinctBy { it.id }
+            // Same-severity ties (e.g. two Air Quality Alerts, one for today and one for tomorrow)
+            // otherwise sort in whatever order the API happened to return them.
+            .sortedWith(
+                compareBy<NwsAlertProperties> { severityOrder.indexOf(parseSeverity(it.severity, it.event, it.description)) }
+                    .thenBy { parseInstantOrMax(it.effective) }
+            )
+            .map { p ->
+                WeatherAlert(
+                    id = p.id ?: p.hashCode().toString(),
+                    event = p.event ?: "Weather Alert",
+                    severity = parseSeverity(p.severity, p.event, p.description),
+                    headline = p.headline ?: p.event ?: "Weather Alert",
+                    description = normalizeNwsText(p.description),
+                    instruction = p.instruction?.let { normalizeNwsText(it) },
+                    areaDesc = p.areaDesc,
+                    senderName = p.senderName,
+                    effectiveLabel = formatNwsTime(p.effective),
+                    // "ends" is when the hazard itself is expected to end; "expires" is only when
+                    // the CAP message expires, which for long-duration products (e.g. a multi-day
+                    // Flood Watch) is often much sooner than the actual hazard window and reads as
+                    // misleadingly early if shown as "expires". Prefer "ends", falling back to
+                    // "expires" for simpler/shorter products that don't set it.
+                    expiresLabel = formatNwsTime(p.ends ?: p.expires),
+                    // NWS sometimes sets these to "Unknown" rather than omitting them — treat that
+                    // the same as absent so the UI doesn't render a useless "Unknown" badge.
+                    urgency = p.urgency?.takeIf { it != "Unknown" },
+                    certainty = p.certainty?.takeIf { it != "Unknown" }
+                )
+            }
+    }
+
+    private fun parseSeverity(raw: String?, event: String?, description: String?): AlertSeverity {
+        when (raw) {
+            "Extreme" -> return AlertSeverity.EXTREME
+            "Severe" -> return AlertSeverity.SEVERE
+            "Moderate" -> return AlertSeverity.MODERATE
+            "Minor" -> return AlertSeverity.MINOR
+        }
+        // NWS tags nearly every Air Quality Alert severity "Unknown" — its CAP severity taxonomy
+        // has no air-quality category — so without this, a "Code Red...unhealthful for the
+        // general population" advisory would render in the calmest visual tier, same as a Small
+        // Craft Advisory. State environmental agencies use EPA's standardized "Code <color>" AQI
+        // names verbatim nationwide in these alerts, so it's a reliable signal to infer from.
+        if (event?.contains("Air Quality", ignoreCase = true) == true) {
+            val text = description.orEmpty()
+            return when {
+                Regex("code\\s+(purple|maroon)", RegexOption.IGNORE_CASE).containsMatchIn(text) -> AlertSeverity.EXTREME
+                Regex("code\\s+red", RegexOption.IGNORE_CASE).containsMatchIn(text) -> AlertSeverity.SEVERE
+                Regex("code\\s+orange", RegexOption.IGNORE_CASE).containsMatchIn(text) -> AlertSeverity.MODERATE
+                else -> AlertSeverity.MODERATE // still an active DEP advisory — never as calm as "Info"
+            }
+        }
+        return AlertSeverity.UNKNOWN
+    }
+
+    private fun parseInstantOrMax(iso: String?): java.time.Instant =
+        iso?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() } ?: java.time.Instant.MAX
+
+    // NWS text products are hard-wrapped to ~80 columns with a literal newline at every wrap
+    // point, and only a genuine paragraph break uses a blank line (\n\n). Rendered verbatim in a
+    // proportional-width Compose Text, those wrap newlines produce short, choppy lines instead of
+    // normal paragraph reflow. Collapse single newlines to spaces; keep blank-line paragraph breaks.
+    private fun normalizeNwsText(raw: String?): String =
+        raw.orEmpty()
+            .replace(Regex("(?<!\\n)\\n(?!\\n)"), " ")
+            .replace(Regex(" {2,}"), " ")
+            .trim()
+
+    // NWS timestamps are ISO-8601 with a UTC offset (e.g. "2026-07-16T14:00:00-05:00"),
+    // a different shape than Open-Meteo's local "yyyy-MM-dd'T'HH:mm" — java.time handles the
+    // offset directly and is available unconditionally since minSdk 26 meets its API floor.
+    private fun formatNwsTime(iso: String?): String? = iso?.let {
+        try {
+            OffsetDateTime.parse(it).format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun buildUpcomingHeadline(

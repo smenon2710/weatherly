@@ -42,7 +42,10 @@ data class WeatherData(
     val hourlyPressure: List<Int>,
     val hourlyPrecipProb: List<Int>,
     val hourlyAqi: List<Int>,
-    val daily: List<DayEntry>
+    val daily: List<DayEntry>,
+    // Default required: ForecastCache deserializes old cached JSON (written before this field
+    // existed) via Moshi's reflective adapter, which only fills in a missing key from a default.
+    val alerts: List<WeatherAlert> = emptyList()
 ) {
     val hourLabels: List<String> get() = hourly.map { it.hourLabel }
 }
@@ -59,6 +62,25 @@ data class MetricChart(
 data class WeatherTip(val emoji: String, val text: String, val tone: TipTone)
 
 enum class TipTone { HOT, COLD, RAIN, SNOW, WIND, NICE, NEUTRAL }
+
+/** Official advisory from the National Weather Service (api.weather.gov). US coverage only. */
+data class WeatherAlert(
+    val id: String,
+    val event: String,
+    val severity: AlertSeverity,
+    val headline: String,
+    val description: String,
+    val instruction: String?,
+    val areaDesc: String?,
+    val senderName: String?,
+    val effectiveLabel: String?,
+    val expiresLabel: String?,
+    // Raw NWS values (e.g. "Immediate", "Likely") — null/"Unknown" means NWS didn't set one.
+    val urgency: String?,
+    val certainty: String?
+)
+
+enum class AlertSeverity { EXTREME, SEVERE, MODERATE, MINOR, UNKNOWN }
 
 data class HourEntry(
     val hourLabel: String,

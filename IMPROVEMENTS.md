@@ -87,6 +87,24 @@ Found by testing the Settings screen build on a physical phone.
 | — | Lookahead headline accuracy — the "Clear skies for the next few hours" style pill under the main temperature is entirely locally computed (`WeatherRepository.buildUpcomingHeadline()`), not sourced from the API; user flagged it as inaccurate/not useful. Root cause: the no-significant-event fallback path picked whichever WMO code was most common across the next 6 hours by bare plurality (e.g. 3 of 6 hours, tied with another condition), and included the current hour itself in that vote — enough to assert a specific condition on weak, sometimes-wrong evidence. Fixed by requiring a real majority (≥60% of the 6-hour window) before asserting a specific condition; otherwise returns "Mixed conditions over the next few hours." instead of guessing |
 | B9 | Security fix: the OpenRouter API key field in Settings originally prefilled with the actual stored key (masked, with a reveal toggle) — meaning anyone with the phone unlocked could reveal and copy out a key that isn't theirs. Redesigned so the field is always empty and only ever holds a *new* value about to be saved; `SettingsViewModel.hasOpenRouterKey` exposes only whether a key exists, never its value. Added an explicit "Remove saved key" action (`PreferencesStore.setOpenRouterKey("")` via `removeOpenRouterKey()`) since Save no longer treats a blank field as "clear the key" |
 
+### Completed — Weather Alerts (2026-07-16)
+
+The app previously showed no official advisories at all — a real functional gap versus other weather apps. Integrated the National Weather Service's free, no-key, US-only active-alerts API (`api.weather.gov/alerts/active`).
+
+| # | Title |
+|---|---|
+| — | Core feature: `NwsApi`/`NwsAlertModels` (raw response), `NetworkModule.nwsApi` (dedicated client with the `User-Agent` header NWS requires), `WeatherRepository.mapAlerts()` (fetched in parallel with forecast/air-quality, gracefully degrading via `runCatching` so an NWS outage or non-US point never breaks the weather load), `WeatherData.alerts` domain field |
+| — | UI: `AlertBannerList` (full-bleed, severity-colored banner above the hero — deliberately breaks the app's soft-rounded-corners language so it reads as a system notice), "+N more" affordance instead of stacking every alert, `DetailSheet.Alert`/`AlertList` + `AlertDetailContent` for the full text |
+| — | AI chat awareness: `ChatRepository.weatherBrief()` now prepends active advisories to the system prompt context, and the assistant is told to volunteer them even when not asked directly |
+| — | Design pass (invoked `frontend-design` skill): replaced an initial stock Tailwind-style severity palette with one rooted in the app's own tokens — Critical is the one new hue (warm rust/oxblood, not a clinical red); Advisory reuses the launcher icon's warm-gold; Info reuses the existing `tipColors()` RAIN tone verbatim |
+| — | Accuracy fix, found via live NWS data: NWS separates `ends` (when the hazard itself ends) from `expires` (when the CAP message expires, often much sooner for long-duration products like a multi-day Flood Watch). Was using `expires`; switched to prefer `ends`, relabeled "Expires" → "In effect until" |
+| — | Accuracy fix, also found via live NWS data (Franklin Park, NJ): NWS tags nearly every Air Quality Alert `severity: "Unknown"` (no air-quality category in its CAP taxonomy), so a "Code Red...unhealthful for the general population" alert rendered in the calmest visual tier — same as a Small Craft Advisory. `parseSeverity()` now parses EPA's standardized "Code Red/Orange/Purple/Maroon" AQI names from the description for Air Quality Alerts specifically, defaulting to Moderate (never the calmest tier) rather than Unknown |
+| — | Added a same-severity sort tiebreaker (effective time) — NWS can have multiple same-severity alerts active at once (e.g. today's and tomorrow's Air Quality Alert), so ordering was previously arbitrary API-array order |
+| — | Added `certainty`/`urgency` badges to the detail sheet (e.g. "IMMEDIATE", "LIKELY") — reuses the alert's own severity color rather than a separate badge palette; NWS's own `"Unknown"` value is treated as absent |
+| — | Text-quality fix: NWS text products are hard-wrapped at ~80 columns with a literal newline at every wrap point. Rendered verbatim this produced choppy short lines instead of paragraph reflow; `normalizeNwsText()` collapses wrap-newlines to spaces while preserving genuine paragraph breaks |
+
+All of the above verified on-device (screenshots) against live NWS data in both light and dark theme before landing, including the R8-minified release build (confirms no repeat of the B4 Moshi-stripping issue — the existing package-agnostic `-keep @com.squareup.moshi.JsonClass` rule already covers the new models).
+
 ### Pending — Priority 3 (larger scope)
 
 | # | Title | Effort |

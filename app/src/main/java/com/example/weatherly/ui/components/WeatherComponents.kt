@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Info
@@ -44,6 +45,8 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Brightness3
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -78,9 +81,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.MetricChart
 import com.example.weatherly.data.model.TipTone
+import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.ui.theme.LocalIsDarkTheme
@@ -171,6 +176,34 @@ private fun tipColors(tone: TipTone): Pair<Color, Color> {
         TipTone.NEUTRAL ->
             if (isDark) Color(0xFF1A1810) to TextPrimary
             else Color(0xFFEAE6DE) to TextPrimary
+    }
+}
+
+/**
+ * Three visual tiers (the 5-value [AlertSeverity] enum still drives sort order and the detail
+ * sheet). Deliberately NOT a stock red/orange/amber/blue safety palette — every hue here is
+ * either reused from an existing design-system token or, where genuinely new, rooted in the
+ * app's own warm-cream/deep-navy register so it reads as "this app's danger color" rather than
+ * an imported web-safety swatch.
+ */
+@Composable
+private fun alertColors(severity: AlertSeverity): Pair<Color, Color> {
+    val isDark = LocalIsDarkTheme.current
+    return when (severity) {
+        // The one genuinely new hue in the app: a warm rust/oxblood rather than a clinical
+        // fire-engine red, so it still sits in the same "dusty, warm" family as everything else.
+        AlertSeverity.EXTREME, AlertSeverity.SEVERE ->
+            if (isDark) Color(0xFF2E1610) to Color(0xFFE8927A)
+            else Color(0xFFF5E3DE) to Color(0xFF9C3B26)
+        // Reuses the launcher icon's warm-gold (#E0B15C) — the app's own "advisory" register.
+        AlertSeverity.MODERATE ->
+            if (isDark) Color(0xFF2E2210) to Color(0xFFE0B15C)
+            else Color(0xFFF3E6CC) to Color(0xFF8A5A1E)
+        // Least urgent — borrows the existing RAIN tip tone verbatim rather than inventing a
+        // separate "info gray."
+        AlertSeverity.MINOR, AlertSeverity.UNKNOWN ->
+            if (isDark) Color(0xFF0D1E2E) to Color(0xFF7FA8C9)
+            else Color(0xFFDCE6EF) to Color(0xFF3F5670)
     }
 }
 
@@ -282,6 +315,66 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
         Icon(tipIcon(tip.tone), contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(tip.text, color = fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/**
+ * Only the most-severe active NWS advisory renders as the full banner — a "+N more" row appears
+ * beneath it instead of stacking every alert at full height, so 2-3 concurrent advisories don't
+ * push the whole hero off the first screen. Renders nothing when [alerts] is empty.
+ *
+ * Deliberately full-bleed and square (no side margin, no corner rounding) — every other surface
+ * in the app (GlassCard, chips, buttons) is soft and rounded, so this is the one place that
+ * breaks that language on purpose: it reads as a system-level notice, not a content card.
+ */
+@Composable
+fun AlertBannerList(
+    alerts: List<WeatherAlert>,
+    modifier: Modifier = Modifier,
+    onAlertClick: (WeatherAlert) -> Unit,
+    onMoreClick: (List<WeatherAlert>) -> Unit
+) {
+    if (alerts.isEmpty()) return
+    val primary = alerts.first()
+    val (bg, fg) = alertColors(primary.severity)
+    Column(modifier = modifier.fillMaxWidth().background(bg)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onAlertClick(primary) }
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    primary.event.uppercase(), color = fg, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
+                )
+                Text(
+                    primary.headline, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Filled.ChevronRight, contentDescription = "View advisory details",
+                tint = fg.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)
+            )
+        }
+        val extraCount = alerts.size - 1
+        if (extraCount > 0) {
+            Text(
+                "+$extraCount more advisor${if (extraCount == 1) "y" else "ies"}",
+                color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(fg.copy(alpha = 0.08f))
+                    .clickable { onMoreClick(alerts) }
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+        }
     }
 }
 
@@ -904,6 +997,10 @@ sealed interface DetailSheet {
     ) : DetailSheet
 
     data class Day(val day: DayEntry, val windUnit: String, val precipUnit: String) : DetailSheet
+
+    data class Alert(val alert: WeatherAlert) : DetailSheet
+
+    data class AlertList(val alerts: List<WeatherAlert>) : DetailSheet
 }
 
 @Composable
@@ -1584,8 +1681,77 @@ fun DetailSheetContent(sheet: DetailSheet) {
                 DetailRow("Precipitation", day.precipSumMm?.let { "$it ${sheet.precipUnit}" } ?: "0 ${sheet.precipUnit}")
                 DetailRow("Max wind", day.windMaxKmh?.let { "$it ${sheet.windUnit}" } ?: "--")
             }
+            is DetailSheet.Alert -> AlertDetailContent(sheet.alert)
+            is DetailSheet.AlertList -> Column {
+                sheet.alerts.forEachIndexed { i, a ->
+                    if (i > 0) {
+                        Spacer(Modifier.height(20.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(20.dp))
+                    }
+                    AlertDetailContent(a)
+                }
+            }
         }
     }
+}
+
+/** Small tinted pill for urgency/certainty (e.g. "IMMEDIATE", "LIKELY") — reuses the same fg
+ * color as the rest of the sheet rather than introducing a separate badge palette. */
+@Composable
+private fun AlertBadge(text: String, color: Color) {
+    Text(
+        text.uppercase(),
+        color = color,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.4.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun AlertDetailContent(alert: WeatherAlert) {
+    val (_, fg) = alertColors(alert.severity)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                alert.severity.name.lowercase().replaceFirstChar { it.uppercase() },
+                color = fg, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp
+            )
+            Text(alert.event, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    if (alert.urgency != null || alert.certainty != null) {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            alert.urgency?.let { AlertBadge(it, fg) }
+            alert.certainty?.let { AlertBadge(it, fg) }
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+    if (alert.description.isNotBlank()) {
+        Text(alert.description, color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp)
+    }
+    alert.instruction?.takeIf { it.isNotBlank() }?.let {
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "WHAT TO DO", color = TextSecondary, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(it, color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp)
+    }
+    Spacer(Modifier.height(18.dp))
+    alert.senderName?.let { DetailRow("Issued by", it) }
+    alert.areaDesc?.let { DetailRow("Area", it) }
+    alert.effectiveLabel?.let { DetailRow("Effective", it) }
+    alert.expiresLabel?.let { DetailRow("In effect until", it) }
 }
 
 @Composable

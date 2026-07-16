@@ -16,6 +16,7 @@ object NetworkModule {
     private const val GEOCODING_URL = "https://geocoding-api.open-meteo.com/"
     private const val AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/"
     private const val OPENROUTER_URL = "https://openrouter.ai/"
+    private const val NWS_URL = "https://api.weather.gov/"
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -53,4 +54,24 @@ object NetworkModule {
     }
 
     fun makeStreamingCall(request: Request): Call = openRouterHttp.newCall(request)
+
+    // NWS requires a real identifying User-Agent — generic/missing UAs get throttled per their policy.
+    private val nwsHttp: OkHttpClient = okHttp.newBuilder()
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "(SkySpeak weather app, https://github.com/smenon2710/weatherly)")
+                .header("Accept", "application/geo+json")
+                .build()
+            chain.proceed(req)
+        }
+        .build()
+
+    val nwsApi: NwsApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(NWS_URL)
+            .client(nwsHttp)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(NwsApi::class.java)
+    }
 }

@@ -145,7 +145,9 @@ class ChatRepository {
             Base every answer ONLY on the weather data below — do not invent numbers.
             When asked about an activity (jogging, driving, hiking, cycling, what to wear,
             carrying an umbrella), weigh temperature, feels-like, precipitation chance,
-            wind, UV and air quality, then give a clear recommendation.
+            wind, UV, air quality, and any active advisories, then give a clear recommendation.
+            If an active advisory could affect the question (e.g. a driving question during a
+            Winter Weather Advisory), mention it even if not asked directly.
             Lead with the relevant conditions, then the suggestion. Keep units as shown.
             If the data doesn't cover something (e.g. days far ahead), say so briefly.
         """.trimIndent()
@@ -159,6 +161,12 @@ class ChatRepository {
     private fun weatherBrief(w: WeatherData, units: UnitSystem): String {
         val t = units.tempLabel
         val sb = StringBuilder()
+        if (w.alerts.isNotEmpty()) {
+            sb.appendLine("ACTIVE NWS ADVISORIES (mention these before answering if relevant to the question):")
+            w.alerts.forEach { a ->
+                sb.appendLine("- ${a.event} (${a.severity}): ${a.headline}" + (a.expiresLabel?.let { " — until $it" } ?: ""))
+            }
+        }
         sb.appendLine("Location: ${w.locationName}")
         sb.appendLine(
             "Now: ${w.currentTempC}$t, ${w.condition}" +

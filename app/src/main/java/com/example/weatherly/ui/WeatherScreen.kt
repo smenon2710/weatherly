@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.ui.components.AlertBannerList
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.AttributionFooter
 import com.example.weatherly.ui.components.CurrentHeader
@@ -328,6 +329,17 @@ fun WeatherContent(
                     .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Official NWS advisories — sits on the plain background, above the hero, so it
+                // reads as a distinct "official notice" layer rather than blending into the
+                // condition gradient or the casual local TipBanners further down.
+                if (data.alerts.isNotEmpty()) {
+                    AlertBannerList(
+                        alerts = data.alerts,
+                        modifier = Modifier.fillMaxWidth(),
+                        onAlertClick = { sheet = DetailSheet.Alert(it) },
+                        onMoreClick = { sheet = DetailSheet.AlertList(it) }
+                    )
+                }
                 // Condition-responsive gradient hero — sky tone at top, fades to AppBackground
                 Box(
                     modifier = Modifier
