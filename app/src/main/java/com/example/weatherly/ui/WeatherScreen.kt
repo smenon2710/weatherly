@@ -329,18 +329,6 @@ fun WeatherContent(
                     .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Official NWS advisories — a GlassCard like every other section, so it reads as
-                // part of the app rather than a bolted-on system banner; sits above the hero so
-                // it's still the first thing seen, with urgency carried by color, not shape.
-                if (data.alerts.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    AlertBannerList(
-                        alerts = data.alerts,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        onAlertClick = { sheet = DetailSheet.Alert(it) },
-                        onMoreClick = { sheet = DetailSheet.AlertList(it) }
-                    )
-                }
                 // Condition-responsive gradient hero — sky tone at top, fades to AppBackground
                 Box(
                     modifier = Modifier
@@ -433,6 +421,22 @@ fun WeatherContent(
                                     )
                                 }
                             }
+                        }
+                        // Official NWS advisories — placed after the wordmark row rather than
+                        // before it, so the app's own branding is always visible above/around the
+                        // alert. Combined with the "National Weather Service" eyebrow inside
+                        // AlertBannerList itself, this keeps the alert reading as in-app content
+                        // rather than something that could be mistaken for an OS-level
+                        // notification (the icon+bold-title+chevron row shape below is, on its
+                        // own, structurally similar to Android's own notification template).
+                        if (data.alerts.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            AlertBannerList(
+                                alerts = data.alerts,
+                                modifier = Modifier.fillMaxWidth(),
+                                onAlertClick = { sheet = DetailSheet.Alert(it) },
+                                onMoreClick = { sheet = DetailSheet.AlertList(it) }
+                            )
                         }
                         Spacer(Modifier.height(8.dp))
                         CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)

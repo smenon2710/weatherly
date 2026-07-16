@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
@@ -354,8 +355,18 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
  * and border treatment per theme) — only the fill color changes, by severity. An earlier version
  * was deliberately full-bleed and square to read as a "system notice," but that broke the app's
  * otherwise consistently soft, rounded visual language badly enough that it read as foreign
- * rather than intentional. Urgency now comes from color and top-of-screen position alone, the
- * same way the rest of the app differentiates content without changing its shape language.
+ * rather than intentional.
+ *
+ * A small "NATIONAL WEATHER SERVICE" eyebrow (matching the app's own small-caps section-label
+ * style, not Android's notification chrome) self-identifies the source at a glance. This exists
+ * because the icon + bold-title + subtitle + chevron row below is, structurally, the same
+ * template Android's own system notifications use — without an explicit "this is in-app content
+ * from X" label, a user could plausibly mistake it for an OS-level notification rather than
+ * something the app is showing them, which matters more here than in a typical card since it's a
+ * safety-relevant message. `WeatherScreen` places this card *after* the "sky·speak" wordmark row
+ * rather than before it for the same reason — branding should be visible before the alert is,
+ * so the alert reads as "content inside this app" from the first frame, not as something
+ * appearing above/outside the app itself.
  */
 @Composable
 fun AlertBannerList(
@@ -369,6 +380,15 @@ fun AlertBannerList(
     val (bg, fg) = alertColors(primary.severity)
     GlassCard(modifier = modifier.fillMaxWidth(), fill = bg) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "National Weather Service".uppercase(), color = fg, fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
