@@ -105,6 +105,19 @@ The app previously showed no official advisories at all — a real functional ga
 
 All of the above verified on-device (screenshots) against live NWS data in both light and dark theme before landing, including the R8-minified release build (confirms no repeat of the B4 Moshi-stripping issue — the existing package-agnostic `-keep @com.squareup.moshi.JsonClass` rule already covers the new models).
 
+### Completed — Design Audit (2026-07-16)
+
+User-reported bug plus a broader `frontend-design` skill pass, grounded in on-device screenshots (light + dark) rather than guessing.
+
+| # | Title |
+|---|---|
+| B10 | Bug fix, user-reported: the `DailyCard` 7-day temperature range bar rendered a uniformly different color per unit system for the exact same real temperatures — yellowish in °C, reddish-orange in °F. Root cause: `tempColor()`'s thresholds (0/8/15/22/28°) are calibrated in Celsius, but `DayEntry.lowC`/`highC` hold values in the user's *current display unit* despite the "C" suffix (a documented existing caveat). Fahrenheit numbers are always larger, so they skewed uniformly into the ">28" hot bucket. Fixed by converting to true Celsius first via `toCelsius()`, mirroring the existing `WeatherAdvisor.toC` pattern. `DailyCard` derives `metric` from `data.windUnit` rather than adding a new field. Verified on-device: identical bar colors for the same real temperatures in both unit systems |
+| — | Fix: `CurrentHeader`'s location name had no `textAlign`, so a name that wraps to two lines (e.g. "Franklin Park, New Jersey") left-justifies its second line inside an auto-sized text box that's only centered as a whole — reads as left-aligned. Fixed with explicit `textAlign = Center` + `fillMaxWidth()` |
+| — | Design fix: dark mode's condition-responsive hero gradient — a signature feature — was nearly invisible. Most dark sky-tone stops in `conditionGradient` were only a few RGB steps from the background color (`#0F1923`), so the "hero shifts with the sky" effect that reads clearly in light mode rendered as a flat navy rectangle for most conditions (confirmed via screenshot: overcast, rain, snow, clear-day, fog all affected; only thunder and clear-night had adequate contrast). Recalibrated each dark stop for real lightness/hue separation from the background, same hue families as light mode |
+| — | Design fix: `Indigo` was a byte-for-byte duplicate of `Cyan`, the primary accent used everywhere for icons/buttons. Precipitation callouts (hourly %, daily %, Visibility tile) shared the exact same color as generic app chrome, diluting the color-coding. Gave it a distinct dusty periwinkle (`#7B88BC`) so "this is rain data" reads as its own signal |
+
+All verified on-device in both light and dark theme, plus a full `assembleRelease` build to confirm nothing regressed under R8.
+
 ### Pending — Priority 3 (larger scope)
 
 | # | Title | Effort |

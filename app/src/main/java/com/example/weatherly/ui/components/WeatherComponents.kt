@@ -75,6 +75,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import java.util.Calendar
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -101,19 +102,32 @@ val Cyan = Color(0xFF6B86A3)    // dusty blue — the primary accent
 val Amber = Color(0xFFC8A86A)   // muted sand
 val Coral = Color(0xFFC18A92)   // muted rose
 val Green = Color(0xFF8AA68C)   // muted sage
-val Indigo = Color(0xFF6B86A3)  // dusty blue
+// Was previously an exact duplicate of Cyan (#6B86A3) — every other named token here is a
+// distinct hue, but precipitation callouts (hourly/daily % badges, Visibility tile) shared the
+// app's single primary accent color, so "this is rain-related data" and "this is the app's
+// generic brand/action color" were visually the same signal. A dusty periwinkle keeps the same
+// muted family and still reads as "blue = precipitation" without doubling as the primary accent.
+val Indigo = Color(0xFF7B88BC)  // dusty periwinkle — distinct from the primary accent
 val Purple = Color(0xFF9C8AA8)  // muted mauve
 val Orange = Color(0xFFC0876B)  // muted clay
 val Teal = Color(0xFF6FA39B)    // muted teal
 
-private fun tempColor(c: Int): Color = when {
-    c <= 0 -> Color(0xFF7FA8C9)
-    c <= 8 -> Color(0xFF8FB6C2)
-    c <= 15 -> Color(0xFF93B58C)
-    c <= 22 -> Color(0xFFCBB36B)
-    c <= 28 -> Color(0xFFCD9A6B)
+// Thresholds are calibrated in Celsius. WeatherData's "C"-suffixed fields (see the field-naming
+// caveat in CLAUDE.md) actually hold values in the user's *current* unit system, not always
+// Celsius — callers must convert to true Celsius first (see WeatherAdvisor.toC for the same
+// pattern) or a Fahrenheit reading skews uniformly into the "hot" bucket, making the whole 7-day
+// range bar read reddish-orange in °F and yellowish in °C for the exact same real temperatures.
+private fun tempColor(celsius: Int): Color = when {
+    celsius <= 0 -> Color(0xFF7FA8C9)
+    celsius <= 8 -> Color(0xFF8FB6C2)
+    celsius <= 15 -> Color(0xFF93B58C)
+    celsius <= 22 -> Color(0xFFCBB36B)
+    celsius <= 28 -> Color(0xFFCD9A6B)
     else -> Color(0xFFC58587)
 }
+
+private fun toCelsius(v: Int, metric: Boolean): Int =
+    if (metric) v else ((v - 32) * 5.0 / 9.0).roundToInt()
 
 /**
  * Returns a two-stop vertical gradient: a sky tone for the weather condition
@@ -124,21 +138,28 @@ private fun tempColor(c: Int): Color = when {
 fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
     val isDark = LocalIsDarkTheme.current
     val base = MaterialTheme.colorScheme.background
+    // Dark-mode stops are deliberately lighter/more saturated than a naive "darken the light
+    // color" pass would produce. The background itself is already a deep navy (#0F1923), so the
+    // original dark stops here (mostly within a few RGB steps of the background) rendered the
+    // hero as a flat, nearly gradient-less navy rectangle for every condition except thunder and
+    // clear-night — losing the "shifts with the sky" identity that reads clearly in light mode.
+    // Each stop keeps light mode's hue family but is recalibrated for a visible lift off the
+    // background, same as light mode's stops are clearly lifted off the cream background.
     val sky = when {
         code in 95..99 ->
-            if (isDark) Color(0xFF1C1230) else Color(0xFF3A2F50)
+            if (isDark) Color(0xFF241A3D) else Color(0xFF3A2F50)
         code in 71..86 ->
-            if (isDark) Color(0xFF1A2230) else Color(0xFFD0E0EE)
+            if (isDark) Color(0xFF283C52) else Color(0xFFD0E0EE)
         code in 51..82 ->
-            if (isDark) Color(0xFF0E1C2A) else Color(0xFFBFD4E6)
+            if (isDark) Color(0xFF1C3348) else Color(0xFFBFD4E6)
         code in 45..48 ->
-            if (isDark) Color(0xFF18202A) else Color(0xFFCDD3D8)
+            if (isDark) Color(0xFF283038) else Color(0xFFCDD3D8)
         !isDay ->
             if (isDark) Color(0xFF04091A) else Color(0xFF1A2448)
         code <= 2 ->
-            if (isDark) Color(0xFF102030) else Color(0xFFB8D8F0)
+            if (isDark) Color(0xFF16324E) else Color(0xFFB8D8F0)
         else ->
-            if (isDark) Color(0xFF141C24) else Color(0xFFC8D2DC)
+            if (isDark) Color(0xFF212E3A) else Color(0xFFC8D2DC)
     }
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val tintedSky = when (hour) {
@@ -258,13 +279,19 @@ fun CurrentHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Location — small caps, light weight, recedes so temperature can lead
+        // Location — small caps, light weight, recedes so temperature can lead. Explicit
+        // textAlign is required, not cosmetic: without it, a long name that wraps to two lines
+        // (e.g. "Franklin Park, New Jersey") left-justifies its second line inside the
+        // auto-sized text box, which reads as the whole block being left-aligned even though the
+        // box itself is centered in the column.
         Text(
             data.locationName.uppercase(),
             color = subColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 2.sp
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(4.dp))
         // Condition + glyph on the same line — supporting context, not the hero
@@ -504,6 +531,10 @@ fun DailyCard(
     onDayClick: (DayEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Derived rather than added as a new WeatherData field: windUnit is already set from
+    // UnitSystem.windLabel ("km/h" vs "mph") at fetch time, so it reliably reflects metric vs
+    // imperial without plumbing a whole extra field through the repository for this one use.
+    val metric = data.windUnit == "km/h"
     GlassCard(modifier.fillMaxWidth()) {
         Column {
             SectionLabel(Icons.Filled.CalendarMonth, "${data.daily.size}-day forecast", Green)
@@ -548,7 +579,8 @@ fun DailyCard(
                         TempRangeBar(
                             low = day.lowC, high = day.highC,
                             weekMin = data.weekMinC, weekMax = data.weekMaxC,
-                            currentC = if (index == 0) data.currentTempC else null
+                            currentC = if (index == 0) data.currentTempC else null,
+                            metric = metric
                         )
                     }
                     Text(
@@ -562,7 +594,7 @@ fun DailyCard(
 }
 
 @Composable
-private fun TempRangeBar(low: Int, high: Int, weekMin: Int, weekMax: Int, currentC: Int?) {
+private fun TempRangeBar(low: Int, high: Int, weekMin: Int, weekMax: Int, currentC: Int?, metric: Boolean) {
     val dotColor = TextPrimary
     Canvas(modifier = Modifier.fillMaxWidth().height(6.dp)) {
         val w = size.width
@@ -575,7 +607,8 @@ private fun TempRangeBar(low: Int, high: Int, weekMin: Int, weekMax: Int, curren
         val segW = (x2 - x1).coerceAtLeast(h)
         drawRoundRect(
             brush = Brush.horizontalGradient(
-                listOf(tempColor(low), tempColor(high)), startX = x1, endX = x1 + segW
+                listOf(tempColor(toCelsius(low, metric)), tempColor(toCelsius(high, metric))),
+                startX = x1, endX = x1 + segW
             ),
             topLeft = Offset(x1, 0f),
             size = Size(segW, h),
