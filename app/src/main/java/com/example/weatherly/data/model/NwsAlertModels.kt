@@ -14,6 +14,7 @@ data class NwsAlertProperties(
     @Json(name = "status") val status: String?,
     @Json(name = "certainty") val certainty: String?,
     @Json(name = "urgency") val urgency: String?,
+    @Json(name = "sent") val sent: String?,
     @Json(name = "headline") val headline: String?,
     @Json(name = "description") val description: String?,
     @Json(name = "instruction") val instruction: String?,

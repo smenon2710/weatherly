@@ -271,6 +271,17 @@ class WeatherRepository(private val context: Context) {
             // "Actual" excludes Test/Exercise/Draft products NWS also publishes through this feed.
             .filter { it.status == "Actual" }
             .distinctBy { it.id }
+            // NWS can independently issue multiple non-linked products for the identical event
+            // and area — confirmed live for Franklin Park, NJ: two separate Air Quality Alert
+            // issuances covering the exact same 3 zones simultaneously, a day apart, neither
+            // referencing the other (empty "references", messageType "Alert" not "Update"). This
+            // is a rolling day-ahead reissuance pattern, not an error, but showing both raw CAP
+            // products reads as a duplicate to a user — NWS's own consumer-facing tools show only
+            // the current one. Collapse to the most-recently-sent entry per (event, area); a
+            // missing event/areaDesc falls back to that alert's own id as the group key so two
+            // unrelated alerts with incomplete data never accidentally collapse into each other.
+            .groupBy { (it.event ?: it.id) to (it.areaDesc ?: it.id) }
+            .map { (_, group) -> group.maxByOrNull { parseInstantOrMin(it.sent) } ?: group.first() }
             // Same-severity ties (e.g. two Air Quality Alerts, one for today and one for tomorrow)
             // otherwise sort in whatever order the API happened to return them.
             .sortedWith(
@@ -328,6 +339,11 @@ class WeatherRepository(private val context: Context) {
 
     private fun parseInstantOrMax(iso: String?): java.time.Instant =
         iso?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() } ?: java.time.Instant.MAX
+
+    // Opposite default of parseInstantOrMax: used when picking the *latest* of several timestamps
+    // (most-recently-sent alert wins), where a missing/unparseable value should lose, not win.
+    private fun parseInstantOrMin(iso: String?): java.time.Instant =
+        iso?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() } ?: java.time.Instant.MIN
 
     // NWS text products are hard-wrapped to ~80 columns with a literal newline at every wrap
     // point, and only a genuine paragraph break uses a blank line (\n\n). Rendered verbatim in a
