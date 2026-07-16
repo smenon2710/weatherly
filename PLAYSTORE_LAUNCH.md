@@ -90,7 +90,7 @@ KEY_PASSWORD=your_key_password
 
 ### 4. Data Safety Form (Play Console)
 
-**⚠️ Drifted from the live Console submission (found 2026-07-16, not yet re-submitted):** the checklist below marks this form as already filled out, but that submission predates the NWS weather-alerts feature (`api.weather.gov`), which also now receives location coordinates on every fetch. The table below and `docs/privacy.html` have been corrected to reflect actual current app behavior — **the live Play Console Data Safety form itself still needs to be manually updated to match** (this file and the hosted policy are documentation, not the actual submission; only re-editing the form in Console fixes the real compliance gap).
+**✅ Re-submitted in Console (2026-07-16):** the live Data Safety form was updated and verified against the Store Listing preview — Location (Approximate + Precise) shows Shared/App functionality and Collected/Optional/App functionality, matching the table below. Note that Play Console's form has no field to name individual third-party recipients (Open-Meteo, NWS) — it only captures data type/shared/purpose, so checking "Shared: Yes, App functionality" for Location is the complete disclosure Console requires; the specific recipient names live in `docs/privacy.html` instead.
 
 Fill out in Play Console → Store listing → Data safety. Summary (see the detailed draft answers below for the full form flow):
 
@@ -116,8 +116,8 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 | Data type | Collected? | Shared? | Purpose | Optional? | Ephemeral? |
 |---|---|---|---|---|---|
-| Approximate location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | No (core feature; app is unusable without it unless a manual city is picked) | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's/NWS's own retention policy |
-| Precise location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | No | Same as above |
+| Approximate location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Yes — a manual city search works without ever granting location permission | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's/NWS's own retention policy |
+| Precise location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Yes — same as above | Same as above |
 | Other user-generated content *(free-form chat text)* | Yes, only if the user opens AI chat and a key is configured | Yes — OpenRouter (and whichever model OpenRouter routes to) | App functionality | Yes — the quick-suggest chips work without any chat text ever being sent | No |
 
 **Data types with no data to declare (leave unchecked):** Personal info (name/email/etc. — never collected), Financial info (the donation link opens an external Razorpay page in the browser; the app itself never collects or processes payment details), Health & fitness, Photos/videos, Audio, Contacts, Calendar, Messages (SMS/email), Web browsing history, Device/other IDs, App info & performance (no analytics or crash-reporting SDK in the codebase).
@@ -299,7 +299,7 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 - [x] Build signed AAB (not APK)
 - [x] Create Play Console account ($25, paid, identity verification complete)
 - [x] Create app entry in Play Console (package name `io.github.smenon2710.skyspeak`) — now on "Finish setting up your app" dashboard
-- [x] Fill out Data Safety form (completed via "Finish setting up your app" flow) — **⚠️ re-open and update 2026-07-16: needs the National Weather Service added as a location-sharing third party, see section 4 above**
+- [x] Fill out Data Safety form (completed via "Finish setting up your app" flow) — re-submitted 2026-07-16 to reflect the National Weather Service as a location-sharing third party (see section 4 above)
 - [x] Complete content rating questionnaire (completed via "Finish setting up your app" flow — outcome: Everyone)
 - [x] Store listing assets ready in `store_assets/` — 3 screenshots (1280×2560, 2:1, no alpha), 512×512 icon, 1024×500 feature graphic — verified against Play Console upload spec (upload to Play Console still needed)
 - [x] Set category to Weather, write short + full description (completed via "Finish setting up your app" flow)
