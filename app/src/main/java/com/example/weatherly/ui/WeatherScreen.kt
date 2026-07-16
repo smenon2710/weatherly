@@ -65,8 +65,10 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.data.model.SavedPlace
+import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.ui.components.AlertBannerList
+import com.example.weatherly.ui.components.ResolvedAlertCard
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.AttributionFooter
 import com.example.weatherly.ui.components.CurrentHeader
@@ -95,6 +97,7 @@ fun WeatherScreen(
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val searching by viewModel.searching.collectAsStateWithLifecycle()
+    val resolvedAlerts by viewModel.resolvedAlerts.collectAsStateWithLifecycle()
 
     var showLocations by remember { mutableStateOf(false) }
 
@@ -130,7 +133,9 @@ fun WeatherScreen(
                 onOpenLocations = { showLocations = true },
                 onOpenChat = onOpenChat,
                 onOpenRadar = onOpenRadar,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                resolvedAlerts = resolvedAlerts,
+                onDismissResolved = { viewModel.dismissResolvedAlert(it) }
             )
 
         else -> Box(
@@ -299,7 +304,9 @@ fun WeatherContent(
     onOpenLocations: () -> Unit = {},
     onOpenChat: () -> Unit = {},
     onOpenRadar: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    resolvedAlerts: List<TrackedAlert> = emptyList(),
+    onDismissResolved: (String) -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
 
@@ -422,22 +429,6 @@ fun WeatherContent(
                                 }
                             }
                         }
-                        // Official NWS advisories — placed after the wordmark row rather than
-                        // before it, so the app's own branding is always visible above/around the
-                        // alert. Combined with the "National Weather Service" eyebrow inside
-                        // AlertBannerList itself, this keeps the alert reading as in-app content
-                        // rather than something that could be mistaken for an OS-level
-                        // notification (the icon+bold-title+chevron row shape below is, on its
-                        // own, structurally similar to Android's own notification template).
-                        if (data.alerts.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            AlertBannerList(
-                                alerts = data.alerts,
-                                modifier = Modifier.fillMaxWidth(),
-                                onAlertClick = { sheet = DetailSheet.Alert(it) },
-                                onMoreClick = { sheet = DetailSheet.AlertList(it) }
-                            )
-                        }
                         Spacer(Modifier.height(8.dp))
                         CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
                         Spacer(Modifier.height(20.dp))
@@ -451,6 +442,24 @@ fun WeatherContent(
                         .padding(horizontal = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Official NWS advisories and resolved-alert acknowledgments render as the
+                    // first cards here, styled identically to every other card — after two
+                    // reverted attempts at making the alert visually exceptional (full-bleed, or
+                    // placed above the hero), consistency with the rest of the app turned out to
+                    // matter more than standing out. Active alerts render above any resolved
+                    // notices, since an ongoing hazard is more important than an acknowledgment.
+                    resolvedAlerts.forEach { resolved ->
+                        Spacer(Modifier.height(12.dp))
+                        ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
+                    }
+                    if (data.alerts.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        AlertBannerList(
+                            alerts = data.alerts,
+                            onAlertClick = { sheet = DetailSheet.Alert(it) },
+                            onMoreClick = { sheet = DetailSheet.AlertList(it) }
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     HourlyCard(data)
                     Spacer(Modifier.height(12.dp))

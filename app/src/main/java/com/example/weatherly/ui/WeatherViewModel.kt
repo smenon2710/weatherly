@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.ThemePreference
+import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.UnitSystem
+import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
@@ -64,6 +66,12 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val _lastLatLon = MutableStateFlow<Pair<Double, Double>?>(null)
     val lastLatLon: StateFlow<Pair<Double, Double>?> = _lastLatLon.asStateFlow()
 
+    /** Alerts that were previously active and are no longer, awaiting user dismissal. Populated
+     * by comparing each fetch's alerts against PreferencesStore's last-tracked set — see
+     * trackAlertChanges(). */
+    private val _resolvedAlerts = MutableStateFlow<List<TrackedAlert>>(emptyList())
+    val resolvedAlerts: StateFlow<List<TrackedAlert>> = _resolvedAlerts.asStateFlow()
+
     init {
         // Show the last known forecast immediately so the app never opens to a blank screen.
         forecastCache.load()?.let { (data, ts) ->
@@ -111,6 +119,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     .onSuccess {
                     forecastCache.save(it)
                     _state.value = WeatherUiState.Success(it)
+                    trackAlertChanges(it.alerts)
                     // Keep home-screen widget in sync whenever the app fetches fresh data.
                     viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
                 }
@@ -128,6 +137,24 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     /** Pull-to-refresh entry point: refresh data while keeping the screen visible. */
     fun refresh() = load(forceRefresh = true, background = true)
 
+    /** Diffs this fetch's alerts against the last-tracked set to detect resolution (an alert
+     * that was tracked but is no longer active) — covers alerts that clear silently during a
+     * background refresh, not just ones the user is staring at when they expire. */
+    private fun trackAlertChanges(current: List<WeatherAlert>) {
+        val currentIds = current.map { it.id }.toSet()
+        val previous = prefs.getTrackedAlerts()
+        val newlyResolved = previous.filter { it.id !in currentIds }
+        if (newlyResolved.isNotEmpty()) {
+            val alreadyShown = _resolvedAlerts.value.map { it.id }.toSet()
+            _resolvedAlerts.value = _resolvedAlerts.value + newlyResolved.filterNot { it.id in alreadyShown }
+        }
+        prefs.setTrackedAlerts(current.map { TrackedAlert(it.id, it.event) })
+    }
+
+    fun dismissResolvedAlert(id: String) {
+        _resolvedAlerts.value = _resolvedAlerts.value.filterNot { it.id == id }
+    }
+
     fun onPermissionDenied() {
         if (_selected.value != null) load() else _state.value = WeatherUiState.NeedsPermission
     }
@@ -135,13 +162,21 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     fun selectCurrentLocation() {
         _selected.value = null
         prefs.setSelected(null)
+        resetAlertTracking()
         load(forceRefresh = true)
     }
 
     fun selectPlace(place: SavedPlace) {
         _selected.value = place
         prefs.setSelected(place)
+        resetAlertTracking()
         load(forceRefresh = true)
+    }
+
+    /** A tracked alert from the previous location isn't a real "resolution" for the new one. */
+    private fun resetAlertTracking() {
+        prefs.setTrackedAlerts(emptyList())
+        _resolvedAlerts.value = emptyList()
     }
 
     fun addPlace(place: SavedPlace) {

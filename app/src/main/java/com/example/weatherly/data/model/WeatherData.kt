@@ -80,6 +80,9 @@ data class WeatherAlert(
     val certainty: String?
 )
 
+/** Minimal persisted record of an alert that was shown, used to detect when it later clears. */
+data class TrackedAlert(val id: String, val event: String)
+
 enum class AlertSeverity { EXTREME, SEVERE, MODERATE, MINOR, UNKNOWN }
 
 data class HourEntry(

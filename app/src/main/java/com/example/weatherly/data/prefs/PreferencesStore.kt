@@ -3,6 +3,7 @@ package com.example.weatherly.data.prefs
 import android.content.Context
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.ThemePreference
+import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.UnitSystem
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -17,6 +18,8 @@ class PreferencesStore(context: Context) {
     private val placesType = Types.newParameterizedType(List::class.java, SavedPlace::class.java)
     private val placesAdapter = moshi.adapter<List<SavedPlace>>(placesType)
     private val placeAdapter = moshi.adapter(SavedPlace::class.java)
+    private val trackedAlertsType = Types.newParameterizedType(List::class.java, TrackedAlert::class.java)
+    private val trackedAlertsAdapter = moshi.adapter<List<TrackedAlert>>(trackedAlertsType)
 
     fun getUnitSystem(): UnitSystem =
         prefs.getString(KEY_UNITS, null)?.let {
@@ -78,6 +81,20 @@ class PreferencesStore(context: Context) {
         if (Locale.getDefault().country in setOf("US", "LR", "MM")) UnitSystem.IMPERIAL
         else UnitSystem.METRIC
 
+    // --- Weather alerts -------------------------------------------------------
+    /** The set of alert IDs+events last shown for the current place, used to detect resolution
+     * (an alert that was tracked but is no longer active) across app restarts and background
+     * refreshes. Callers should clear this (setTrackedAlerts(emptyList())) on a location change,
+     * since a previously-tracked alert from a different place isn't a real "resolution." */
+    fun getTrackedAlerts(): List<TrackedAlert> =
+        prefs.getString(KEY_TRACKED_ALERTS, null)?.let {
+            runCatching { trackedAlertsAdapter.fromJson(it) }.getOrNull()
+        } ?: emptyList()
+
+    fun setTrackedAlerts(alerts: List<TrackedAlert>) {
+        prefs.edit().putString(KEY_TRACKED_ALERTS, trackedAlertsAdapter.toJson(alerts)).apply()
+    }
+
     // --- Appearance ---------------------------------------------------------
     fun getThemePreference(): ThemePreference =
         prefs.getString(KEY_THEME, null)?.let {
@@ -95,5 +112,6 @@ class PreferencesStore(context: Context) {
         private const val KEY_OR_KEY = "openrouter_key"
         private const val KEY_OR_MODEL = "openrouter_model"
         private const val KEY_THEME = "theme_preference"
+        private const val KEY_TRACKED_ALERTS = "tracked_alerts"
     }
 }

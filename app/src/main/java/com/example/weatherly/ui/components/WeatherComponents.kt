@@ -34,7 +34,9 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Info
@@ -49,6 +51,7 @@ import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -87,6 +90,7 @@ import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.MetricChart
 import com.example.weatherly.data.model.TipTone
+import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
@@ -349,24 +353,22 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
 /**
  * Only the most-severe active NWS advisory renders as the full banner — a "+N more" row appears
  * beneath it instead of stacking every alert at full height, so 2-3 concurrent advisories don't
- * push the whole hero off the first screen. Renders nothing when [alerts] is empty.
+ * take over the top of the screen. Renders nothing when [alerts] is empty.
  *
  * Built on the same [GlassCard] every other surface in the app uses (same corner radius, shadow,
- * and border treatment per theme) — only the fill color changes, by severity. An earlier version
- * was deliberately full-bleed and square to read as a "system notice," but that broke the app's
- * otherwise consistently soft, rounded visual language badly enough that it read as foreign
- * rather than intentional.
+ * and border treatment per theme) — only the fill color changes, by severity. Two earlier
+ * revisions tried to make this stand out as *unlike* the rest of the app (full-bleed/square to
+ * read as a "system notice"; later, placed above the hero before any app branding) — both were
+ * reverted after direct user feedback that the result looked out of place or was mistakable for
+ * an OS notification. `WeatherScreen` now renders this as the first card in the normal card flow,
+ * right after the hero, with no special-cased positioning — consistency with the rest of the app
+ * turned out to matter more than making the alert visually exceptional.
  *
  * A small "NATIONAL WEATHER SERVICE" eyebrow (matching the app's own small-caps section-label
- * style, not Android's notification chrome) self-identifies the source at a glance. This exists
- * because the icon + bold-title + subtitle + chevron row below is, structurally, the same
- * template Android's own system notifications use — without an explicit "this is in-app content
- * from X" label, a user could plausibly mistake it for an OS-level notification rather than
- * something the app is showing them, which matters more here than in a typical card since it's a
- * safety-relevant message. `WeatherScreen` places this card *after* the "sky·speak" wordmark row
- * rather than before it for the same reason — branding should be visible before the alert is,
- * so the alert reads as "content inside this app" from the first frame, not as something
- * appearing above/outside the app itself.
+ * style, not Android's notification chrome) self-identifies the source at a glance — the icon +
+ * bold-title + subtitle + chevron row below it is, structurally, the same template Android's own
+ * system notifications use, so this label still matters for avoiding that mistaken-identity read
+ * even now that the card lives in the ordinary card list rather than above the hero.
  */
 @Composable
 fun AlertBannerList(
@@ -424,6 +426,36 @@ fun AlertBannerList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onMoreClick(alerts) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A calm, dismissible acknowledgment that a previously-active alert has cleared — closing the
+ * loop for a user who saw the warning earlier rather than leaving them to notice its silent
+ * disappearance on their own (or not notice at all). Deliberately styled opposite to
+ * [AlertBannerList]: sage green rather than a severity color, a checkmark rather than a warning
+ * triangle, and an explicit dismiss action rather than persistent — this is reassurance, not an
+ * ongoing hazard, and shouldn't compete visually with an actual active alert if both are shown
+ * at once (a resolved notice always renders below any currently-active alert; see WeatherScreen).
+ */
+@Composable
+fun ResolvedAlertCard(resolved: TrackedAlert, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    GlassCard(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "${resolved.event} has ended",
+                color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    Icons.Filled.Close, contentDescription = "Dismiss",
+                    tint = TextSecondary, modifier = Modifier.size(16.dp)
                 )
             }
         }
