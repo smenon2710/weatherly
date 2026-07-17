@@ -430,12 +430,16 @@ fun WeatherContent(
                         .padding(horizontal = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Official NWS advisories and resolved-alert acknowledgments render as the
-                    // first cards here, styled identically to every other card — after two
-                    // reverted attempts at making the alert visually exceptional (full-bleed, or
-                    // placed above the hero), consistency with the rest of the app turned out to
-                    // matter more than standing out. Active alerts render above any resolved
-                    // notices, since an ongoing hazard is more important than an acknowledgment.
+                    // Official NWS advisories and resolved-alert acknowledgments render first here
+                    // — after two reverted attempts at making the alert visually exceptional
+                    // (full-bleed, or placed above the hero), consistency with the rest of the
+                    // app's card flow turned out to matter more than standing out. They're no
+                    // longer full GlassCards themselves (see AlertBannerList's doc comment for
+                    // why — a compact single-line severity strip now, not a fourth axis of "make
+                    // it different"), but they still live in this same ordinary position in the
+                    // flow rather than anywhere exceptional. Active alerts render above any
+                    // resolved notices, since an ongoing hazard is more important than an
+                    // acknowledgment.
                     if (data.alerts.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
                         AlertBannerList(
@@ -481,7 +485,7 @@ fun WeatherContent(
             onDismissRequest = { sheet = null },
             containerColor = MaterialTheme.colorScheme.surface
         ) {
-            DetailSheetContent(current)
+            DetailSheetContent(current, onAlertSelected = { sheet = DetailSheet.Alert(it) })
         }
     }
 }

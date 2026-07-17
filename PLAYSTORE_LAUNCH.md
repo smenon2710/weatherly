@@ -315,5 +315,6 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
   - [x] Screenshots re-shot 2026-07-17 against the current build — see the Store Listing Assets table above
   - [ ] **In progress:** rollout to the `skyspeak-testers` Closed Testing track submitted in Play Console — does not reset the 14-day tester clock (same as the versionCode 6→7→8 updates)
   - [ ] Upload the 5 new screenshots to Play Console → Store listing (replacing the 3 old ones there) and paste the corrected short/full description (already rewritten below in this doc) — Console holds its own copy of both, independent of this file
+- [ ] **Not yet released, uncommitted:** Alert Display Redesign (B18 in `IMPROVEMENTS.md` + the `AlertBannerList`/`ResolvedAlertCard` single-line strip redesign) — code changes exist in the working tree only. `versionCode` is still 9 (1.0.8); this has not been committed, built, or uploaded to any track. Will ship as versionCode 10 whenever it's next built.
 - [ ] Apply for / confirm Production access unlocked
 - [ ] Promote to Production and submit for review (typically 1–3 days)

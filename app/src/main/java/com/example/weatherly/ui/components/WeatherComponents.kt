@@ -28,7 +28,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
@@ -359,26 +362,6 @@ fun TipBanner(tip: WeatherTip, modifier: Modifier = Modifier) {
 }
 
 /**
- * Only the most-severe active NWS advisory renders as the full banner — a "+N more" row appears
- * beneath it instead of stacking every alert at full height, so 2-3 concurrent advisories don't
- * take over the top of the screen. Renders nothing when [alerts] is empty.
- *
- * Built on the same [GlassCard] every other surface in the app uses (same corner radius, shadow,
- * and border treatment per theme) — only the fill color changes, by severity. Two earlier
- * revisions tried to make this stand out as *unlike* the rest of the app (full-bleed/square to
- * read as a "system notice"; later, placed above the hero before any app branding) — both were
- * reverted after direct user feedback that the result looked out of place or was mistakable for
- * an OS notification. `WeatherScreen` now renders this as the first card in the normal card flow,
- * right after the hero, with no special-cased positioning — consistency with the rest of the app
- * turned out to matter more than making the alert visually exceptional.
- *
- * A small "NATIONAL WEATHER SERVICE" eyebrow (matching the app's own small-caps section-label
- * style, not Android's notification chrome) self-identifies the source at a glance — the icon +
- * bold-title + subtitle + chevron row below it is, structurally, the same template Android's own
- * system notifications use, so this label still matters for avoiding that mistaken-identity read
- * even now that the card lives in the ordinary card list rather than above the hero.
- */
-/**
  * A concise, single-line, never-truncated stand-in for NWS's own (often long) headline prose —
  * e.g. "3:45 PM – Tomorrow, 12:00 AM". NWS legitimately issues multiple same-named advisories for
  * one point (day-by-day reissuance, or overlapping zone coverage for border locations), and the
@@ -397,6 +380,25 @@ private fun alertTimeWindow(alert: WeatherAlert): String? {
     }
 }
 
+/**
+ * A single-line severity strip — the app's original full-card treatment (icon + bold title +
+ * subtitle + chevron, same [GlassCard] language as every other surface) went through two earlier
+ * revisions trying to make it stand out as *unlike* the rest of the app (full-bleed/square,
+ * placed above the hero) and both were reverted after user feedback that it looked foreign or
+ * mistakable for an OS notification. This isn't a third attempt at that — it's a different axis
+ * of change (smaller, not different-looking): the same [TipBanner] left-accent-bar language
+ * already established and accepted elsewhere in this app, sized to one line instead of the old
+ * four-line block. Renders nothing when [alerts] is empty.
+ *
+ * Tapping goes straight to that alert's [DetailSheet.Alert] when there's exactly one; with
+ * multiple active alerts it opens [DetailSheet.AlertList] (a chooser) instead of guessing which
+ * one the user meant — the [SeverityDotCluster] one dot per alert, each colored by that alert's
+ * own severity, is what lets someone gauge overall risk before tapping in, e.g. "one rust dot,
+ * one gold dot" reads as "one severe hazard, one advisory" without opening anything. The leading
+ * `AccountBalance` icon (a government building, not a warning triangle) is deliberate: it's the
+ * same icon this card's old "NATIONAL WEATHER SERVICE" eyebrow used, so it still signals "this is
+ * an official source, not app-generated content" without needing a spelled-out label line.
+ */
 @Composable
 fun AlertBannerList(
     alerts: List<WeatherAlert>,
@@ -406,56 +408,50 @@ fun AlertBannerList(
 ) {
     if (alerts.isEmpty()) return
     val primary = alerts.first()
-    val (bg, fg) = alertColors(primary.severity)
-    GlassCard(modifier = modifier.fillMaxWidth(), fill = bg) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "National Weather Service".uppercase(), color = fg, fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onAlertClick(primary) },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        primary.event.uppercase(), color = fg, fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
-                    )
-                    Text(
-                        alertTimeWindow(primary) ?: primary.headline,
-                        color = fg, fontSize = 13.sp, fontWeight = FontWeight.Normal,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.Filled.ChevronRight, contentDescription = "View advisory details",
-                    tint = fg.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)
-                )
-            }
-            val extraCount = alerts.size - 1
-            if (extraCount > 0) {
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = fg.copy(alpha = 0.18f))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "+$extraCount more advisor${if (extraCount == 1) "y" else "ies"}",
-                    color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onMoreClick(alerts) }
-                )
-            }
+    val (_, fg) = alertColors(primary.severity)
+    val isDark = LocalIsDarkTheme.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp))
+            .background(fg.copy(alpha = if (isDark) 0.08f else 0.10f))
+            .drawBehind { drawRect(color = fg, size = Size(4.dp.toPx(), size.height)) }
+            .clickable { if (alerts.size > 1) onMoreClick(alerts) else onAlertClick(primary) }
+            .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            primary.event, color = fg, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+        )
+        if (alerts.size > 1) {
+            Spacer(Modifier.width(10.dp))
+            SeverityDotCluster(alerts)
+        }
+        Spacer(Modifier.width(6.dp))
+        Icon(
+            Icons.Filled.ChevronRight, contentDescription = "View advisory details",
+            tint = fg.copy(alpha = 0.7f), modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/** One small dot per alert, colored by that alert's own severity — lets someone gauge overall
+ * risk at a glance ("one rust dot, one gold dot") without tapping in. Caps the dot count so a
+ * pathological number of simultaneous alerts can't crowd the single-line strip; the "+N" text
+ * fallback mirrors the old "+N more" row's role for that edge case. */
+@Composable
+private fun SeverityDotCluster(alerts: List<WeatherAlert>, maxDots: Int = 4) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        alerts.take(maxDots).forEach { a ->
+            val (_, dotColor) = alertColors(a.severity)
+            Box(Modifier.size(7.dp).clip(CircleShape).background(dotColor))
+        }
+        val remaining = alerts.size - maxDots
+        if (remaining > 0) {
+            Text("+$remaining", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -463,29 +459,38 @@ fun AlertBannerList(
 /**
  * A calm, dismissible acknowledgment that a previously-active alert has cleared — closing the
  * loop for a user who saw the warning earlier rather than leaving them to notice its silent
- * disappearance on their own (or not notice at all). Deliberately styled opposite to
- * [AlertBannerList]: sage green rather than a severity color, a checkmark rather than a warning
- * triangle, and an explicit dismiss action rather than persistent — this is reassurance, not an
- * ongoing hazard, and shouldn't compete visually with an actual active alert if both are shown
- * at once (a resolved notice always renders below any currently-active alert; see WeatherScreen).
+ * disappearance on their own (or not notice at all). Same single-line strip language as
+ * [AlertBannerList] for visual consistency between them (an odd pairing otherwise — a shrunk
+ * "urgent" indicator sitting above a full-size "all clear" card), but sage green rather than a
+ * severity color and a checkmark rather than a warning triangle: this is reassurance, not an
+ * ongoing hazard, and shouldn't compete visually with an actual active alert if both are shown at
+ * once (a resolved notice always renders below any currently-active alert; see WeatherScreen).
  */
 @Composable
 fun ResolvedAlertCard(resolved: TrackedAlert, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    GlassCard(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(
-                "${resolved.event} has ended",
-                color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
+    val isDark = LocalIsDarkTheme.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp))
+            .background(Green.copy(alpha = if (isDark) 0.08f else 0.10f))
+            .drawBehind { drawRect(color = Green, size = Size(4.dp.toPx(), size.height)) }
+            .padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "${resolved.event} has ended",
+            color = Green, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            Icon(
+                Icons.Filled.Close, contentDescription = "Dismiss",
+                tint = Green.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)
             )
-            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    Icons.Filled.Close, contentDescription = "Dismiss",
-                    tint = TextSecondary, modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }
@@ -1841,8 +1846,19 @@ private fun MoonDetailContent(sheet: DetailSheet.Metric) {
 }
 
 @Composable
-fun DetailSheetContent(sheet: DetailSheet) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
+fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Unit = {}) {
+    // verticalScroll is a general safety net, not just for AlertList: ModalBottomSheet does not
+    // make its content scrollable on its own, and every sheet type here relied on its content
+    // happening to fit within the sheet's max height. That held by chance for a single metric/day/
+    // alert, but silently cropped content with no way to reach it once DetailSheet.AlertList could
+    // stack more than fit on one screen (found via multiple simultaneous NWS alerts) — this fixes
+    // that class of bug everywhere, not just the case that happened to surface it first.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
+    ) {
         when (sheet) {
             is DetailSheet.Metric -> when (sheet.title) {
                 "Wind"          -> WindDetailContent(sheet)
@@ -1872,14 +1888,23 @@ fun DetailSheetContent(sheet: DetailSheet) {
                 DetailRow("Max wind", day.windMaxKmh?.let { "$it ${sheet.windUnit}" } ?: "--")
             }
             is DetailSheet.Alert -> AlertDetailContent(sheet.alert)
+            // A tappable summary list, not every alert's full write-up stacked at full height —
+            // that older approach buried whichever alert was 2nd or 3rd under the others' full
+            // description/instruction text (exactly the content someone most needs to actually
+            // read for a safety-relevant message), and relied on this sheet's content always
+            // fitting within one screen, which stopped holding once there were enough alerts.
+            // Tapping a row hands off to the same DetailSheet.Alert single-alert view every other
+            // entry point already uses.
             is DetailSheet.AlertList -> Column {
+                Text("Active Advisories", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${sheet.alerts.size} advisories for this location", color = TextSecondary, fontSize = 14.sp
+                )
+                Spacer(Modifier.height(10.dp))
                 sheet.alerts.forEachIndexed { i, a ->
-                    if (i > 0) {
-                        Spacer(Modifier.height(20.dp))
-                        HorizontalDivider()
-                        Spacer(Modifier.height(20.dp))
-                    }
-                    AlertDetailContent(a)
+                    if (i > 0) HorizontalDivider(color = TextSecondary.copy(alpha = 0.12f))
+                    AlertSummaryRow(a, onClick = { onAlertSelected(a) })
                 }
             }
         }
@@ -1901,6 +1926,32 @@ private fun AlertBadge(text: String, color: Color) {
             .background(color.copy(alpha = 0.14f))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     )
+}
+
+/** One row per alert in the [DetailSheet.AlertList] chooser — a severity dot (not the full badge
+ * treatment [AlertDetailContent] uses, this is a summary, not the detail view), event name, and
+ * the same [alertTimeWindow] used by [AlertBannerList] so the two stay consistent. */
+@Composable
+private fun AlertSummaryRow(alert: WeatherAlert, onClick: () -> Unit) {
+    val (_, fg) = alertColors(alert.severity)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(fg))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(alert.event, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            (alertTimeWindow(alert) ?: alert.headline).let {
+                Text(it, color = TextSecondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+    }
 }
 
 @Composable
