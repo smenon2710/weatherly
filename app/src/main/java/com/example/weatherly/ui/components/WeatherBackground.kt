@@ -10,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -30,9 +29,10 @@ import kotlin.random.Random
 
 /**
  * Full-screen animated backdrop, in the spirit of Apple Weather's per-condition scenes. Sits
- * behind the entire scrolling [com.example.weatherly.ui.WeatherScreen] content (see
- * [LocalTranslucentCards], which the screen turns on around its card flow so cards read as
- * frosted glass over this rather than opaque tiles on a flat color).
+ * behind the entire scrolling [com.example.weatherly.ui.WeatherScreen] content — visible in the
+ * hero and in the gaps/margins around cards. Cards themselves are fully opaque (`GlassCard`); a
+ * translucent "frosted glass" card fill was tried and reverted after it produced visibly patchy
+ * seams against this background, especially in light mode — see `GlassCard`'s doc comment.
  *
  * A single [Canvas] redraws every frame off one shared `timeMs` clock — reading that value only
  * inside the draw phase (not composition) means each tick re-draws just this Canvas, not the
@@ -114,6 +114,22 @@ fun WeatherBackground(
     }
     val cloudTint = if (isDark) Color(0xFF4A5560).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.35f)
 
+    // Rain/snow/sleet/hail/wind particles: dark mode keeps near-white, which pops against the
+    // dark gradient stops. The same white is nearly invisible against light mode's pale pastel
+    // sky stops — alpha alone can't fix a hue that's fundamentally wrong for a light background,
+    // which is why the light-mode weather background looked "unchanging" (the base gradient was
+    // shifting per condition the whole time; the particle layer on top just wasn't visible enough
+    // to register). Light-mode inks reuse this app's existing rain/snow "slate blue" tip-tone
+    // family (see tipColors() in WeatherComponents.kt) so particles read as this app's own
+    // palette, not a generic gray overlay bolted on to fix a bug.
+    val rainInk = if (isDark) Color.White else Color(0xFF3F5670)
+    val snowInk = if (isDark) Color.White else Color(0xFF5D7A94)
+    val sleetInk = if (isDark) Color(0xFFD8E4EA) else Color(0xFF56707F)
+    val hailInk = if (isDark) Color(0xFFE8EDF0) else Color(0xFF6B7B85)
+    val windInk = if (isDark) Color.White else Color(0xFF5D6B78)
+    val iceSheenInk = if (isDark) Color.White else Color(0xFF6E88A0)
+    val snowWashInk = if (isDark) Color.White else Color(0xFF9DB2C2)
+
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
@@ -137,38 +153,38 @@ fun WeatherBackground(
                 Scene.HAZE -> drawHaze(timeMs, isDark)
                 Scene.MIST -> drawFogBands(fogSeeds, timeMs, fogTint.copy(alpha = fogTint.alpha * 0.55f))
                 Scene.FOG -> drawFogBands(fogSeeds, timeMs, fogTint)
-                Scene.DRIZZLE -> drawRain(rainSeeds, timeMs, RainIntensity.DRIZZLE, isDark)
-                Scene.RAIN_LIGHT -> drawRain(rainSeeds, timeMs, RainIntensity.LIGHT, isDark)
-                Scene.RAIN_MODERATE -> drawRain(rainSeeds, timeMs, RainIntensity.MODERATE, isDark)
+                Scene.DRIZZLE -> drawRain(rainSeeds, timeMs, RainIntensity.DRIZZLE, isDark, rainInk)
+                Scene.RAIN_LIGHT -> drawRain(rainSeeds, timeMs, RainIntensity.LIGHT, isDark, rainInk)
+                Scene.RAIN_MODERATE -> drawRain(rainSeeds, timeMs, RainIntensity.MODERATE, isDark, rainInk)
                 Scene.RAIN_HEAVY -> {
-                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark)
+                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark, rainInk)
                     drawGroundWash(Color(0xFF16222C), 0.30f)
                 }
                 Scene.FREEZING_RAIN -> {
-                    drawRain(rainSeeds, timeMs, RainIntensity.LIGHT, isDark)
-                    drawIceSheen(timeMs)
+                    drawRain(rainSeeds, timeMs, RainIntensity.LIGHT, isDark, rainInk)
+                    drawIceSheen(timeMs, iceSheenInk)
                 }
-                Scene.SNOW_LIGHT -> drawSnow(snowSeeds, timeMs, SnowIntensity.LIGHT)
+                Scene.SNOW_LIGHT -> drawSnow(snowSeeds, timeMs, SnowIntensity.LIGHT, isDark, snowInk)
                 Scene.SNOW_MODERATE -> {
-                    drawSnow(snowSeeds, timeMs, SnowIntensity.MODERATE)
-                    drawGroundWash(Color.White, 0.16f)
+                    drawSnow(snowSeeds, timeMs, SnowIntensity.MODERATE, isDark, snowInk)
+                    drawGroundWash(snowWashInk, 0.16f)
                 }
                 Scene.SNOW_HEAVY -> {
-                    drawSnow(snowSeeds, timeMs, SnowIntensity.HEAVY)
-                    drawGroundWash(Color.White, 0.26f)
+                    drawSnow(snowSeeds, timeMs, SnowIntensity.HEAVY, isDark, snowInk)
+                    drawGroundWash(snowWashInk, 0.26f)
                 }
                 Scene.SLEET -> {
-                    drawSleet(sleetSeeds, timeMs)
+                    drawSleet(sleetSeeds, timeMs, sleetInk)
                     drawGroundWash(Color(0xFF8FA3AC), 0.18f)
                 }
-                Scene.HAIL -> drawHail(hailSeeds, timeMs)
+                Scene.HAIL -> drawHail(hailSeeds, timeMs, hailInk)
                 Scene.THUNDER -> {
-                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark)
+                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark, rainInk)
                     drawThunderFlash(thunderSeeds, timeMs)
                 }
                 Scene.THUNDER_HAIL -> {
-                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark)
-                    drawHail(hailSeeds, timeMs)
+                    drawRain(rainSeeds, timeMs, RainIntensity.HEAVY, isDark, rainInk)
+                    drawHail(hailSeeds, timeMs, hailInk)
                     drawThunderFlash(thunderSeeds, timeMs)
                 }
                 Scene.TORNADO -> {
@@ -177,7 +193,7 @@ fun WeatherBackground(
                 }
                 Scene.HURRICANE -> {
                     drawRect(Color(0xFF10151C).copy(alpha = 0.30f), size = size)
-                    drawHurricaneRain(rainSeeds, timeMs)
+                    drawHurricaneRain(rainSeeds, timeMs, rainInk)
                     drawThunderFlash(thunderSeeds, timeMs)
                 }
                 Scene.DUST_STORM -> drawDustStorm(dustSeeds, timeMs)
@@ -187,15 +203,10 @@ fun WeatherBackground(
                 }
             }
             if (moteSeeds.isNotEmpty()) drawMotes(moteSeeds, timeMs)
-            if (severeWind && scene != Scene.TORNADO && scene != Scene.HURRICANE) drawWindStreaks(windSeeds, timeMs)
+            if (severeWind && scene != Scene.TORNADO && scene != Scene.HURRICANE) drawWindStreaks(windSeeds, timeMs, windInk)
         }
     }
 }
-
-/** Toggled on by [com.example.weatherly.ui.WeatherScreen] around its card flow so [GlassCard]
- * reads as frosted glass over [WeatherBackground] instead of an opaque tile. Every other screen
- * (Settings, detail sheets, Chat) leaves this off and keeps the fully-opaque default. */
-val LocalTranslucentCards = staticCompositionLocalOf { false }
 
 // ── Condition → scene mapping ───────────────────────────────────────────────────
 
@@ -287,10 +298,13 @@ private enum class RainIntensity(
     val alphaLight: Float,
     val alphaDark: Float
 ) {
-    DRIZZLE(45, 260f, 14f, 1.5f, 0.20f, 0.28f),
-    LIGHT(80, 420f, 20f, 1.8f, 0.28f, 0.36f),
-    MODERATE(120, 600f, 26f, 2.0f, 0.36f, 0.46f),
-    HEAVY(160, 820f, 34f, 2.4f, 0.46f, 0.58f)
+    // alphaLight bumped up from the original white-based tuning: a colored ink (see rainInk in
+    // WeatherBackground) has much better contrast against the light gradient than white ever did
+    // at the same alpha, but these still need to be strong enough to read clearly on their own.
+    DRIZZLE(45, 260f, 14f, 1.5f, 0.30f, 0.28f),
+    LIGHT(80, 420f, 20f, 1.8f, 0.38f, 0.36f),
+    MODERATE(120, 600f, 26f, 2.0f, 0.46f, 0.46f),
+    HEAVY(160, 820f, 34f, 2.4f, 0.56f, 0.58f)
 }
 
 private enum class SnowIntensity(val count: Int, val basePxPerSec: Float, val sizeMin: Float, val sizeSpread: Float) {
@@ -317,12 +331,12 @@ private fun lerpF(a: Float, b: Float, t: Float) = a + (b - a) * t
 
 // ── Particle renderers ────────────────────────────────────────────────────────
 
-private fun DrawScope.drawRain(seeds: List<Seed>, timeMs: Long, intensity: RainIntensity, isDark: Boolean) {
+private fun DrawScope.drawRain(seeds: List<Seed>, timeMs: Long, intensity: RainIntensity, isDark: Boolean, ink: Color) {
     val w = size.width
     val h = size.height
     val streak = intensity.streakPx
     val slant = w * 0.05f
-    val color = Color.White.copy(alpha = if (isDark) intensity.alphaDark else intensity.alphaLight)
+    val color = ink.copy(alpha = if (isDark) intensity.alphaDark else intensity.alphaLight)
     seeds.forEach { s ->
         val speed = intensity.basePxPerSec * (0.75f + s.b * 0.5f)
         val cycleMs = (h + streak) / speed * 1000f
@@ -343,11 +357,11 @@ private fun DrawScope.drawRain(seeds: List<Seed>, timeMs: Long, intensity: RainI
 /** Near-horizontal driving rain sheets — the "extreme horizontal rain" a hurricane needs, distinct
  * from [drawRain]'s gentle angled streaks rather than a parameter tweak to it, so normal rain
  * scenes can't accidentally end up with hurricane-grade slant. */
-private fun DrawScope.drawHurricaneRain(seeds: List<Seed>, timeMs: Long) {
+private fun DrawScope.drawHurricaneRain(seeds: List<Seed>, timeMs: Long, ink: Color) {
     val w = size.width
     val h = size.height
     val streak = 60f
-    val color = Color.White.copy(alpha = 0.5f)
+    val color = ink.copy(alpha = 0.5f)
     seeds.forEach { s ->
         val speed = 1100f * (0.8f + s.b * 0.4f)
         val travel = w + streak * 3f
@@ -365,9 +379,12 @@ private fun DrawScope.drawHurricaneRain(seeds: List<Seed>, timeMs: Long) {
     }
 }
 
-private fun DrawScope.drawSnow(seeds: List<Seed>, timeMs: Long, intensity: SnowIntensity) {
+private fun DrawScope.drawSnow(seeds: List<Seed>, timeMs: Long, intensity: SnowIntensity, isDark: Boolean, ink: Color) {
     val w = size.width
     val h = size.height
+    // Light mode gets a touch more alpha than dark, same reasoning as RainIntensity.alphaLight —
+    // a colored ink contrasts far better than white ever did here, but still needs to read clearly.
+    val baseAlpha = if (isDark) 0.55f else 0.65f
     seeds.forEach { s ->
         val speed = intensity.basePxPerSec * (0.75f + s.b * 0.5f)
         val cycleMs = (h + 24f) / speed * 1000f
@@ -378,13 +395,13 @@ private fun DrawScope.drawSnow(seeds: List<Seed>, timeMs: Long, intensity: SnowI
         val xBase = s.b * w
         val x = xBase + sin(timeMs / 1000f * swayFreq * 6.283f + s.d * 6.283f) * swayAmp
         val radius = intensity.sizeMin + s.c * intensity.sizeSpread
-        drawCircle(Color.White.copy(alpha = 0.55f + s.c * 0.3f), radius = radius, center = Offset(x, y))
+        drawCircle(ink.copy(alpha = baseAlpha + s.c * 0.3f), radius = radius, center = Offset(x, y))
     }
 }
 
 /** Slanted, hard-edged, fast streaks with small bounce ticks at the baseline — sleet reads as
  * "harder than rain, smaller than hail" rather than a snow or rain variant. */
-private fun DrawScope.drawSleet(seeds: List<Seed>, timeMs: Long) {
+private fun DrawScope.drawSleet(seeds: List<Seed>, timeMs: Long, ink: Color) {
     val w = size.width
     val h = size.height
     val streak = 10f
@@ -396,7 +413,7 @@ private fun DrawScope.drawSleet(seeds: List<Seed>, timeMs: Long) {
         val y = t * (h + streak) - streak
         val x = (((s.c * w) + t * slant) % w + w) % w
         drawLine(
-            color = Color(0xFFD8E4EA).copy(alpha = 0.55f),
+            color = ink.copy(alpha = 0.65f),
             start = Offset(x, y), end = Offset(x - slant * 0.4f, y + streak),
             strokeWidth = 1.6f, cap = StrokeCap.Round
         )
@@ -404,7 +421,7 @@ private fun DrawScope.drawSleet(seeds: List<Seed>, timeMs: Long) {
         // synced to the exact landing frame (cheap approximation of "bouncing off surfaces").
         val groundY = h - 6f - s.d * (h * 0.25f)
         drawLine(
-            color = Color(0xFFD8E4EA).copy(alpha = 0.25f),
+            color = ink.copy(alpha = 0.35f),
             start = Offset(x - 3f, groundY), end = Offset(x + 3f, groundY),
             strokeWidth = 1.2f, cap = StrokeCap.Round
         )
@@ -414,7 +431,7 @@ private fun DrawScope.drawSleet(seeds: List<Seed>, timeMs: Long) {
 /** Falling hard spheres with static impact marks — impact positions are per-seed fixed points
  * (not synced to the exact frame a given particle lands), a deliberate simplification that still
  * reads as "hail hitting the ground" without simulating real per-particle collision timing. */
-private fun DrawScope.drawHail(seeds: List<Seed>, timeMs: Long) {
+private fun DrawScope.drawHail(seeds: List<Seed>, timeMs: Long, ink: Color) {
     val w = size.width
     val h = size.height
     seeds.forEach { s ->
@@ -424,11 +441,11 @@ private fun DrawScope.drawHail(seeds: List<Seed>, timeMs: Long) {
         val y = t * (h + 10f) - 5f
         val x = s.c * w
         val radius = 2.5f + s.d * 2.5f
-        drawCircle(Color(0xFFE8EDF0).copy(alpha = 0.85f), radius = radius, center = Offset(x, y))
+        drawCircle(ink.copy(alpha = 0.85f), radius = radius, center = Offset(x, y))
         if (t > 0.9f) {
             val impactAlpha = (1f - t) / 0.1f * 0.4f
             val iy = h - 4f
-            drawLine(Color.White.copy(alpha = impactAlpha), Offset(x - 5f, iy), Offset(x + 5f, iy), strokeWidth = 1.5f)
+            drawLine(ink.copy(alpha = impactAlpha), Offset(x - 5f, iy), Offset(x + 5f, iy), strokeWidth = 1.5f)
         }
     }
 }
@@ -565,7 +582,7 @@ private fun DrawScope.drawGroundWash(color: Color, alpha: Float) {
 /** Slow-moving specular highlight sweeping across the lower half of the screen — the "high-gloss
  * reflective ice sheen" freezing rain needs, distinct from the flat opacity wash every other scene
  * uses, since ice is specifically about catching and moving light. */
-private fun DrawScope.drawIceSheen(timeMs: Long) {
+private fun DrawScope.drawIceSheen(timeMs: Long, ink: Color) {
     val w = size.width
     val h = size.height
     val t = wrap01(timeMs, 0f, 14000f)
@@ -573,9 +590,9 @@ private fun DrawScope.drawIceSheen(timeMs: Long) {
     drawRect(
         brush = Brush.horizontalGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0f),
-                Color.White.copy(alpha = 0.18f),
-                Color.White.copy(alpha = 0f)
+                ink.copy(alpha = 0f),
+                ink.copy(alpha = 0.28f),
+                ink.copy(alpha = 0f)
             ),
             startX = cx - w * 0.25f,
             endX = cx + w * 0.25f
@@ -583,7 +600,7 @@ private fun DrawScope.drawIceSheen(timeMs: Long) {
         topLeft = Offset(0f, h * 0.55f),
         size = Size(w, h * 0.45f)
     )
-    drawGroundWash(Color.White, 0.20f)
+    drawGroundWash(ink, 0.24f)
 }
 
 /** Drifting ochre/gold particulate bands (reusing the fog-band drift mechanic, since a dust wall
@@ -666,7 +683,7 @@ private fun DrawScope.drawTornado(timeMs: Long, debris: List<Seed>) {
 /** Fast horizontal motion-distortion lines, layered over any scene once gusts cross the severe
  * threshold — the "Severe Squall/Wind" treatment. Deliberately not drawn for Tornado/Hurricane,
  * which already imply extreme wind through their own dedicated scenes. */
-private fun DrawScope.drawWindStreaks(seeds: List<Seed>, timeMs: Long) {
+private fun DrawScope.drawWindStreaks(seeds: List<Seed>, timeMs: Long, ink: Color) {
     val w = size.width
     val h = size.height
     seeds.forEach { s ->
@@ -677,7 +694,7 @@ private fun DrawScope.drawWindStreaks(seeds: List<Seed>, timeMs: Long) {
         val x = t * (w + streakLen) - streakLen
         val y = s.d * h
         drawLine(
-            color = Color.White.copy(alpha = 0.10f + s.c * 0.08f),
+            color = ink.copy(alpha = 0.14f + s.c * 0.10f),
             start = Offset(x, y), end = Offset(x + streakLen, y + streakLen * 0.06f),
             strokeWidth = 1.2f, cap = StrokeCap.Round
         )

@@ -41,7 +41,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,7 +75,6 @@ import com.example.weatherly.ui.components.DailyCard
 import com.example.weatherly.ui.components.DetailSheet
 import com.example.weatherly.ui.components.DetailSheetContent
 import com.example.weatherly.ui.components.HourlyCard
-import com.example.weatherly.ui.components.LocalTranslucentCards
 import com.example.weatherly.ui.components.MetricsGrid
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
@@ -309,8 +307,9 @@ fun WeatherContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Full-screen animated scene (rain/snow/fog/clouds/etc., condition + time-of-day driven) —
-        // sits behind the entire scrolling content, not just the hero, so cards below need to read
-        // as frosted glass over it (see the LocalTranslucentCards block around the card flow below).
+        // sits behind the entire scrolling content, not just the hero. Cards below are fully
+        // opaque (see GlassCard's doc comment for why a translucent card fill was reverted); the
+        // background shows through in the hero and in the gaps/margins around cards instead.
         WeatherBackground(
             code = data.currentIcon,
             isDay = data.isDay,
@@ -422,57 +421,56 @@ fun WeatherContent(
                     }
                 }
 
-                // Cards section — translucent so WeatherBackground's animated scene shows through
-                // (LocalTranslucentCards is read by every GlassCard nested below this point).
-                CompositionLocalProvider(LocalTranslucentCards provides true) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Official NWS advisories and resolved-alert acknowledgments render as the
-                        // first cards here, styled identically to every other card — after two
-                        // reverted attempts at making the alert visually exceptional (full-bleed, or
-                        // placed above the hero), consistency with the rest of the app turned out to
-                        // matter more than standing out. Active alerts render above any resolved
-                        // notices, since an ongoing hazard is more important than an acknowledgment.
-                        if (data.alerts.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            AlertBannerList(
-                                alerts = data.alerts,
-                                onAlertClick = { sheet = DetailSheet.Alert(it) },
-                                onMoreClick = { sheet = DetailSheet.AlertList(it) }
-                            )
-                        }
-                        resolvedAlerts.forEach { resolved ->
-                            Spacer(Modifier.height(12.dp))
-                            ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
-                        }
+                // Cards section — fully opaque (see GlassCard's doc comment on why a translucent
+                // fill was tried and reverted); WeatherBackground still shows through in the
+                // hero above and in the gaps/margins around these cards.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Official NWS advisories and resolved-alert acknowledgments render as the
+                    // first cards here, styled identically to every other card — after two
+                    // reverted attempts at making the alert visually exceptional (full-bleed, or
+                    // placed above the hero), consistency with the rest of the app turned out to
+                    // matter more than standing out. Active alerts render above any resolved
+                    // notices, since an ongoing hazard is more important than an acknowledgment.
+                    if (data.alerts.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
-                        HourlyCard(data)
-                        Spacer(Modifier.height(12.dp))
-                        DailyCard(
-                            data,
-                            onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
+                        AlertBannerList(
+                            alerts = data.alerts,
+                            onAlertClick = { sheet = DetailSheet.Alert(it) },
+                            onMoreClick = { sheet = DetailSheet.AlertList(it) }
                         )
-                        Spacer(Modifier.height(12.dp))
-                        MetricsGrid(data, onMetricClick = { sheet = it })
-                        if (cachedAt != null) {
-                            val agoText = remember(cachedAt) {
-                                val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
-                                if (agoMin < 1) "just now" else "${agoMin}m ago"
-                            }
-                            Text(
-                                "Showing data from $agoText · pull to refresh",
-                                color = TextSecondary.copy(alpha = 0.6f),
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                            )
-                        }
-                        AttributionFooter(textColor = TextSecondary)
                     }
+                    resolvedAlerts.forEach { resolved ->
+                        Spacer(Modifier.height(12.dp))
+                        ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    HourlyCard(data)
+                    Spacer(Modifier.height(12.dp))
+                    DailyCard(
+                        data,
+                        onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    MetricsGrid(data, onMetricClick = { sheet = it })
+                    if (cachedAt != null) {
+                        val agoText = remember(cachedAt) {
+                            val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
+                            if (agoMin < 1) "just now" else "${agoMin}m ago"
+                        }
+                        Text(
+                            "Showing data from $agoText · pull to refresh",
+                            color = TextSecondary.copy(alpha = 0.6f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        )
+                    }
+                    AttributionFooter(textColor = TextSecondary)
                 }
             }
         }

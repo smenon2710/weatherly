@@ -247,16 +247,14 @@ fun GlassCard(
     // Light mode: soft 1dp shadow keeps cards airy; dark mode: 6dp lifts them off the background.
     val elevation = if (isDark) 6.dp else 1.dp
     val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.07f)
-    // WeatherScreen turns LocalTranslucentCards on around its card flow so cards read as frosted
-    // glass over WeatherBackground's animated scene. Only applies when the caller hasn't already
-    // overridden `fill` (e.g. AlertBannerList's severity-tinted cards stay fully opaque — urgency
-    // legibility matters more than the glass effect there).
-    val translucent = LocalTranslucentCards.current
-    val actualFill = when {
-        fill != Color.Unspecified -> fill
-        translucent -> surface.copy(alpha = if (isDark) 0.72f else 0.78f)
-        else -> surface
-    }
+    // Cards are always fully opaque. A translucent "frosted glass" fill over WeatherBackground's
+    // animated scene was tried and reverted — real glassmorphism needs actual blur (RenderEffect,
+    // API 31+), not just alpha; alpha-blending a near-white light-mode fill over a busy animated
+    // background instead produced a visibly patchy card with seams at the rounded corners (worse
+    // in light mode — dark-on-dark blends forgivingly, light-on-colored doesn't), confirmed via a
+    // real device screenshot. The animated background still shows in the hero and in the gaps
+    // between/around cards; cards themselves are solid.
+    val actualFill = if (fill == Color.Unspecified) surface else fill
     val shape = RoundedCornerShape(corner)
     var m = modifier
         .shadow(elevation = elevation, shape = shape, clip = false)

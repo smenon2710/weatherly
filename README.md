@@ -12,7 +12,7 @@ in-app donation link supports the developer if you'd like to.
 
 ## Features
 - Current conditions, next 24 hours, and a 7-day forecast in a single API call
-- Full-screen animated weather background (rain, snow, fog, clouds, haze, sleet, hail, thunder, freezing rain, and more — 26 conditions in all) driven entirely by real data: WMO code, cloud cover %, visibility, air quality, wind speed, and active NWS alerts. Cards render as frosted glass over it.
+- Full-screen animated weather background (rain, snow, fog, clouds, haze, sleet, hail, thunder, freezing rain, and more — 26 conditions in all) driven entirely by real data: WMO code, cloud cover %, visibility, air quality, wind speed, and active NWS alerts. Visible in the hero and in the gaps around cards, which stay fully opaque for legibility.
 - Rain and snow are tracked and shown as genuinely distinct hazards — separate real amounts (not a single ambiguous "precipitation" figure), distinct units where they actually differ (snowfall is cm/in, not mm/in), and the AI assistant and quick-suggestion advice (umbrella, driving, hiking, etc.) all correctly distinguish "it's snowing" from "it's raining" rather than treating a generic precipitation-chance percentage as if it always meant rain
 - Official National Weather Service advisories (severe warnings, watches, air quality alerts — US locations only), no API key, shown with severity-colored cards and full detail sheets
 - Home-screen widget with size-aware layouts, chrono-dynamic content (morning/daytime/night), and Material You dynamic colors
