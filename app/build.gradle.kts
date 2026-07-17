@@ -26,8 +26,8 @@ android {
         applicationId = "io.github.smenon2710.skyspeak"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
 
         // Surfaced to code via BuildConfig.OPENROUTER_API_KEY / OPENROUTER_MODEL.
         buildConfigField("String", "OPENROUTER_API_KEY", "\"$openRouterApiKey\"")
