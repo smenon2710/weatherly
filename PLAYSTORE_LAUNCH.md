@@ -109,7 +109,7 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 **Top-level questions:**
 - *Does your app collect or share any of the required user data types?* → **Yes**
-- *Is all of the user data collected by your app encrypted in transit?* → **Yes** (every API call — Open-Meteo, OpenRouter, RainViewer/OSM tiles, National Weather Service — goes over HTTPS)
+- *Is all of the user data collected by your app encrypted in transit?* → **Yes** (every API call — Open-Meteo, OpenRouter, National Weather Service — goes over HTTPS)
 - *Do you provide a way for users to request that their data be deleted?* → **No account exists, so there's no server-side data tied to a user identity to delete.** All app data (cache, preferences, on-device API key) lives in local app storage and is removed on uninstall. If Console requires an affirmative answer here, note in the form that data deletion is handled via app uninstall since no account/backend exists.
 
 **Per data type:**
@@ -157,19 +157,19 @@ Character counts verified — safe to paste directly into Play Console.
 
 **App title** (30 char limit): `SkySpeak: Premium Weather Chat` — exactly 30 characters.
 
-**Short description** (80 char limit, 78 used):
+**Short description** (80 char limit, 79 used):
 ```
-Ad-free forecasts, live radar, and an AI weather assistant. No account needed.
+Ad-free forecasts, a live weather view, and an AI assistant. No account needed.
 ```
 
-**Full description** (4000 char limit, ~2230 used):
+**Full description** (4000 char limit, ~2227 used):
 ```
 SkySpeak is a clean, ad-free weather app built for people who just want accurate forecasts without the clutter — plus an AI assistant for the planning questions a forecast alone can't answer.
 
 WHAT YOU GET
 • Current conditions, next 24 hours, and a 7-day forecast in one glance
-• A hero display that visually shifts with the sky — clear blue, rain slate, thunder indigo, snow white-blue — so conditions read at a glance
-• Live precipitation radar with play/pause and a frame scrubber
+• A full-screen animated weather view — rain, snow, fog, clouds, and more — so conditions read at a glance instead of buried in numbers
+• Rain and snow shown as what they actually are: real, separate amounts — not one vague "precipitation" figure that could quietly mean either
 • Air quality, pressure, visibility, wind, humidity, sunrise/sunset, and moon phase — all in one screen
 • Official National Weather Service advisories — severe warnings, watches, and air quality alerts — shown clearly at a glance (U.S. locations)
 • A home-screen widget that adapts its layout to size and time of day
@@ -186,7 +186,7 @@ PRIVACY BY DESIGN
 • Full privacy policy available in-app and on our website
 
 ABOUT THE DATA
-Forecasts come from Open-Meteo, a free and open weather data provider, attributed at the bottom of the weather screen. The precipitation radar uses OpenStreetMap tiles with a RainViewer overlay. Weather advisories come from the National Weather Service, the official U.S. government forecasting agency.
+Forecasts come from Open-Meteo, a free and open weather data provider, attributed at the bottom of the weather screen. Weather advisories come from the National Weather Service, the official U.S. government forecasting agency.
 
 SkySpeak is free to use with no paywalled features. If you find it useful, an optional "Support the developer" link is available — entirely optional, never required.
 

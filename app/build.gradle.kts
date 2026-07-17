@@ -109,7 +109,4 @@ dependencies {
 
     // Home-screen widget (Jetpack Glance)
     implementation("androidx.glance:glance-appwidget:1.1.1")
-
-    // Map (OSMDroid — OpenStreetMap, no API key required)
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
 }

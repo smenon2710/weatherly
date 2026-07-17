@@ -21,7 +21,14 @@ object WeatherAdvisor {
         val gustK = toKmh(w.windGustKmh ?: w.windKmh ?: 0, metric)
         val rain = rainChance(w)
         val code = w.currentIcon
-        val ctx = Ctx(w, units, metric, feelsC, windK, gustK, rain, code)
+        // Real signal, not just a WMO-code guess: `rain` above is a type-agnostic precipitation
+        // probability (Open-Meteo doesn't distinguish rain from snow in it), so a high reading
+        // used to tell people to grab an umbrella even when it was actually snowing. Checked first
+        // in umbrella() so that case gets the right advice instead.
+        val isSnowy = (w.currentSnowfall ?: 0.0) > 0.0 ||
+            w.hourlySnowfall.take(3).sum() > 0.0 ||
+            isSnowOrIce(code)
+        val ctx = Ctx(w, units, metric, feelsC, windK, gustK, rain, code, isSnowy)
 
         return when (intent) {
             AdviceIntent.UMBRELLA -> umbrella(ctx)
@@ -41,7 +48,8 @@ object WeatherAdvisor {
         val windK: Int,
         val gustK: Int,
         val rain: Int,
-        val code: Int
+        val code: Int,
+        val isSnowy: Boolean
     ) {
         val feelsLabel = "${w.realFeelC ?: w.currentTempC}${units.tempLabel}"
         val tempLabel = "${w.currentTempC}${units.tempLabel}"
@@ -51,6 +59,10 @@ object WeatherAdvisor {
     private fun umbrella(c: Ctx): String {
         if (isThunder(c.code)) return "Thunderstorms around, so rain is likely — take a waterproof layer, " +
             "and note an umbrella won't help much if it's gusty (winds ${c.windLabel})."
+        // Checked before the rain-percentage logic below: that percentage is a type-agnostic
+        // "chance of precipitation" and would otherwise tell someone to grab an umbrella for snow.
+        if (c.isSnowy) return "It's snow, not rain, so an umbrella won't do much good — wear waterproof " +
+            "boots and watch your footing instead."
         return when {
             c.rain >= 60 || isRainCode(c.code) ->
                 "Yes — there's a high chance of rain (${c.rain}%). Take an umbrella" +
@@ -71,7 +83,8 @@ object WeatherAdvisor {
             else -> "It feels like ${c.feelsLabel} — no jacket needed, light clothing is fine."
         }
         val extra = when {
-            c.rain >= 50 -> " Go for something water-resistant given the ${c.rain}% rain chance."
+            c.isSnowy -> " It's snow, not rain — go for something waterproof and insulated."
+            c.rain >= 50 -> " Go for something water-resistant given the ${c.rain}% precipitation chance."
             c.windK >= 35 -> " A windproof layer would help with the breeze (${c.windLabel})."
             else -> ""
         }
@@ -81,7 +94,8 @@ object WeatherAdvisor {
     private fun walking(c: Ctx): String {
         if (isThunder(c.code)) return "Best to hold off — there are thunderstorms about. Wait until they pass before heading out."
         val cautions = buildList {
-            if (c.rain >= 50) add("a ${c.rain}% chance of rain")
+            if (c.isSnowy) add("snow underfoot, so watch your footing")
+            else if (c.rain >= 50) add("a ${c.rain}% chance of rain")
             if (c.feelsC >= 30) add("it's hot at ${c.feelsLabel}, so hydrate and take it easy")
             if (c.feelsC <= 2) add("it's cold at ${c.feelsLabel}, so wrap up well")
             if (c.gustK >= 45) add("gusty winds")
@@ -89,7 +103,7 @@ object WeatherAdvisor {
             if ((c.w.uvIndex ?: 0) >= 8 && c.w.isDay) add("very high UV — wear sunscreen")
         }
         return if (cautions.isEmpty()) {
-            "Good conditions for a walk or jog — feels like ${c.feelsLabel}, low rain chance (${c.rain}%), and winds are ${c.windLabel}."
+            "Good conditions for a walk or jog — feels like ${c.feelsLabel}, low precipitation chance (${c.rain}%), and winds are ${c.windLabel}."
         } else {
             "Doable, but keep in mind " + cautions.joinToString(", and ") +
                 ". Otherwise it feels like ${c.feelsLabel} with winds ${c.windLabel}."
@@ -99,7 +113,9 @@ object WeatherAdvisor {
     private fun driving(c: Ctx): String {
         val hazards = buildList {
             if (isFog(c.code) || (c.w.visibility ?: 99) <= 2) add("reduced visibility — use low-beam headlights and slow down")
-            if (isSnowOrIce(c.code)) add("snow or ice is possible, so roads may be slippery — leave extra braking distance")
+            // c.isSnowy also catches snow arriving in the next few hours, not just the current
+            // icon, unlike a bare isSnowOrIce(c.code) check.
+            if (c.isSnowy) add("snow or ice is possible, so roads may be slippery — leave extra braking distance")
             if (c.rain >= 60 || c.code in 63..65 || c.code == 82) add("wet roads from heavy rain — ease off the speed")
             if (isThunder(c.code)) add("thunderstorms can bring sudden downpours and poor visibility")
             if (c.gustK >= 55) add("strong gusts (${c.gustK} km/h) — watch for crosswinds on open stretches")
@@ -114,7 +130,8 @@ object WeatherAdvisor {
     private fun hiking(c: Ctx): String {
         if (isThunder(c.code)) return "Not a good day for a hike — thunderstorms make exposed trails risky. Save it for clearer weather."
         val notes = buildList {
-            if (c.rain >= 50) add("a ${c.rain}% rain chance could mean muddy, slippery trails")
+            if (c.isSnowy) add("snow could make trails icy or hard to follow — waterproof boots and poles help")
+            else if (c.rain >= 50) add("a ${c.rain}% rain chance could mean muddy, slippery trails")
             if (c.feelsC >= 30) add("it's hot (${c.feelsLabel}) — start early, carry plenty of water")
             if (c.feelsC <= 2) add("it's cold (${c.feelsLabel}) — layer up and watch for ice")
             if ((c.w.uvIndex ?: 0) >= 8) add("UV is very high — hat, sunglasses and sunscreen")
@@ -122,7 +139,7 @@ object WeatherAdvisor {
         }
         val daylight = c.w.sunset?.let { " Daylight lasts until about $it." } ?: ""
         return if (notes.isEmpty()) {
-            "Great day for a hike — feels like ${c.feelsLabel}, low rain chance (${c.rain}%), and manageable winds.$daylight"
+            "Great day for a hike — feels like ${c.feelsLabel}, low precipitation chance (${c.rain}%), and manageable winds.$daylight"
         } else {
             "You can hike, just plan for " + notes.joinToString(", and ") + ".$daylight"
         }
@@ -138,7 +155,8 @@ object WeatherAdvisor {
             else -> "Keep it light and airy, and stay hydrated — it's warm out."
         }
         val adds = buildList {
-            if (c.rain >= 50) add("bring a waterproof layer (${c.rain}% rain)")
+            if (c.isSnowy) add("it's snow rather than rain — waterproof, insulated boots are worth it")
+            else if (c.rain >= 50) add("bring a waterproof layer (${c.rain}% precipitation chance)")
             if ((c.w.uvIndex ?: 0) >= 8 && c.w.isDay) add("add sunglasses and sunscreen for the strong sun")
             if (c.windK >= 35) add("a windproof layer for the breeze")
         }

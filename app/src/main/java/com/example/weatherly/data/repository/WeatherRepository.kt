@@ -130,6 +130,7 @@ class WeatherRepository(private val context: Context) {
         val dPop = r.daily?.precipProbMax ?: emptyList()
         val dWind = r.daily?.windSpeedMax ?: emptyList()
         val dPrecip = r.daily?.precipitationSum ?: emptyList()
+        val dSnowSum = r.daily?.snowfallSum ?: emptyList()
 
         val hourly = window.map { i ->
             val hourTime = hourTimes.getOrNull(i) ?: ""
@@ -158,6 +159,14 @@ class WeatherRepository(private val context: Context) {
         val hourlyPressure = window.map { (r.hourly?.surfacePressure?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyPrecipProb = window.map { r.hourly?.precipitationProbability?.getOrNull(it) ?: 0 }
         val hourlyAqi = window.map { (air?.hourly?.usAqi?.getOrNull(it) ?: 0.0).roundToInt() }
+        // Real per-hour amounts, not just probability — rain+showers combined (both are liquid
+        // precip; Open-Meteo's rain/showers split is a convective-vs-stratiform distinction, not
+        // relevant to the wet-road/umbrella hazard) and snowfall kept separate, since it's a
+        // different unit (see UnitSystem.snowLabel) and a different real-world hazard.
+        val hourlyPrecipAmount = window.map {
+            (r.hourly?.rain?.getOrNull(it) ?: 0.0) + (r.hourly?.showers?.getOrNull(it) ?: 0.0)
+        }
+        val hourlySnowfall = window.map { r.hourly?.snowfall?.getOrNull(it) ?: 0.0 }
 
         val todayDate = currentTime?.substring(0, 10)
         val todayIndex = dTimes.indexOf(todayDate).let {
@@ -181,7 +190,8 @@ class WeatherRepository(private val context: Context) {
                         uvMax = dUv.getOrNull(i)?.roundToInt(),
                         precipProbMax = dPop.getOrNull(i),
                         windMaxKmh = dWind.getOrNull(i)?.roundToInt(),
-                        precipSumMm = dPrecip.getOrNull(i)
+                        precipSumMm = dPrecip.getOrNull(i),
+                        snowfallSum = dSnowSum.getOrNull(i)
                     )
                 )
             }
@@ -234,6 +244,9 @@ class WeatherRepository(private val context: Context) {
             cloudCoverPct = current?.cloudCover,
             precipMm = current?.precipitation,
             precipUnit = units.precipLabel,
+            currentRainMm = current?.rain?.let { it + (current.showers ?: 0.0) },
+            currentSnowfall = current?.snowfall,
+            snowUnit = units.snowLabel,
             uvIndex = uvNow?.roundToInt(),
             uvLabel = uvNow?.let { uvLabel(it) },
             visibility = visMeters?.let { visToUnit(it) },
@@ -257,7 +270,9 @@ class WeatherRepository(private val context: Context) {
             hourlyPrecipProb = hourlyPrecipProb,
             hourlyAqi = hourlyAqi,
             daily = daily,
-            alerts = mapAlerts(alerts)
+            alerts = mapAlerts(alerts),
+            hourlyPrecipAmount = hourlyPrecipAmount,
+            hourlySnowfall = hourlySnowfall
         )
     }
 

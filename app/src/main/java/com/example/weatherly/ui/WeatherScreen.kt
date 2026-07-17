@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -42,6 +41,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -77,10 +76,11 @@ import com.example.weatherly.ui.components.DailyCard
 import com.example.weatherly.ui.components.DetailSheet
 import com.example.weatherly.ui.components.DetailSheetContent
 import com.example.weatherly.ui.components.HourlyCard
+import com.example.weatherly.ui.components.LocalTranslucentCards
 import com.example.weatherly.ui.components.MetricsGrid
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
-import com.example.weatherly.ui.components.conditionGradient
+import com.example.weatherly.ui.components.WeatherBackground
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,7 +88,6 @@ import kotlinx.coroutines.delay
 fun WeatherScreen(
     viewModel: WeatherViewModel = viewModel(),
     onOpenChat: () -> Unit = {},
-    onOpenRadar: () -> Unit = {},
     onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -106,7 +105,7 @@ fun WeatherScreen(
     ) { granted ->
         if (granted) {
             // Already-granted permission resolves near-instantly here, including on every
-            // return from Chat/Radar (WeatherScreen re-enters composition each time). Use a
+            // return from Chat/Settings (WeatherScreen re-enters composition each time). Use a
             // background load when content is already on screen so it isn't wiped by a full
             // Loading state, mirroring the ON_RESUME effect below.
             viewModel.load(background = state is WeatherUiState.Success)
@@ -132,7 +131,6 @@ fun WeatherScreen(
                 onRefresh = { viewModel.refresh() },
                 onOpenLocations = { showLocations = true },
                 onOpenChat = onOpenChat,
-                onOpenRadar = onOpenRadar,
                 onOpenSettings = onOpenSettings,
                 resolvedAlerts = resolvedAlerts,
                 onDismissResolved = { viewModel.dismissResolvedAlert(it) }
@@ -303,18 +301,28 @@ fun WeatherContent(
     isRefreshing: Boolean = false,
     onOpenLocations: () -> Unit = {},
     onOpenChat: () -> Unit = {},
-    onOpenRadar: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     resolvedAlerts: List<TrackedAlert> = emptyList(),
     onDismissResolved: (String) -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Full-screen animated scene (rain/snow/fog/clouds/etc., condition + time-of-day driven) —
+        // sits behind the entire scrolling content, not just the hero, so cards below need to read
+        // as frosted glass over it (see the LocalTranslucentCards block around the card flow below).
+        WeatherBackground(
+            code = data.currentIcon,
+            isDay = data.isDay,
+            aqi = data.aqi,
+            cloudCoverPct = data.cloudCoverPct,
+            visibility = data.visibility,
+            visibilityUnit = data.visibilityUnit,
+            windKmh = data.windKmh,
+            windGustKmh = data.windGustKmh,
+            alerts = data.alerts,
+            modifier = Modifier.fillMaxSize()
+        )
         val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -336,11 +344,11 @@ fun WeatherContent(
                     .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Condition-responsive gradient hero — sky tone at top, fades to AppBackground
+                // Hero content sits directly over WeatherBackground's full-screen animated scene —
+                // no gradient background of its own anymore (see the Box above this Column).
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(conditionGradient(data.currentIcon, data.isDay)))
                         .padding(horizontal = 16.dp)
                 ) {
                     Column(
@@ -354,10 +362,10 @@ fun WeatherContent(
                         // wordmark to exactly 1/3 of the screen width, which was narrow enough to wrap
                         // "skyspeak" onto a second line on some phones).
                         // Icons are grouped by function, not by which side has room: Locations + Settings
-                        // are both "configuration" actions (plain icon, low visual weight, matching each
-                        // other); Radar + Chat are "feature" actions (tinted/filled chips, higher weight).
-                        // Putting Settings in the right-hand chip group would give a once-in-a-while
-                        // action the same visual prominence as the app's primary CTA.
+                        // are both "configuration" actions (plain icon, low visual weight); Chat is the
+                        // app's single "feature" action (tinted/filled chip, higher weight). Putting
+                        // Settings there would give a once-in-a-while action the same visual prominence
+                        // as the app's primary CTA.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -391,42 +399,21 @@ fun WeatherContent(
                                     maxLines = 1
                                 )
                             }
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .shadow(3.dp, CircleShape, clip = false)
+                                    .clip(CircleShape)
+                                    .background(Cyan)
+                                    .clickable { onOpenChat() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .shadow(2.dp, CircleShape, clip = false)
-                                        .clip(CircleShape)
-                                        .background(Cyan.copy(alpha = 0.18f))
-                                        .clickable { onOpenRadar() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Radar,
-                                        contentDescription = "Radar map",
-                                        tint = Cyan,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .shadow(3.dp, CircleShape, clip = false)
-                                        .clip(CircleShape)
-                                        .background(Cyan)
-                                        .clickable { onOpenChat() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Filled.AutoAwesome,
-                                        contentDescription = "Ask the weather assistant",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                                Icon(
+                                    Icons.Filled.AutoAwesome,
+                                    contentDescription = "Ask the weather assistant",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -435,54 +422,57 @@ fun WeatherContent(
                     }
                 }
 
-                // Cards section on the plain app background
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Official NWS advisories and resolved-alert acknowledgments render as the
-                    // first cards here, styled identically to every other card — after two
-                    // reverted attempts at making the alert visually exceptional (full-bleed, or
-                    // placed above the hero), consistency with the rest of the app turned out to
-                    // matter more than standing out. Active alerts render above any resolved
-                    // notices, since an ongoing hazard is more important than an acknowledgment.
-                    if (data.alerts.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        AlertBannerList(
-                            alerts = data.alerts,
-                            onAlertClick = { sheet = DetailSheet.Alert(it) },
-                            onMoreClick = { sheet = DetailSheet.AlertList(it) }
-                        )
-                    }
-                    resolvedAlerts.forEach { resolved ->
-                        Spacer(Modifier.height(12.dp))
-                        ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    HourlyCard(data)
-                    Spacer(Modifier.height(12.dp))
-                    DailyCard(
-                        data,
-                        onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    MetricsGrid(data, onMetricClick = { sheet = it })
-                    if (cachedAt != null) {
-                        val agoText = remember(cachedAt) {
-                            val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
-                            if (agoMin < 1) "just now" else "${agoMin}m ago"
+                // Cards section — translucent so WeatherBackground's animated scene shows through
+                // (LocalTranslucentCards is read by every GlassCard nested below this point).
+                CompositionLocalProvider(LocalTranslucentCards provides true) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Official NWS advisories and resolved-alert acknowledgments render as the
+                        // first cards here, styled identically to every other card — after two
+                        // reverted attempts at making the alert visually exceptional (full-bleed, or
+                        // placed above the hero), consistency with the rest of the app turned out to
+                        // matter more than standing out. Active alerts render above any resolved
+                        // notices, since an ongoing hazard is more important than an acknowledgment.
+                        if (data.alerts.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            AlertBannerList(
+                                alerts = data.alerts,
+                                onAlertClick = { sheet = DetailSheet.Alert(it) },
+                                onMoreClick = { sheet = DetailSheet.AlertList(it) }
+                            )
                         }
-                        Text(
-                            "Showing data from $agoText · pull to refresh",
-                            color = TextSecondary.copy(alpha = 0.6f),
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        resolvedAlerts.forEach { resolved ->
+                            Spacer(Modifier.height(12.dp))
+                            ResolvedAlertCard(resolved = resolved, onDismiss = { onDismissResolved(resolved.id) })
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        HourlyCard(data)
+                        Spacer(Modifier.height(12.dp))
+                        DailyCard(
+                            data,
+                            onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
                         )
+                        Spacer(Modifier.height(12.dp))
+                        MetricsGrid(data, onMetricClick = { sheet = it })
+                        if (cachedAt != null) {
+                            val agoText = remember(cachedAt) {
+                                val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
+                                if (agoMin < 1) "just now" else "${agoMin}m ago"
+                            }
+                            Text(
+                                "Showing data from $agoText · pull to refresh",
+                                color = TextSecondary.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            )
+                        }
+                        AttributionFooter(textColor = TextSecondary)
                     }
-                    AttributionFooter(textColor = TextSecondary)
                 }
             }
         }

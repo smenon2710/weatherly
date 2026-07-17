@@ -19,6 +19,14 @@ data class WeatherData(
     val cloudCoverPct: Int?,
     val precipMm: Double?,
     val precipUnit: String,
+    // Real type-specific current-conditions amounts, distinct from `precipMm` (rain+showers+snow
+    // water-equivalent combined) — a genuine unit mismatch, not just a naming one: snowfall is in
+    // `snowUnit` (cm/in), not `precipUnit` (mm/in) — see UnitSystem.snowLabel. Defaulted to null
+    // for the same ForecastCache/Moshi backward-compat reason as `alerts` below: old cached JSON
+    // written before these fields existed is missing the keys entirely.
+    val currentRainMm: Double? = null,
+    val currentSnowfall: Double? = null,
+    val snowUnit: String = "cm",
     val uvIndex: Int?,
     val uvLabel: String?,
     val visibility: Int?,
@@ -45,7 +53,11 @@ data class WeatherData(
     val daily: List<DayEntry>,
     // Default required: ForecastCache deserializes old cached JSON (written before this field
     // existed) via Moshi's reflective adapter, which only fills in a missing key from a default.
-    val alerts: List<WeatherAlert> = emptyList()
+    val alerts: List<WeatherAlert> = emptyList(),
+    // Real per-hour amounts (not probability) — rain+showers combined, and snowfall separately.
+    // Same defaulting reason as `alerts`.
+    val hourlyPrecipAmount: List<Double> = emptyList(),
+    val hourlySnowfall: List<Double> = emptyList()
 ) {
     val hourLabels: List<String> get() = hourly.map { it.hourLabel }
 }
@@ -56,7 +68,17 @@ data class MetricChart(
     val values: List<Float>,
     val unit: String,
     /** Index where the calendar day changes (i.e. "12 AM" entry). Null when no day boundary in range. */
-    val dayChangeIndex: Int? = null
+    val dayChangeIndex: Int? = null,
+    /** For a chart whose values are on a known fixed scale (e.g. a 0–100 probability) — forces
+     * SparklineTile's y-axis to that range instead of auto-scaling to the values' own min/max.
+     * Null (the default) preserves auto-scaling, which is correct for unbounded series like
+     * temperature or wind where there's no fixed universal range. Without this, a day where
+     * precipitation chance only wobbles between 10–25% renders as a dramatic full-height peak,
+     * visually indistinguishable from a genuine 80–100% day — the sparkline shape reflects the
+     * day's *relative* wiggle, not the *absolute* risk level, which is exactly backwards for a
+     * chart someone reads to decide whether to carry an umbrella.
+     */
+    val fixedRange: ClosedFloatingPointRange<Float>? = null
 )
 
 data class WeatherTip(val emoji: String, val text: String, val tone: TipTone)
@@ -105,5 +127,6 @@ data class DayEntry(
     val uvMax: Int?,
     val precipProbMax: Int?,
     val windMaxKmh: Int?,
-    val precipSumMm: Double?
+    val precipSumMm: Double?,
+    val snowfallSum: Double? = null
 )

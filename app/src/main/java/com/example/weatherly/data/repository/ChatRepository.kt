@@ -148,6 +148,10 @@ class ChatRepository {
             wind, UV, air quality, and any active advisories, then give a clear recommendation.
             If an active advisory could affect the question (e.g. a driving question during a
             Winter Weather Advisory), mention it even if not asked directly.
+            The data distinguishes rain from snow explicitly (e.g. "rain: 0.4 mm" vs "snowing: 1.2
+            cm", or "(2.1 cm snow)" next to an hour/day) — a "% precip" figure alone only means
+            *some* precipitation is possible, not which kind, so always use the explicit rain/snow
+            signal when advising on umbrellas, driving, or footwear rather than assuming rain.
             Lead with the relevant conditions, then the suggestion. Keep units as shown.
             If the data doesn't cover something (e.g. days far ahead), say so briefly.
         """.trimIndent()
@@ -182,7 +186,11 @@ class ChatRepository {
             w.windKmh?.let { add("wind $it ${w.windUnit}" + (w.windDir?.let { d -> " $d" } ?: "")) }
             w.windGustKmh?.let { add("gusts $it ${w.windUnit}") }
             w.cloudCoverPct?.let { add("cloud $it%") }
-            w.precipMm?.let { add("precip $it ${w.precipUnit}") }
+            // Type-specific, not the old flat "precip" (rain+showers+snow water-equivalent combined)
+            // — the model needs to know whether it's actually rain or snow to give correct advice
+            // (e.g. umbrella vs. slippery-roads), not just that "some precipitation" occurred.
+            w.currentSnowfall?.takeIf { it > 0.0 }?.let { add("snowing: ${fmt1(it)} ${w.snowUnit} in the last hour") }
+            w.currentRainMm?.takeIf { it > 0.0 }?.let { add("rain: ${fmt1(it)} ${w.precipUnit} in the last hour") }
             w.uvIndex?.let { add("UV $it" + (w.uvLabel?.let { l -> " ($l)" } ?: "")) }
             w.aqi?.let { add("AQI $it" + (w.aqiLabel?.let { l -> " ($l)" } ?: "")) }
             w.visibility?.let { add("visibility $it ${w.visibilityUnit}") }
@@ -193,17 +201,26 @@ class ChatRepository {
         }
         val hours = w.hourly.take(8)
         if (hours.isNotEmpty()) {
-            sb.appendLine("Next hours: " + hours.joinToString("; ") { h ->
-                "${h.hourLabel} ${h.tempC}$t" + (h.precipChance?.let { " ${it}% rain" } ?: "")
-            })
+            // "% precip", not "% rain" — precipitation_probability doesn't distinguish type, so
+            // labeling it "rain" was actively wrong on hours it's actually going to snow. The
+            // explicit "(snow)" flag below is what carries the real type, from hourlySnowfall.
+            sb.appendLine("Next hours: " + hours.mapIndexed { i, h ->
+                val snow = w.hourlySnowfall.getOrNull(i) ?: 0.0
+                "${h.hourLabel} ${h.tempC}$t" +
+                    (h.precipChance?.let { " ${it}% precip" } ?: "") +
+                    (if (snow > 0.0) " (${fmt1(snow)}${w.snowUnit} snow)" else "")
+            }.joinToString("; "))
         }
         val days = w.daily.take(6)
         if (days.isNotEmpty()) {
             sb.appendLine("Coming days: " + days.joinToString("; ") { d ->
                 "${d.dayLabel} ${d.highC}/${d.lowC}$t ${d.phrase ?: ""}" +
-                    (d.precipProbMax?.let { " ${it}% rain" } ?: "")
+                    (d.precipProbMax?.let { " ${it}% precip" } ?: "") +
+                    (d.snowfallSum?.takeIf { it > 0.0 }?.let { " (${fmt1(it)}${w.snowUnit} snow)" } ?: "")
             })
         }
         return sb.toString().trim()
     }
+
+    private fun fmt1(v: Double): String = String.format(Locale.US, "%.1f", v)
 }

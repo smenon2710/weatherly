@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -246,7 +247,16 @@ fun GlassCard(
     // Light mode: soft 1dp shadow keeps cards airy; dark mode: 6dp lifts them off the background.
     val elevation = if (isDark) 6.dp else 1.dp
     val stroke = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.07f)
-    val actualFill = if (fill == Color.Unspecified) surface else fill
+    // WeatherScreen turns LocalTranslucentCards on around its card flow so cards read as frosted
+    // glass over WeatherBackground's animated scene. Only applies when the caller hasn't already
+    // overridden `fill` (e.g. AlertBannerList's severity-tinted cards stay fully opaque — urgency
+    // legibility matters more than the glass effect there).
+    val translucent = LocalTranslucentCards.current
+    val actualFill = when {
+        fill != Color.Unspecified -> fill
+        translucent -> surface.copy(alpha = if (isDark) 0.72f else 0.78f)
+        else -> surface
+    }
     val shape = RoundedCornerShape(corner)
     var m = modifier
         .shadow(elevation = elevation, shape = shape, clip = false)
@@ -801,8 +811,8 @@ fun SparklineTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier 
                 Canvas(modifier = Modifier.fillMaxWidth().height(52.dp)) {
                     val values = chart.values
                     val n = values.size
-                    val mn = values.min()
-                    val mx = values.max()
+                    val mn = chart.fixedRange?.start ?: values.min()
+                    val mx = chart.fixedRange?.endInclusive ?: values.max()
                     val rng = (mx - mn).coerceAtLeast(1f)
                     val pad = 4.dp.toPx()
 
@@ -1104,6 +1114,10 @@ sealed interface DetailSheet {
         val windDir: String? = null,
         val windGust: String? = null,
         val hourlyActualTemps: List<Int>? = null,
+        // Aligned with `chart.values` by index — lets PrecipDetailContent color each hour's bar by
+        // its real type (rain vs snow) rather than a single rain-only intensity palette applied
+        // uniformly regardless of what's actually falling that hour.
+        val hourlySnowfall: List<Double>? = null,
     ) : DetailSheet
 
     data class Day(val day: DayEntry, val windUnit: String, val precipUnit: String) : DetailSheet
@@ -1175,7 +1189,14 @@ fun MetricsGrid(
                 ))
             }, Modifier.fillMaxWidth())
         }
-        m["Precipitation"]?.let { t -> SparklineTile(t, { click(t) }, Modifier.fillMaxWidth()) }
+        m["Precipitation"]?.let { t ->
+            SparklineTile(t, onClick = {
+                onMetricClick(DetailSheet.Metric(
+                    t.icon, t.accent, t.label, t.value, t.description, t.chart,
+                    hourlySnowfall = data.hourlySnowfall,
+                ))
+            }, Modifier.fillMaxWidth())
+        }
 
         // ── Atmosphere: AQI + Pressure ────────────────────────────────────────
         SectionLabel(Icons.Filled.Air, "Atmosphere", Teal)
@@ -1196,8 +1217,12 @@ fun MetricsGrid(
 
 private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
     val dayChangeIdx = d.hourLabels.indexOfFirst { it == "12 AM" }.takeIf { it >= 0 }
-    fun chart(values: List<Int>, unit: String): MetricChart? =
-        if (values.size >= 2) MetricChart(d.hourLabels, values.map { it.toFloat() }, unit, dayChangeIdx) else null
+    fun chart(
+        values: List<Int>,
+        unit: String,
+        fixedRange: ClosedFloatingPointRange<Float>? = null
+    ): MetricChart? =
+        if (values.size >= 2) MetricChart(d.hourLabels, values.map { it.toFloat() }, unit, dayChangeIdx, fixedRange) else null
 
     val uvAdvice = when (d.uvLabel) {
         "Low" -> "Minimal risk — no protection needed."
@@ -1274,11 +1299,50 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
             "falling pressure often signals incoming unsettled weather, while rising pressure means clearing.",
         chart(d.hourlyPressure, "hPa"),
         gaugeFraction = d.pressureHpa?.let { ((it - 960) / 90f).coerceIn(0f, 1f) }))
-    add(MetricTileData(Icons.Filled.Grain, "Precipitation", d.precipMm?.let { "$it ${d.precipUnit}" } ?: "0 ${d.precipUnit}", "In last hour", Cyan,
-        "${d.precipMm ?: 0.0} ${d.precipUnit} of precipitation fell in the last hour. " +
-            "The chart shows the chance of precipitation over the coming hours.",
-        chart(d.hourlyPrecipProb, "%")))
+    // Precipitation — one combined tile (not separate rain/snow tiles), but the value, icon, accent,
+    // and description all reflect whichever type is actually real, sourced from Open-Meteo's real
+    // rain/showers/snowfall fields rather than inferred from the WMO code. Rain and snow are
+    // different hazards in different units (see UnitSystem.snowLabel), so showing a bare number
+    // with no type — or worse, a rain-shaped label on a snow day — is the inaccuracy this fixes.
+    // Real-time conditions win over the forecast when something is actually falling right now;
+    // otherwise falls back to whichever type dominates the next 12 hours.
+    run {
+        val nextSnow = d.hourlySnowfall.take(12).sum()
+        val nextRain = d.hourlyPrecipAmount.take(12).sum()
+        val snowingNow = (d.currentSnowfall ?: 0.0) > 0.0
+        val rainingNow = (d.currentRainMm ?: 0.0) > 0.0
+        val isSnow = when {
+            snowingNow -> true
+            rainingNow -> false
+            else -> nextSnow > 0.0 && nextSnow >= nextRain
+        }
+        val (value, sub) = when {
+            snowingNow -> "${fmt1(d.currentSnowfall!!)} ${d.snowUnit}" to "Snowing now"
+            rainingNow -> "${fmt1(d.currentRainMm!!)} ${d.precipUnit}" to "In last hour"
+            isSnow && nextSnow > 0.0 -> "${fmt1(nextSnow)} ${d.snowUnit}" to "Snow expected"
+            nextRain > 0.0 -> "${fmt1(nextRain)} ${d.precipUnit}" to "Rain expected"
+            else -> "0 ${d.precipUnit}" to "In last hour"
+        }
+        val description = when {
+            snowingNow -> "Snow is currently falling — ${fmt1(d.currentSnowfall!!)} ${d.snowUnit} in the last hour."
+            rainingNow -> "${fmt1(d.currentRainMm!!)} ${d.precipUnit} of rain fell in the last hour."
+            isSnow && nextSnow > 0.0 -> "About ${fmt1(nextSnow)} ${d.snowUnit} of snow is expected over the next 12 hours."
+            nextRain > 0.0 -> "About ${fmt1(nextRain)} ${d.precipUnit} of rain is expected over the next 12 hours."
+            else -> "No rain or snow expected right now."
+        } + " The chart shows the chance of precipitation over the coming hours."
+        add(MetricTileData(
+            icon = if (isSnow) Icons.Filled.AcUnit else Icons.Filled.Grain,
+            label = "Precipitation",
+            value = value,
+            sub = sub,
+            accent = if (isSnow) Indigo else Cyan,
+            description = description,
+            chart = chart(d.hourlyPrecipProb, "%", 0f..100f)
+        ))
+    }
 }
+
+private fun fmt1(v: Double): String = String.format(Locale.US, "%.1f", v)
 
 /** US AQI band → colour (green → maroon). */
 private fun aqiColor(aqi: Int?): Color = when {
@@ -1316,6 +1380,11 @@ private fun precipIntensityColor(prob: Float): Color = when {
     prob < 80 -> Color(0xFFCC7B40)
     else      -> Color(0xFFC05050)
 }
+
+// Distinct from the green→red rain-intensity ramp above on purpose — a snow hour is a different
+// hazard, not just "more intense rain," so it gets one fixed color at any probability rather than
+// running through that ramp.
+private val snowBarColor = Color(0xFF5AA0C4)
 
 // ── Default detail (bar chart) ────────────────────────────────────────────────
 
@@ -1646,14 +1715,21 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
 
     sheet.chart?.let { chart ->
         Spacer(Modifier.height(22.dp))
-        Text("HOURLY RAIN CHANCE", color = textSec, fontSize = 11.sp,
+        // Open-Meteo's precipitation_probability doesn't distinguish rain from snow — it's the
+        // chance of *any* precipitation — so this label must stay type-neutral. It used to read
+        // "HOURLY RAIN CHANCE" unconditionally, which was flatly wrong on days the headline value
+        // above correctly says "Snow expected".
+        Text("HOURLY PRECIPITATION CHANCE", color = textSec, fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(8.dp))
 
-        // Intensity legend
+        // Intensity legend — plus a distinct snow swatch, since the bars below now color
+        // snow-forecast hours with that same color regardless of intensity rather than running
+        // them through the rain-only green→red ramp.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf("Low" to precipIntensityColor(10f), "Moderate" to precipIntensityColor(30f),
-                   "High" to precipIntensityColor(55f), "Very high" to precipIntensityColor(75f))
+                   "High" to precipIntensityColor(55f), "Very high" to precipIntensityColor(75f),
+                   "❄️ Snow" to snowBarColor)
                 .forEach { (label, color) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
@@ -1666,6 +1742,7 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
 
         val values = chart.values
         val dayChangeI = chart.dayChangeIndex
+        val snowfall = sheet.hourlySnowfall
         Canvas(modifier = Modifier.fillMaxWidth().height(128.dp)) {
             val n = values.size
             val gap = 2.5.dp.toPx()
@@ -1682,7 +1759,12 @@ private fun PrecipDetailContent(sheet: DetailSheet.Metric) {
             values.forEachIndexed { i, prob ->
                 val barH = (prob / 100f) * size.height
                 if (barH > 1.dp.toPx()) {
-                    drawRoundRect(precipIntensityColor(prob),
+                    // Real per-hour type, not a guess: a snow hour gets the snow color at every
+                    // intensity, rather than running through the rain-only green→red ramp, which
+                    // is exactly the "chart doesn't distinguish rain from snow" inaccuracy this fixes.
+                    val isSnowHour = (snowfall?.getOrNull(i) ?: 0.0) > 0.0
+                    val barColor = if (isSnowHour) snowBarColor else precipIntensityColor(prob)
+                    drawRoundRect(barColor,
                         topLeft = Offset(i * (barW + gap), size.height - barH),
                         size = Size(barW, barH), cornerRadius = r)
                 }

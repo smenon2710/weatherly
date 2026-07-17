@@ -21,7 +21,14 @@ data class CurrentBlock(
     @Json(name = "wind_direction_10m") val windDirection: Double?,
     @Json(name = "surface_pressure") val surfacePressure: Double?,
     @Json(name = "cloud_cover") val cloudCover: Int?,
-    @Json(name = "precipitation") val precipitation: Double?
+    @Json(name = "precipitation") val precipitation: Double?,
+    // Real type-specific fields, distinct from `precipitation` (which is the rain+showers+snow
+    // water-equivalent total) — needed to tell users accurately whether it's rain or snow falling
+    // right now rather than inferring from the WMO weather_code. Unit follows precipitation_unit
+    // for rain/showers (mm/inch); snowfall's own unit is cm/inch — see UnitSystem.snowLabel.
+    @Json(name = "rain") val rain: Double?,
+    @Json(name = "showers") val showers: Double?,
+    @Json(name = "snowfall") val snowfall: Double?
 )
 
 data class HourlyBlock(
@@ -34,7 +41,10 @@ data class HourlyBlock(
     @Json(name = "wind_speed_10m") val windSpeed: List<Double?>?,
     @Json(name = "apparent_temperature") val apparentTemperature: List<Double?>?,
     @Json(name = "relative_humidity_2m") val humidity: List<Int?>?,
-    @Json(name = "surface_pressure") val surfacePressure: List<Double?>?
+    @Json(name = "surface_pressure") val surfacePressure: List<Double?>?,
+    @Json(name = "rain") val rain: List<Double?>?,
+    @Json(name = "showers") val showers: List<Double?>?,
+    @Json(name = "snowfall") val snowfall: List<Double?>?
 )
 
 data class DailyBlock(
@@ -47,5 +57,6 @@ data class DailyBlock(
     @Json(name = "uv_index_max") val uvIndexMax: List<Double?>?,
     @Json(name = "precipitation_sum") val precipitationSum: List<Double?>?,
     @Json(name = "precipitation_probability_max") val precipProbMax: List<Int?>?,
-    @Json(name = "wind_speed_10m_max") val windSpeedMax: List<Double?>?
+    @Json(name = "wind_speed_10m_max") val windSpeedMax: List<Double?>?,
+    @Json(name = "snowfall_sum") val snowfallSum: List<Double?>?
 )

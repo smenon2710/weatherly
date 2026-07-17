@@ -12,8 +12,8 @@ in-app donation link supports the developer if you'd like to.
 
 ## Features
 - Current conditions, next 24 hours, and a 7-day forecast in a single API call
-- Condition-responsive hero gradient — the background shifts tone to match the sky (clear blue, rain slate, thunder indigo, snow white-blue), with a subtle time-of-day tint at dawn/golden hour/dusk
-- Precipitation radar map (OpenStreetMap + RainViewer, no API key) with play/pause and a frame scrubber
+- Full-screen animated weather background (rain, snow, fog, clouds, haze, sleet, hail, thunder, freezing rain, and more — 26 conditions in all) driven entirely by real data: WMO code, cloud cover %, visibility, air quality, wind speed, and active NWS alerts. Cards render as frosted glass over it.
+- Rain and snow are tracked and shown as genuinely distinct hazards — separate real amounts (not a single ambiguous "precipitation" figure), distinct units where they actually differ (snowfall is cm/in, not mm/in), and the AI assistant and quick-suggestion advice (umbrella, driving, hiking, etc.) all correctly distinguish "it's snowing" from "it's raining" rather than treating a generic precipitation-chance percentage as if it always meant rain
 - Official National Weather Service advisories (severe warnings, watches, air quality alerts — US locations only), no API key, shown with severity-colored cards and full detail sheets
 - Home-screen widget with size-aware layouts, chrono-dynamic content (morning/daytime/night), and Material You dynamic colors
 - Automatic location via FusedLocationProvider + on-device reverse geocoding
@@ -21,6 +21,7 @@ in-app donation link supports the developer if you'd like to.
 - Offline-first: the last successful forecast is cached so the app never opens to a blank screen
 - Built-in AI weather assistant (OpenRouter) that answers practical questions
   like "can I jog this evening?" using your actual forecast as context
+- Settings screen: light/dark/system theme, units, and on-device OpenRouter key/model management
 - Material 3 UI with full light/dark theme support and Compose previews
 - No weather API key, no credit card, no usage worries for personal use
 
@@ -59,19 +60,20 @@ attribution requirement (public domain), US locations only.
 ## Project structure
 ```
 app/src/main/java/com/example/weatherly/
-├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat/Radar screens
+├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat/Settings screens
 ├─ data/
 │  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models, NWS alert models
 │  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter, NWS) + network module
 │  ├─ repository/   # WeatherRepository + ChatRepository (weather-aware prompts)
+│  ├─ advice/       # WeatherAdvisor — local, no-network rule-based advice (umbrella, driving, etc.)
 │  └─ prefs/        # unit/place selection, on-device OpenRouter key/model, forecast cache
 ├─ location/        # FusedLocationProvider wrapper
 ├─ ui/
-│  ├─ WeatherViewModel.kt / WeatherScreen.kt   # pull-to-refresh + chat/radar entry
+│  ├─ WeatherViewModel.kt / WeatherScreen.kt   # pull-to-refresh + chat/settings entry
 │  ├─ ChatViewModel.kt / ChatScreen.kt         # AI assistant
-│  ├─ RadarScreen.kt                           # OSMDroid + RainViewer precipitation radar
+│  ├─ SettingsViewModel.kt / SettingsScreen.kt # theme, units, OpenRouter key/model
 │  ├─ Previews.kt   # @Preview composables with sample data
-│  ├─ components/   # Header, hourly row, daily list, metric tiles, attribution
+│  ├─ components/   # Header, hourly row, daily list, metric tiles, attribution, WeatherBackground
 │  └─ theme/        # Colors, type, Material 3 theme
 ├─ widget/          # Jetpack Glance home-screen widget
 └─ util/            # WMO weather-code -> emoji + text, moon-phase calculator

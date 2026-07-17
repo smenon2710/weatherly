@@ -15,13 +15,15 @@ interface OpenMeteoApi {
         @Query("precipitation_unit") precipitationUnit: String,
         @Query("current") current: String =
             "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code," +
-            "wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure,cloud_cover,precipitation",
+            "wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure,cloud_cover,precipitation," +
+            "rain,showers,snowfall",
         @Query("hourly") hourly: String =
             "temperature_2m,weather_code,precipitation_probability,uv_index,visibility," +
-            "wind_speed_10m,apparent_temperature,relative_humidity_2m,surface_pressure",
+            "wind_speed_10m,apparent_temperature,relative_humidity_2m,surface_pressure," +
+            "rain,showers,snowfall",
         @Query("daily") daily: String =
             "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset," +
-            "uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
+            "uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,snowfall_sum",
         @Query("timezone") timezone: String = "auto",
         @Query("past_days") pastDays: Int = 1,
         @Query("forecast_days") forecastDays: Int = 7

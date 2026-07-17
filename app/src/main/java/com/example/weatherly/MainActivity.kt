@@ -17,14 +17,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.data.model.ThemePreference
 import com.example.weatherly.ui.ChatScreen
-import com.example.weatherly.ui.RadarScreen
 import com.example.weatherly.ui.SettingsScreen
 import com.example.weatherly.ui.WeatherScreen
-import com.example.weatherly.ui.WeatherUiState
 import com.example.weatherly.ui.WeatherViewModel
 import com.example.weatherly.ui.theme.WeatherlyTheme
 
-private enum class Screen { WEATHER, CHAT, RADAR, SETTINGS }
+private enum class Screen { WEATHER, CHAT, SETTINGS }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,9 +41,6 @@ class MainActivity : ComponentActivity() {
             WeatherlyTheme(darkTheme = darkTheme) {
                 var screen by rememberSaveable { mutableStateOf(Screen.WEATHER) }
 
-                val latLon by weatherViewModel.lastLatLon.collectAsStateWithLifecycle()
-                val state by weatherViewModel.state.collectAsStateWithLifecycle()
-                val locationName = (state as? WeatherUiState.Success)?.data?.locationName ?: ""
                 val units by weatherViewModel.units.collectAsStateWithLifecycle()
 
                 AnimatedContent(
@@ -63,17 +58,10 @@ class MainActivity : ComponentActivity() {
                         Screen.WEATHER -> WeatherScreen(
                             viewModel = weatherViewModel,
                             onOpenChat = { screen = Screen.CHAT },
-                            onOpenRadar = { screen = Screen.RADAR },
                             onOpenSettings = { screen = Screen.SETTINGS }
                         )
                         Screen.CHAT -> ChatScreen(
                             weatherViewModel = weatherViewModel,
-                            onBack = { screen = Screen.WEATHER }
-                        )
-                        Screen.RADAR -> RadarScreen(
-                            lat = latLon?.first ?: 0.0,
-                            lon = latLon?.second ?: 0.0,
-                            locationName = locationName,
                             onBack = { screen = Screen.WEATHER }
                         )
                         Screen.SETTINGS -> SettingsScreen(

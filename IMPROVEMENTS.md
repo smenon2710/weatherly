@@ -908,15 +908,16 @@ There is no way to share conditions with another person (e.g. "It's 31° and par
 
 ### 33. Onboarding walkthrough for new users
 
-**Source:** External tester feedback (2026-07-13, `Testers Community` report). No first-launch walkthrough or tooltips exist today — a new user opens straight into the live weather screen with no guidance on chat/radar/widget.
+**Source:** External tester feedback (2026-07-13, `Testers Community` report). No first-launch walkthrough or tooltips exist today — a new user opens straight into the live weather screen with no guidance on chat/widget.
 
-**Approach:** A brief interactive first-launch sequence (2–3 screens) highlighting the AI chat assistant and radar, with a skip option. Persist "seen" state in `PreferencesStore` so it only shows once. Genuine scope item, not a quick fix — sequence alongside items 25/35/36 if a Settings screen is built (could add a "Replay walkthrough" entry there too).
+**Approach:** A brief interactive first-launch sequence (2–3 screens) highlighting the AI chat assistant and the animated weather background, with a skip option. Persist "seen" state in `PreferencesStore` so it only shows once. Genuine scope item, not a quick fix — sequence alongside items 25/35/36 if a Settings screen is built (could add a "Replay walkthrough" entry there too).
+*(Updated: originally also called out the radar map, which was removed as low-value — see the git history around WeatherBackground.kt's introduction. Settings screen shipped 2026-07-13.)*
 
 ---
 
 ### 34. Play Store screenshot text overlays
 
-**Source:** External tester feedback (2026-07-13). Current screenshots (`store_assets/screenshot-0{1,2,3}-*.png`, per the L9 entry above) already show real app screens (Weather/Chat/Radar), not generic mockups — the tester report's framing was slightly off — but adding concise text overlays ("Live precipitation radar", "AI assistant grounded in your forecast") would still make them more effective on the store listing.
+**Source:** External tester feedback (2026-07-13). Current screenshots (`store_assets/screenshot-0{1,2,3}-*.png`, per the L9 entry above) already show real app screens (Weather/Chat — the third was Radar, since removed and due for a reshoot), not generic mockups — the tester report's framing was slightly off — but adding concise text overlays ("Rain, snow, and fog — shown as they really are", "AI assistant grounded in your forecast") would still make them more effective on the store listing.
 
 **Approach:** Pure asset work — re-render the three screenshots with a short text callout per image, same tooling as `store_assets/render_feature_graphic.py`. No app code changes; re-upload to Play Console store listing when ready.
 
