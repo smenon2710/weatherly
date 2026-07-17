@@ -40,7 +40,7 @@ The app is mid-launch-prep as of 2026-07-01. Full checklist, decisions, and rati
 
 ## Architecture
 
-**Single-activity, three-screen app.** `MainActivity` holds a `WeatherViewModel` (activity-scoped) and dispatches between `WeatherScreen`, `ChatScreen`, and `RadarScreen` via `AnimatedContent` keyed on a private `Screen` enum (`WEATHER`, `CHAT`, `RADAR`). `WeatherViewModel` exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` so `RadarScreen` can center the map on the current weather location without re-fetching.
+**Single-activity, four-screen app.** `MainActivity` holds a `WeatherViewModel` (activity-scoped) and dispatches between `WeatherScreen`, `ChatScreen`, `RadarScreen`, and `SettingsScreen` via `AnimatedContent` keyed on a private `Screen` enum (`WEATHER`, `CHAT`, `RADAR`, `SETTINGS`). `WeatherViewModel` exposes `lastLatLon: StateFlow<Pair<Double,Double>?>` so `RadarScreen` can center the map on the current weather location without re-fetching, and `themePreference: StateFlow<ThemePreference>` (read at the `MainActivity` root to pick light/dark/system for `WeatherlyTheme`) so `SettingsScreen` can change it. `SettingsScreen`/`SettingsViewModel` also own unit-system switching, on-device OpenRouter key/model management (the key field is write-only — `SettingsViewModel` never echoes the stored secret back), and a "Rate on Google Play" deep link with a browser fallback.
 
 **Data layer:**
 
