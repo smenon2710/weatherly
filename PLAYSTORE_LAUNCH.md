@@ -288,6 +288,19 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
 
 ---
 
+## Android 16 (API 36) Target SDK Requirement (surfaced 2026-07-21)
+
+While the Production access application (see below) was still pending review, Play Console's Policy status page separately flagged: **"App must target Android 16 (API level 36) or higher."** This is unrelated to the Production access gate — it's Google's annual target-API-level policy (every app must target within one year of the latest Android release) — but it has its own hard deadline: **action by 2026-08-31, or the app loses the ability to publish *any* update** (existing Closed Testing/Production listings stay live and installable; only new releases are blocked). It does not retroactively affect the pending Production access review.
+
+**Fix:** Bumped `compileSdk` 35 → 36 and `targetSdk` 35 → 36 in `app/build.gradle.kts`, shipped as **versionCode 11 / 1.0.10**. Low-risk change for this codebase specifically — edge-to-edge (the main behavioral change API 36 enforces) was already handled correctly (`enableEdgeToEdge()` in `MainActivity`, fixed for the API 35 edge-to-edge requirement back in B5), and the app has no NDK/native code, no foreground services, and no other component types affected by Android 16 behavior changes.
+
+Verified before committing, same bar as every prior release:
+- `assembleDebug`, `bundleRelease` (R8 + resource shrink + signing), and `lint` all `BUILD SUCCESSFUL` with `compileSdk`/`targetSdk` 36 — no new errors, same 33 pre-existing lint warnings as before the bump.
+- `jarsigner -verify` on the signed `app-release.aab`: `jar verified`, cert valid through 2053 (same keystore, unaffected by the SDK bump).
+- **Real on-device sanity install** on a freshly-booted **API 36 emulator** (`Medium_Phone_API_36.0` AVD) — the first release verified on the actual target API level rather than just an older emulator/device: fresh install, granted location, confirmed `target_sdk_version=36` in `nativeloader` logs, a real forecast loaded and the animated background rendered correctly, navigated Weather → Chat → Settings (confirmed Settings shows "Version 1.0.10"), zero `FATAL EXCEPTION`/crashes in logcat across the full session. Uninstalled and emulator shut down after.
+
+---
+
 ## Launch Checklist
 
 - [x] Change `applicationId` away from `com.example.*` (`io.github.smenon2710.skyspeak`)
@@ -322,4 +335,7 @@ This means realistic public availability is **~2+ weeks out**, not a few days, o
   - [x] Uploaded `app-release.aab` to Play Console → Closed Testing (`skyspeak-testers` track) — does not reset the 14-day tester clock (same as versionCode 6→7→8→9)
 - [x] Applied for Production access — submitted 2026-07-20, 21:50 (Play Console). Status: "We have your application for production access — we're reviewing your application form. We'll email the account owner with an update. This usually takes seven days or less, but may occasionally take longer."
 - [ ] **In progress:** Awaiting Google's review of the Production access application (submitted 2026-07-20; ETA ~7 days or less per Play Console, i.e. by ~2026-07-27). Production track itself still shows **Inactive** on the dashboard until this clears.
-- [ ] Promote to Production and submit for review (typically 1–3 days, after access is granted)
+- [ ] Promote to Production and submit for review (typically 1–3 days, after access is granted) — once granted, promote **versionCode 11 / 1.0.10** (the API 36-targeting build), not the earlier versionCode 10, so the first Production release is already compliant with the Android 16 target SDK requirement below
+- [x] **versionCode 11 / 1.0.10 — built and verified locally (2026-07-21), fixes the Android 16 (API 36) target SDK policy requirement.** See the "Android 16 (API 36) Target SDK Requirement" section above for the full notice, fix, and verification detail (`compileSdk`/`targetSdk` 35 → 36, sanity-installed on a real API 36 emulator, zero crashes).
+  - [ ] **Not yet done:** upload `app-release.aab` to Play Console → Closed Testing (`skyspeak-testers` track) — does not reset the 14-day tester clock (same as versionCode 6→7→8→9→10)
+  - [ ] Confirm in Play Console that the "App must target Android 16" policy issue clears once this build is live on a track

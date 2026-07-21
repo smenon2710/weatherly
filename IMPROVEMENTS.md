@@ -181,6 +181,16 @@ User-reported: two related problems found in the same testing pass — the alert
 
 Both parts verified by re-reading the full diff against each reported symptom and design requirement, then confirmed on-device against a real live case: South Brunswick Township, NJ was actively carrying two simultaneous NWS alerts (a Severe Flood Watch + an Air Quality Alert) at build time. Screenshots taken of the full flow — the compact strip showing two severity dots, tapping through to the `DetailSheet.AlertList` chooser (summary rows for both), and drilling into the Flood Watch's full `AlertDetailContent` (severity badge, urgency/certainty pills, description) — with a clean logcat throughout (no crashes across launch, strip tap, chooser, and detail drill-down). Shipped as versionCode 10 / 1.0.9.
 
+### Completed — Android 16 Target SDK Compliance (2026-07-21)
+
+Play Console's Policy status page flagged a new, separate-from-Production-access issue while the Production access application was still pending review: "App must target Android 16 (API level 36) or higher," action required by 2026-08-31 or the app loses the ability to publish any future update (existing live listings are unaffected).
+
+| # | Title |
+|---|---|
+| B19 | Compliance fix: bumped `compileSdk` 35 → 36 and `targetSdk` 35 → 36 in `app/build.gradle.kts` (`app/build.gradle.kts:23,28`), shipped as versionCode 11 / 1.0.10. Low-risk for this codebase: edge-to-edge — the main behavioral surface API 36 changes — was already handled correctly via `enableEdgeToEdge()` (fixed for the API 35 requirement back in B5), and the app has no NDK/native code, no foreground services, and no other component types affected by Android 16's behavior changes. Verified with the same bar as every prior release: `assembleDebug`/`bundleRelease`/`lint` all `BUILD SUCCESSFUL` under Gradle 9.5.0 + AGP 9.3.0 with the new SDK levels (0 new lint issues, same 33 pre-existing warnings), `jarsigner -verify` on the signed AAB, and — new for this release — sanity-installed on a freshly-booted **API 36 emulator** specifically (`Medium_Phone_API_36.0`), not just an older device/emulator: confirmed `target_sdk_version=36` in `nativeloader` logs, a real forecast loaded with the animated background rendering correctly, navigated Weather → Chat → Settings (Settings correctly showed "Version 1.0.10"), zero `FATAL EXCEPTION`/crashes in logcat throughout |
+
+See the "Android 16 (API 36) Target SDK Requirement" section in `PLAYSTORE_LAUNCH.md` for the full notice text and remaining upload steps.
+
 ### Completed — Design Upgrades (2026-06-30)
 
 | # | Title | Impact |

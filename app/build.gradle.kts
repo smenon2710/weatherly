@@ -20,14 +20,14 @@ val openRouterModel: String =
 
 android {
     namespace = "com.example.weatherly"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.smenon2710.skyspeak"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.9"
+        targetSdk = 36
+        versionCode = 11
+        versionName = "1.0.10"
 
         // Surfaced to code via BuildConfig.OPENROUTER_API_KEY / OPENROUTER_MODEL.
         buildConfigField("String", "OPENROUTER_API_KEY", "\"$openRouterApiKey\"")

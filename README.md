@@ -84,5 +84,5 @@ See `CLAUDE.md` for full architecture details.
 ## Notes
 - Conditions use WMO weather codes (Open-Meteo's format); see `util/WeatherIcon.kt`.
 - Library versions are recent stable picks; bump them if Android Studio suggests.
-- minSdk 26; compileSdk/targetSdk 35.
+- minSdk 26; compileSdk/targetSdk 36.
 - Play Store submission status and checklist: see `PLAYSTORE_LAUNCH.md`.
