@@ -312,8 +312,8 @@ fun WeatherContent(
     // so its color has to be calibrated against that scene rather than the fixed app-wide
     // TextPrimary/TextSecondary tokens — see heroTextColors' doc comment for the on-device
     // legibility bug (Franklin Park, NJ, light mode, Overcast) this fixes.
-    val heroIsDark = remember(data.currentIcon, data.isDay, data.cloudCoverPct, data.visibility, data.visibilityUnit, data.aqi, data.alerts) {
-        heroBackdropIsDark(data.currentIcon, data.isDay, data.cloudCoverPct, data.visibility, data.visibilityUnit, data.aqi, data.alerts)
+    val heroIsDark = remember(data.currentIcon, data.isDay, data.alerts) {
+        heroBackdropIsDark(data.currentIcon, data.isDay, data.alerts)
     }
     val (heroPrimary, heroSecondary) = heroTextColors(heroIsDark)
 

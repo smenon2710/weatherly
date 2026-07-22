@@ -291,29 +291,44 @@ private fun classify(
 }
 
 /**
- * Whether the [WeatherBackground] scene for these inputs renders as a dark backdrop even in light
- * theme — night, thunderstorms, and tornado/hurricane/volcanic-ash overlays are all genuinely dark
- * regardless of the app's own light/dark setting (a thunderstorm doesn't get lighter because the
- * user prefers a light theme). `CurrentHeader`'s hero text needs to know this, since it sits
- * directly on top of this background with no card/scrim behind it — see `heroTextColors` in
- * WeatherComponents.kt for the fix this enables. Reuses the same [classify] used to pick the
- * drawn [Scene], so this can never drift out of sync with what's actually on screen.
+ * Whether the actual rendered hero background — [conditionGradient]'s sky color, plus any dark
+ * overlay [WeatherBackground] layers on top — is dark even in light theme. `CurrentHeader`'s hero
+ * text needs this, since it sits directly on top of that background with no card/scrim behind it
+ * (see `heroTextColors` in WeatherComponents.kt for the fix this enables).
+ *
+ * Deliberately mirrors [conditionGradient]'s own `sky` branch order/ranges rather than reusing
+ * [classify]'s [Scene] selection — an earlier version did reuse `classify`, and it was wrong: found
+ * via a real on-device release-build sanity check at Franklin Park, NJ, at night, Overcast. Night
+ * Overcast classifies as `Scene.OVERCAST` (the codes-2-3 branch in `classify` picks a scene from
+ * `cloudCoverPct` alone, ignoring `isDay` entirely), which wasn't in the old dark set — but
+ * `conditionGradient`'s `sky` *is* gated on `!isDay` for any code not already claimed by the
+ * thunder/snow/rain/fog ranges, so the rendered gradient went dark navy anyway. The mismatch is
+ * real: `classify` and `conditionGradient` are two independent decision trees answering different
+ * questions (which particles to draw vs. which sky color to paint), and a scene can be "not
+ * astronomically night" while still sitting on `conditionGradient`'s night-darkened sky. Pixel-
+ * sampled from the real screenshot: temperature text (`0xFF2B2F36`) measured only ~2.3:1 contrast
+ * against the resulting background (~RGB 93,100,122) — the same class of failure B20 fixed for
+ * Overcast-in-daylight, just not caught by the first pass's Scene-based check.
+ *
+ * Tornado/Hurricane are handled separately via [alerts] (not `code`) since `conditionGradient` has
+ * no alert awareness at all — [WeatherBackground] layers its own dark overlay rect for those scenes
+ * independent of whatever the base gradient computed.
  */
-fun heroBackdropIsDark(
-    code: Int,
-    isDay: Boolean,
-    cloudCoverPct: Int?,
-    visibility: Int?,
-    visibilityUnit: String,
-    aqi: Int?,
-    alerts: List<WeatherAlert>
-): Boolean {
-    val scene = classify(code, isDay, cloudCoverPct, visibility, visibilityUnit, aqi, alerts.map { it.event })
-    return scene in setOf(
-        Scene.CLEAR_NIGHT, Scene.FAIR_NIGHT,
-        Scene.THUNDER, Scene.THUNDER_HAIL,
-        Scene.TORNADO, Scene.HURRICANE, Scene.VOLCANIC_ASH
-    )
+fun heroBackdropIsDark(code: Int, isDay: Boolean, alerts: List<WeatherAlert>): Boolean {
+    if (alerts.any {
+            it.event.contains("Tornado", ignoreCase = true) ||
+                it.event.contains("Hurricane", ignoreCase = true) ||
+                it.event.contains("Tropical Storm", ignoreCase = true)
+        }
+    ) return true
+    return when {
+        code in 95..99 -> true
+        code in 71..86 -> false
+        code in 51..82 -> false
+        code in 45..48 -> false
+        !isDay -> true
+        else -> false
+    }
 }
 
 private enum class RainIntensity(
