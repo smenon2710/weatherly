@@ -290,6 +290,32 @@ private fun classify(
     }
 }
 
+/**
+ * Whether the [WeatherBackground] scene for these inputs renders as a dark backdrop even in light
+ * theme — night, thunderstorms, and tornado/hurricane/volcanic-ash overlays are all genuinely dark
+ * regardless of the app's own light/dark setting (a thunderstorm doesn't get lighter because the
+ * user prefers a light theme). `CurrentHeader`'s hero text needs to know this, since it sits
+ * directly on top of this background with no card/scrim behind it — see `heroTextColors` in
+ * WeatherComponents.kt for the fix this enables. Reuses the same [classify] used to pick the
+ * drawn [Scene], so this can never drift out of sync with what's actually on screen.
+ */
+fun heroBackdropIsDark(
+    code: Int,
+    isDay: Boolean,
+    cloudCoverPct: Int?,
+    visibility: Int?,
+    visibilityUnit: String,
+    aqi: Int?,
+    alerts: List<WeatherAlert>
+): Boolean {
+    val scene = classify(code, isDay, cloudCoverPct, visibility, visibilityUnit, aqi, alerts.map { it.event })
+    return scene in setOf(
+        Scene.CLEAR_NIGHT, Scene.FAIR_NIGHT,
+        Scene.THUNDER, Scene.THUNDER_HAIL,
+        Scene.TORNADO, Scene.HURRICANE, Scene.VOLCANIC_ASH
+    )
+}
+
 private enum class RainIntensity(
     val count: Int,
     val basePxPerSec: Float,

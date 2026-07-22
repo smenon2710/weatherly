@@ -79,6 +79,9 @@ import com.example.weatherly.ui.components.MetricsGrid
 import com.example.weatherly.ui.components.TextPrimary
 import com.example.weatherly.ui.components.TextSecondary
 import com.example.weatherly.ui.components.WeatherBackground
+import com.example.weatherly.ui.components.heroBackdropIsDark
+import com.example.weatherly.ui.components.heroTextColors
+import com.example.weatherly.ui.components.heroWeight
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -305,6 +308,15 @@ fun WeatherContent(
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
 
+    // Hero text sits directly on WeatherBackground's animated scene with no card/scrim behind it,
+    // so its color has to be calibrated against that scene rather than the fixed app-wide
+    // TextPrimary/TextSecondary tokens — see heroTextColors' doc comment for the on-device
+    // legibility bug (Franklin Park, NJ, light mode, Overcast) this fixes.
+    val heroIsDark = remember(data.currentIcon, data.isDay, data.cloudCoverPct, data.visibility, data.visibilityUnit, data.aqi, data.alerts) {
+        heroBackdropIsDark(data.currentIcon, data.isDay, data.cloudCoverPct, data.visibility, data.visibilityUnit, data.aqi, data.alerts)
+    }
+    val (heroPrimary, heroSecondary) = heroTextColors(heroIsDark)
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Full-screen animated scene (rain/snow/fog/clouds/etc., condition + time-of-day driven) —
         // sits behind the entire scrolling content, not just the hero. Cards below are fully
@@ -384,16 +396,18 @@ fun WeatherContent(
                                 modifier = Modifier.weight(1f),
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Two-tone wordmark: "sky" recedes, "speak" steps forward
-                                val skyColor = TextSecondary
-                                val speakColor = TextPrimary
+                                // Two-tone wordmark: "sky" recedes, "speak" steps forward. Uses the
+                                // same hero-calibrated colors as CurrentHeader below, not the raw
+                                // app-wide tokens — it sits on the identical animated backdrop.
+                                val skyColor = heroSecondary
+                                val speakColor = heroPrimary
                                 Text(
                                     buildAnnotatedString {
                                         withStyle(SpanStyle(color = skyColor)) { append("sky") }
                                         withStyle(SpanStyle(color = speakColor)) { append("speak") }
                                     },
                                     fontSize = 20.sp,
-                                    fontWeight = FontWeight.Light,
+                                    fontWeight = heroWeight(FontWeight.Light),
                                     letterSpacing = 5.sp,
                                     maxLines = 1
                                 )
@@ -416,7 +430,7 @@ fun WeatherContent(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        CurrentHeader(data, textColor = TextPrimary, subColor = TextSecondary)
+                        CurrentHeader(data, textColor = heroPrimary, subColor = heroSecondary)
                         Spacer(Modifier.height(20.dp))
                     }
                 }

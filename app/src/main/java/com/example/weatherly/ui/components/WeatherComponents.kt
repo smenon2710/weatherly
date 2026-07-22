@@ -180,6 +180,65 @@ fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
     return listOf(tintedSky, base)
 }
 
+/**
+ * Hero text colors, calibrated against the actual [WeatherBackground] scene behind them rather
+ * than the fixed [TextPrimary]/[TextSecondary] app-wide tokens `CurrentHeader` used to take
+ * directly. Found via an on-device light-mode screenshot at a real location (Franklin Park, NJ,
+ * Overcast) and confirmed by sampling actual rendered pixels, not guessing: two distinct failure
+ * modes, both light-theme-only (dark theme's own sky stops are already recalibrated dark enough —
+ * see `conditionGradient`'s doc comment — that the fixed dark-theme text holds up fine as-is):
+ *
+ * 1. Night/thunder/tornado/hurricane/volcanic-ash skies are deliberately DARK even in light theme
+ *    (weather doesn't get lighter because the user's app theme is light) — measured contrast of
+ *    fixed dark [TextPrimary] against light-mode Thunder's sky (`0xFF3A2F50`) was ~1.1:1,
+ *    effectively invisible.
+ * 2. Overcast/fog/mist/haze skies render as a flat, desaturated near-gray (`OVERCAST`'s gray rect
+ *    blended over the sky gradient measured at RGB ~(193,195,195) in a real screenshot) —
+ *    [TextPrimary] still contrasts fine there (near-black holds up against almost anything light),
+ *    but [TextSecondary] (`onSurfaceVariant`, a mid-gray) measured only ~2.2:1 against it, well
+ *    under WCAG's 4.5:1 floor for body text — a gray-on-gray problem, not a "too dark" one.
+ *
+ * On a light backdrop (the common case), [TextPrimary] is unchanged; the secondary tone borrows
+ * `0xFF3F5670` — the same slate-blue "ink" [tipColors]'s RAIN tone and `drawRain`'s light-mode ink
+ * already use elsewhere in this app — rather than inventing a new color, and measures ~4.3–5.6:1
+ * across the light-scene range (worst case Overcast's near-gray, best case a saturated pastel like
+ * Snow). On a dark backdrop, both colors borrow the dark theme's own `onBackground`/
+ * `onSurfaceVariant` pair verbatim — already calibrated for exactly this contrast requirement,
+ * confirmed at ~4.3–12:1 against Thunder's and Night's dark skies.
+ */
+@Composable
+fun heroTextColors(heroBackdropIsDark: Boolean): Pair<Color, Color> {
+    val isDark = LocalIsDarkTheme.current
+    return when {
+        isDark -> TextPrimary to TextSecondary
+        heroBackdropIsDark -> Color(0xFFE0E6ED) to Color(0xFF8A9BAD)
+        else -> TextPrimary to Color(0xFF3F5670)
+    }
+}
+
+/**
+ * One step heavier than [base], for hero text in light theme only. Dark text on a light
+ * background reads visually thinner at the same nominal weight than light text on a dark
+ * background does — a real optical effect (irradiation: a bright surround makes a dark shape look
+ * smaller/thinner than the identical shape reversed), not a rendering bug — so the hero's already-
+ * light weights (Thin display numeral, Light wordmark, Normal body) read as noticeably "weak" in
+ * light theme even once color contrast is fixed (see `heroTextColors`), while the same weights
+ * look fine in dark theme's light-on-dark rendering. User-reported, confirmed by direct comparison
+ * with dark theme rather than assumed. Dark theme returns [base] unchanged.
+ */
+@Composable
+fun heroWeight(base: FontWeight): FontWeight {
+    if (LocalIsDarkTheme.current) return base
+    return when (base) {
+        FontWeight.Thin -> FontWeight.ExtraLight
+        FontWeight.ExtraLight -> FontWeight.Light
+        FontWeight.Light -> FontWeight.Normal
+        FontWeight.Normal -> FontWeight.Medium
+        FontWeight.Medium -> FontWeight.SemiBold
+        else -> base
+    }
+}
+
 // Soft tinted pill — light pastels in light mode, dark tints with contrasting text in dark mode.
 @Composable
 private fun tipColors(tone: TipTone): Pair<Color, Color> {
@@ -304,7 +363,7 @@ fun CurrentHeader(
             data.locationName.uppercase(),
             color = subColor,
             fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = heroWeight(FontWeight.Medium),
             letterSpacing = 2.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -314,19 +373,19 @@ fun CurrentHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             WeatherGlyph(code = data.currentIcon, isDay = data.isDay, size = 20.dp)
             Spacer(Modifier.width(6.dp))
-            Text(data.condition, color = subColor, fontSize = 15.sp, fontWeight = FontWeight.Normal)
+            Text(data.condition, color = subColor, fontSize = 15.sp, fontWeight = heroWeight(FontWeight.Normal))
         }
         // Temperature — the undisputed hero
-        Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = FontWeight.Thin)
+        Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
         // H/L and feels-like as compact secondary info
         Text(
             "H:${data.highTodayC}°  ·  L:${data.lowTodayC}°",
             color = subColor,
             fontSize = 15.sp,
-            fontWeight = FontWeight.Normal
+            fontWeight = heroWeight(FontWeight.Normal)
         )
         data.realFeelC?.let {
-            Text("Feels like $it°", color = subColor, fontSize = 13.sp, fontWeight = FontWeight.Normal)
+            Text("Feels like $it°", color = subColor, fontSize = 13.sp, fontWeight = heroWeight(FontWeight.Normal))
         }
         (data.headline ?: data.comparedToYesterday)?.let {
             Spacer(Modifier.height(10.dp))
@@ -336,7 +395,7 @@ fun CurrentHeader(
                     .background(textColor.copy(alpha = 0.10f))
                     .padding(horizontal = 12.dp, vertical = 5.dp)
             ) {
-                Text(it, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Normal)
+                Text(it, color = textColor, fontSize = 12.sp, fontWeight = heroWeight(FontWeight.Normal))
             }
         }
     }
