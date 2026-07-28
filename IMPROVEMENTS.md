@@ -237,6 +237,14 @@ Play Console's **Monitor and improve → Android vitals → Overview** surfaced 
 
 **Not yet done:** none of V1–V5 have been implemented as code changes — this section is the investigation and fix plan only, written up before touching any dependency versions so the reasoning is on record. Bundling all five into one dependency-refresh release makes sense given the shared root cause for V1–V4; V5 needs its own confirmed-correct fix rather than being bundled in on a guess. Whenever this ships, it'll be the first post-launch update to a **live Production app**, so the same discipline the launch releases used (`assembleDebug`/`bundleRelease`/`lint` clean, `jarsigner -verify`, a real on-device sanity install navigating all three screens with a clean logcat) still applies — arguably more so now that real users, not just closed testers, are on the other end of a bad release.
 
+### Completed — Store Listing Content Fix (2026-07-27)
+
+Found while spot-checking the live Play Store listing right after the Production launch, using the actual copy pasted back from the live page rather than assuming Console matched this repo's drafted content.
+
+| # | Title |
+|---|---|
+| B23 | Content bug, found via direct comparison of the live listing text against `PLAYSTORE_LAUNCH.md`'s drafted description: the Store listing's full description ("About this app") was stale by two shipped features. It still described "Live precipitation radar with play/pause and a frame scrubber" and OpenStreetMap/RainViewer attribution — the entire radar feature was removed from the app on 2026-07-17 (see "Completed — Radar Removed, Animated Weather Background" above), so a prospective user reading the live listing would expect a feature that doesn't exist. It also still described the old static per-condition hero gradient rather than the full-screen animated `WeatherBackground` that replaced it the same day, and omitted both the NWS severe-weather-alerts feature (shipped 2026-07-16) and the rain-vs-snow accuracy work entirely. Root cause: the corrected description was drafted in `PLAYSTORE_LAUNCH.md` back on 2026-07-17 but the Console-side paste was tracked as an open checklist item that never got done before Production launch — Console holds its own independent copy of the listing text, so editing this file alone was never going to fix it. Fixed by pasting the corrected description (already-drafted, unchanged) into Play Console → Store presence → Main store listing and submitting for review. Screenshot count on the live listing was confirmed correct (5, matching `store_assets/`); individual screenshot content wasn't independently re-verified. The Data Safety summary card on the live listing showed only "Location" and not chat data — not confirmed as an actual form gap vs. an abbreviated public-facing summary view; flagged for a direct check next time the Data Safety form is open in Console |
+
 ### Completed — Design Upgrades (2026-06-30)
 
 | # | Title | Impact |
