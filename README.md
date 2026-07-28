@@ -2,6 +2,8 @@
 
 *(formerly Weatherly — the repo and Kotlin package name still say `weatherly`)*
 
+[<img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=io.github.smenon2710.skyspeak)
+
 A clean, ad-free weather app for Pixel (and any Android phone), built with
 Kotlin + Jetpack Compose. Weather data comes from **Open-Meteo** — free for
 non-commercial use, no API key, no sign-up.
