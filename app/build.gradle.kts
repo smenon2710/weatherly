@@ -26,8 +26,8 @@ android {
         applicationId = "io.github.smenon2710.skyspeak"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.0.10"
+        versionCode = 12
+        versionName = "1.0.11"
 
         // Surfaced to code via BuildConfig.OPENROUTER_API_KEY / OPENROUTER_MODEL.
         buildConfigField("String", "OPENROUTER_API_KEY", "\"$openRouterApiKey\"")
@@ -76,7 +76,7 @@ android {
 
 dependencies {
     // Compose (versions managed by the BOM)
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -85,10 +85,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
@@ -105,7 +105,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 
     // Location (FusedLocationProvider)
-    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.android.gms:play-services-location:21.4.0")
 
     // Home-screen widget (Jetpack Glance)
     implementation("androidx.glance:glance-appwidget:1.1.1")
