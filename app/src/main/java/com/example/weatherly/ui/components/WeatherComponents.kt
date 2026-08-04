@@ -70,7 +70,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.PathEffect
@@ -100,6 +99,7 @@ import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.ui.theme.LocalIsDarkTheme
 import com.example.weatherly.util.MoonCalculator
+import com.example.weatherly.util.skyColor
 
 // --- Colours resolved from the active Material 3 colour scheme ---
 val AppBackground: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -142,42 +142,24 @@ private fun toCelsius(v: Int, metric: Boolean): Int =
  * Returns a two-stop vertical gradient: a sky tone for the weather condition
  * at top, fading to the app background at the bottom so the hero section
  * blends seamlessly into the card area below.
+ *
+ * Dark-mode stops are deliberately lighter/more saturated than a naive "darken the light color"
+ * pass would produce. The background itself is already a deep navy (#0F1923), so the original
+ * dark stops here (mostly within a few RGB steps of the background) rendered the hero as a flat,
+ * nearly gradient-less navy rectangle for every condition except thunder and clear-night —
+ * losing the "shifts with the sky" identity that reads clearly in light mode. Each stop keeps
+ * light mode's hue family but is recalibrated for a visible lift off the background, same as
+ * light mode's stops are clearly lifted off the cream background.
+ *
+ * The sky-color selection itself lives in [com.example.weatherly.util.skyColor] — a plain,
+ * non-@Composable function — so the home-screen widget (Glance, no MaterialTheme) can share the
+ * exact same WMO-code thresholds and calibration instead of maintaining a second copy.
  */
 @Composable
 fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
     val isDark = LocalIsDarkTheme.current
     val base = MaterialTheme.colorScheme.background
-    // Dark-mode stops are deliberately lighter/more saturated than a naive "darken the light
-    // color" pass would produce. The background itself is already a deep navy (#0F1923), so the
-    // original dark stops here (mostly within a few RGB steps of the background) rendered the
-    // hero as a flat, nearly gradient-less navy rectangle for every condition except thunder and
-    // clear-night — losing the "shifts with the sky" identity that reads clearly in light mode.
-    // Each stop keeps light mode's hue family but is recalibrated for a visible lift off the
-    // background, same as light mode's stops are clearly lifted off the cream background.
-    val sky = when {
-        code in 95..99 ->
-            if (isDark) Color(0xFF241A3D) else Color(0xFF3A2F50)
-        code in 71..86 ->
-            if (isDark) Color(0xFF283C52) else Color(0xFFD0E0EE)
-        code in 51..82 ->
-            if (isDark) Color(0xFF1C3348) else Color(0xFFBFD4E6)
-        code in 45..48 ->
-            if (isDark) Color(0xFF283038) else Color(0xFFCDD3D8)
-        !isDay ->
-            if (isDark) Color(0xFF04091A) else Color(0xFF1A2448)
-        code <= 2 ->
-            if (isDark) Color(0xFF16324E) else Color(0xFFB8D8F0)
-        else ->
-            if (isDark) Color(0xFF212E3A) else Color(0xFFC8D2DC)
-    }
-    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val tintedSky = when (hour) {
-        in 5..6   -> lerp(sky, Color(0xFFE8936A), 0.18f)  // dawn — warm apricot
-        in 17..18 -> lerp(sky, Color(0xFFD4A44C), 0.15f)  // golden hour — amber
-        in 19..20 -> lerp(sky, Color(0xFFA0668A), 0.20f)  // dusk — dusty violet
-        else      -> sky
-    }
-    return listOf(tintedSky, base)
+    return listOf(skyColor(code, isDay, isDark), base)
 }
 
 /**

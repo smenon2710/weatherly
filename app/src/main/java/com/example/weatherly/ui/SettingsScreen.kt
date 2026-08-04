@@ -78,6 +78,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val hasKey by settingsViewModel.hasOpenRouterKey.collectAsStateWithLifecycle()
     val storedModel by settingsViewModel.openRouterModel.collectAsStateWithLifecycle()
+    val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
 
     // The key field never holds the stored secret — only whatever new value the
     // user is about to save. See SettingsViewModel for why.
@@ -172,6 +173,36 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Widget Background")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OptionPill(
+                            label = "Opaque",
+                            icon = null,
+                            selected = !widgetTransparent,
+                            onClick = { settingsViewModel.setWidgetTransparent(false) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OptionPill(
+                            label = "Transparent",
+                            icon = null,
+                            selected = widgetTransparent,
+                            onClick = { settingsViewModel.setWidgetTransparent(true) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Transparent lets your wallpaper show through the widget. Text may be " +
+                            "harder to read against busy wallpapers.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
                 }
             }
 

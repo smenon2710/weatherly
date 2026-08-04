@@ -112,7 +112,10 @@ data class HourEntry(
     val tempC: Int,
     val icon: Int,
     val isDay: Boolean,
-    val precipChance: Int?
+    val precipChance: Int?,
+    // Defaults to tempC so existing call sites (Previews.kt) that predate this field still
+    // compile with a reasonable placeholder — WeatherRepository always passes the real value.
+    val feelsLikeC: Int = tempC
 )
 
 data class DayEntry(

@@ -26,8 +26,8 @@ android {
         applicationId = "io.github.smenon2710.skyspeak"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.0.11"
+        versionCode = 13
+        versionName = "1.0.12"
 
         // Surfaced to code via BuildConfig.OPENROUTER_API_KEY / OPENROUTER_MODEL.
         buildConfigField("String", "OPENROUTER_API_KEY", "\"$openRouterApiKey\"")
@@ -56,6 +56,14 @@ android {
             )
             ndk {
                 debugSymbolLevel = "FULL"
+            }
+            // AGP 9.3+ optimization DSL — enables both code optimization and optimized resource
+            // shrinking. Confirmed via a real clean bundleRelease that this coexists fine
+            // alongside the legacy isMinifyEnabled/isShrinkResources/proguardFiles lines above
+            // (kept for now rather than migrating keep rules to src/release/keepRules/*.keep —
+            // lower-risk, pure addition).
+            optimization {
+                enable = true
             }
         }
     }
@@ -89,6 +97,15 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+
+    // Direct pin, not a dependency this app uses directly (no Fragment usage anywhere, 100%
+    // Compose): com.google.android.gms:play-services-base/-basement (transitives of
+    // play-services-location below) pin androidx.fragment:fragment:1.1.0 internally regardless
+    // of which play-services-location version is used — confirmed via
+    // `gradle dependencyInsight --dependency androidx.fragment:fragment`. Forcing Gradle's
+    // conflict resolution to a newer version here is what actually clears Play Console's
+    // "outdated SDK version of androidx.fragment:fragment" vitals finding.
+    implementation("androidx.fragment:fragment:1.8.9")
 
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

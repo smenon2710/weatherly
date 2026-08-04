@@ -43,13 +43,13 @@ fun WeatherGlyph(
     }
 }
 
-private enum class Glyph {
+internal enum class Glyph {
     SUN, MOON, CLOUD_SUN, CLOUD_MOON, CLOUD, FOG,
     RAIN, SNOW, THUNDER,
     MOON_RAIN, MOON_SNOW, MOON_THUNDER
 }
 
-private fun glyphFor(code: Int, isDay: Boolean): Glyph = when (code) {
+internal fun glyphFor(code: Int, isDay: Boolean): Glyph = when (code) {
     0          -> if (isDay) Glyph.SUN        else Glyph.MOON
     1, 2       -> if (isDay) Glyph.CLOUD_SUN  else Glyph.CLOUD_MOON
     3          -> Glyph.CLOUD
@@ -66,34 +66,62 @@ private fun glyphFor(code: Int, isDay: Boolean): Glyph = when (code) {
     else       -> Glyph.CLOUD
 }
 
-private val SunColor = Color(0xFFE0B15C)
-private val MoonColor = Color(0xFF93A1B8)
-private val CloudColor = Color(0xFFAAB5C0)
-private val RainColor = Color(0xFF7F97AD)
-private val SnowColor = Color(0xFFA9B6C2)
-private val BoltColor = Color(0xFFE0B15C)
-private val FogColor = Color(0xFFB3BCC6)
+/** Color set for [drawWeather] — lets a caller swap the whole palette without duplicating the
+ * shape-composition logic per glyph. [MutedGlyphColors] is this app's own in-screen palette
+ * (unchanged, still the default); [VividGlyphColors] is a more saturated set for the home-screen
+ * widget only (user-requested, referencing another weather app's widget) — the in-app icon
+ * palette is a deliberate, separate design choice (soft/muted "so they sit calmly on warm
+ * off-white surfaces") and isn't being changed. */
+internal data class GlyphColors(
+    val sun: Color,
+    val moon: Color,
+    val cloud: Color,
+    val rain: Color,
+    val snow: Color,
+    val bolt: Color,
+    val fog: Color,
+)
 
-private fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float) {
+internal val MutedGlyphColors = GlyphColors(
+    sun = Color(0xFFE0B15C),
+    moon = Color(0xFF93A1B8),
+    cloud = Color(0xFFAAB5C0),
+    rain = Color(0xFF7F97AD),
+    snow = Color(0xFFA9B6C2),
+    bolt = Color(0xFFE0B15C),
+    fog = Color(0xFFB3BCC6),
+)
+
+internal val VividGlyphColors = GlyphColors(
+    sun = Color(0xFFFFA726),
+    moon = Color(0xFF9575CD),
+    cloud = Color(0xFFECEFF1),
+    rain = Color(0xFF42A5F5),
+    snow = Color(0xFF81D4FA),
+    bolt = Color(0xFFFFC107),
+    fog = Color(0xFFCFD8DC),
+)
+
+internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: GlyphColors = MutedGlyphColors) {
     when (glyph) {
-        Glyph.SUN        -> drawSun(c, dim * 0.19f, SunColor)
-        Glyph.MOON       -> drawMoon(c, dim * 0.30f, MoonColor)
-        Glyph.CLOUD      -> drawCloud(Offset(c.x, c.y + dim * 0.04f), dim * 0.82f, CloudColor)
+        Glyph.SUN        -> drawSun(c, dim * 0.19f, colors.sun)
+        Glyph.MOON       -> drawMoon(c, dim * 0.30f, colors.moon)
+        Glyph.CLOUD      -> drawCloud(Offset(c.x, c.y + dim * 0.04f), dim * 0.82f, colors.cloud)
         Glyph.CLOUD_SUN  -> {
-            drawSun(Offset(c.x - dim * 0.20f, c.y - dim * 0.22f), dim * 0.12f, SunColor)
-            drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, CloudColor)
+            drawSun(Offset(c.x - dim * 0.20f, c.y - dim * 0.22f), dim * 0.12f, colors.sun)
+            drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, colors.cloud)
         }
         Glyph.CLOUD_MOON -> {
-            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.20f), dim * 0.15f, MoonColor)
-            drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, CloudColor)
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.20f), dim * 0.15f, colors.moon)
+            drawCloud(Offset(c.x + dim * 0.05f, c.y + dim * 0.08f), dim * 0.72f, colors.cloud)
         }
         Glyph.FOG -> {
-            drawCloud(Offset(c.x, c.y - dim * 0.10f), dim * 0.78f, FogColor)
+            drawCloud(Offset(c.x, c.y - dim * 0.10f), dim * 0.78f, colors.fog)
             val w = dim * 0.30f
             val sw = dim * 0.05f
             listOf(0.20f to 0.0f, 0.30f to 0.08f, 0.40f to -0.04f).forEach { (yf, xf) ->
                 drawLine(
-                    FogColor,
+                    colors.fog,
                     Offset(c.x - w + xf * dim, c.y + dim * yf),
                     Offset(c.x + w + xf * dim, c.y + dim * yf),
                     strokeWidth = sw, cap = StrokeCap.Round
@@ -101,45 +129,45 @@ private fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float) {
             }
         }
         Glyph.RAIN -> {
-            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, CloudColor)
+            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
             val sw = dim * 0.055f
             listOf(-0.22f, 0f, 0.22f).forEach { xf ->
                 val x = c.x + xf * dim
-                drawLine(RainColor, Offset(x + dim * 0.04f, c.y + dim * 0.20f),
+                drawLine(colors.rain, Offset(x + dim * 0.04f, c.y + dim * 0.20f),
                     Offset(x - dim * 0.02f, c.y + dim * 0.36f), strokeWidth = sw, cap = StrokeCap.Round)
             }
         }
         Glyph.SNOW -> {
-            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, CloudColor)
+            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
             listOf(-0.22f, 0f, 0.22f).forEach { xf ->
-                drawCircle(SnowColor, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.28f))
+                drawCircle(colors.snow, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.28f))
             }
         }
         Glyph.THUNDER -> {
-            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, CloudColor)
-            drawBolt(c, dim)
+            drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
+            drawBolt(c, dim, colors.bolt)
         }
         Glyph.MOON_RAIN -> {
-            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
-            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
             val sw = dim * 0.055f
             listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
                 val x = c.x + xf * dim
-                drawLine(RainColor, Offset(x + dim * 0.04f, c.y + dim * 0.16f),
+                drawLine(colors.rain, Offset(x + dim * 0.04f, c.y + dim * 0.16f),
                     Offset(x - dim * 0.02f, c.y + dim * 0.32f), strokeWidth = sw, cap = StrokeCap.Round)
             }
         }
         Glyph.MOON_SNOW -> {
-            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
-            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
             listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
-                drawCircle(SnowColor, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.22f))
+                drawCircle(colors.snow, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.22f))
             }
         }
         Glyph.MOON_THUNDER -> {
-            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, MoonColor)
-            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, CloudColor)
-            drawBolt(c, dim)
+            drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
+            drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
+            drawBolt(c, dim, colors.bolt)
         }
     }
 }
@@ -175,7 +203,7 @@ private fun DrawScope.drawMoon(c: Offset, r: Float, col: Color) {
     drawPath(crescent, col)
 }
 
-private fun DrawScope.drawBolt(c: Offset, dim: Float) {
+private fun DrawScope.drawBolt(c: Offset, dim: Float, color: Color) {
     val bolt = Path().apply {
         moveTo(c.x + dim * 0.04f, c.y + dim * 0.12f)
         lineTo(c.x - dim * 0.12f, c.y + dim * 0.30f)
@@ -185,7 +213,7 @@ private fun DrawScope.drawBolt(c: Offset, dim: Float) {
         lineTo(c.x + dim * 0.02f, c.y + dim * 0.22f)
         close()
     }
-    drawPath(bolt, BoltColor)
+    drawPath(bolt, color)
 }
 
 private fun DrawScope.drawCloud(c: Offset, w: Float, color: Color) {

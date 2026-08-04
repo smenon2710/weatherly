@@ -148,7 +148,9 @@ class WeatherRepository(private val context: Context) {
                 tempC = r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0,
                 icon = r.hourly?.weatherCode?.getOrNull(i) ?: 0,
                 isDay = isHourDay,
-                precipChance = r.hourly?.precipitationProbability?.getOrNull(i)
+                precipChance = r.hourly?.precipitationProbability?.getOrNull(i),
+                feelsLikeC = r.hourly?.apparentTemperature?.getOrNull(i)?.roundToInt()
+                    ?: (r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0)
             )
         }
         val hourlyUv = window.map { (r.hourly?.uvIndex?.getOrNull(it) ?: 0.0).roundToInt() }

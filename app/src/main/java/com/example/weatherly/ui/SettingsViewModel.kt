@@ -1,12 +1,16 @@
 package com.example.weatherly.ui
 
 import android.app.Application
+import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.weatherly.BuildConfig
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.widget.WeatherWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -39,5 +43,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun saveOpenRouterModel(model: String) {
         prefs.setOpenRouterModel(model)
         _openRouterModel.value = prefs.getOpenRouterModel(BuildConfig.OPENROUTER_MODEL)
+    }
+
+    private val _widgetTransparent = MutableStateFlow(prefs.getWidgetTransparent())
+    val widgetTransparent: StateFlow<Boolean> = _widgetTransparent.asStateFlow()
+
+    fun setWidgetTransparent(transparent: Boolean) {
+        prefs.setWidgetTransparent(transparent)
+        _widgetTransparent.value = transparent
+        // Refresh immediately so the change is visible without waiting for the next
+        // system-scheduled widget update.
+        viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
     }
 }

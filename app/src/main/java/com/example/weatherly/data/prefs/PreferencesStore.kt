@@ -105,6 +105,17 @@ class PreferencesStore(context: Context) {
         prefs.edit().putString(KEY_THEME, preference.name).apply()
     }
 
+    // --- Widget ---------------------------------------------------------------
+    /** Whether the home-screen widget's background renders translucent instead of opaque.
+     * Defaults to opaque (false) — matches the app's existing card design (GlassCard is always
+     * opaque; a translucent in-app card fill was tried and reverted, see WeatherBackground's
+     * doc comment) and doesn't change existing widgets' appearance unless the user opts in. */
+    fun getWidgetTransparent(): Boolean = prefs.getBoolean(KEY_WIDGET_TRANSPARENT, false)
+
+    fun setWidgetTransparent(transparent: Boolean) {
+        prefs.edit().putBoolean(KEY_WIDGET_TRANSPARENT, transparent).apply()
+    }
+
     companion object {
         private const val KEY_UNITS = "units"
         private const val KEY_PLACES = "places"
@@ -113,5 +124,6 @@ class PreferencesStore(context: Context) {
         private const val KEY_OR_MODEL = "openrouter_model"
         private const val KEY_THEME = "theme_preference"
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
+        private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
     }
 }
