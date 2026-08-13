@@ -64,12 +64,36 @@ import java.util.Calendar
 // XLARGE plus centering content within the actual frame (see WidgetContent below) narrows that
 // gap rather than eliminating it outright — Glance has no way to report the true host size back
 // to Responsive-mode content.
-private val SMALL  = DpSize(110.dp,  50.dp)  // 2×1: temp + emoji only
-private val MEDIUM = DpSize(110.dp, 110.dp)  // 2×2: chrono-dynamic vertical stack
-private val TALL   = DpSize(110.dp, 220.dp)  // 2×4-ish: MEDIUM content + a vertical mini hourly list
-private val WIDE   = DpSize(250.dp,  50.dp)  // 4×1: current + upcoming hourly strip
-private val LARGE  = DpSize(250.dp, 110.dp)  // 4×2: header + full hourly strip
-private val XLARGE = DpSize(300.dp, 250.dp)  // 5×5-ish: header + alert + 7-hour strip
+//
+// MARGIN exists because Responsive matching turned out to need real headroom, not just an exact
+// or greater-or-equal fit: confirmed via the widget QA harness (see IMPROVEMENTS.md) that a real
+// host frame sized to a breakpoint's exact nominal dp value — even a fraction of a dp *larger*
+// after ruling out simple px-rounding — still failed to select that breakpoint and silently
+// rendered the next one down (MEDIUM/TALL/WIDE/LARGE all fell back to SMALL's bare icon+temp
+// layout; XLARGE fell back to LARGE's). This points to Glance/AppWidgetHostView subtracting some
+// system-reserved inset (corner radius / launcher margin) from the reported size before comparing
+// it against declared breakpoints. Shrinking each declared breakpoint below its true target size
+// gives that headroom back. Binary-searched empirically via the QA harness: 8dp was NOT enough
+// (MEDIUM still downgraded to SMALL at a real 110x110dp host); 16dp fixed selection for every
+// tier. SMALL is left unshrunk — it's the floor of the declared set (Responsive always falls back
+// to it), so there's nothing for it to downgrade to.
+//
+// KNOWN TRADE-OFF, not yet resolved: shrinking the declared breakpoint also shrinks the layout
+// canvas Glance composes that tier's content for (Glance has no way to decouple "match against
+// this size" from "lay out content for this size"). XLARGE had slack in its original design and
+// renders cleanly at the smaller canvas. MEDIUM/TALL/WIDE/LARGE did not — their content, tuned to
+// just fit the original (larger) declared size, now visibly clips at MARGIN=16 (confirmed via the
+// QA harness: cut-off degree symbols, truncated location text, a clipped last hourly row/column).
+// Fixing that needs actual layout tightening inside `MediumWidget`/`TallWidget`/`WideWidget`/
+// `LargeWidget` (smaller fonts and/or tighter spacing) sized for a real MARGIN-dp-smaller canvas,
+// not another constant tweak — deliberately not attempted yet, flagged as the next step instead.
+private const val MARGIN = 16
+private val SMALL  = DpSize(110.dp,        50.dp)        // 2×1: temp + emoji only
+private val MEDIUM = DpSize((110 - MARGIN).dp, (110 - MARGIN).dp)  // 2×2: chrono-dynamic vertical stack
+private val TALL   = DpSize((110 - MARGIN).dp, (220 - MARGIN).dp)  // 2×4-ish: MEDIUM content + a vertical mini hourly list
+private val WIDE   = DpSize((250 - MARGIN).dp,  (50 - MARGIN).dp)  // 4×1: current + upcoming hourly strip
+private val LARGE  = DpSize((250 - MARGIN).dp, (110 - MARGIN).dp)  // 4×2: header + full hourly strip
+private val XLARGE = DpSize((300 - MARGIN).dp, (250 - MARGIN).dp)  // 5×5-ish: header + alert + 7-hour strip
 
 private enum class TimeOfDay { MORNING, DAYTIME, NIGHT }
 
@@ -161,7 +185,7 @@ class WeatherWidget : GlanceAppWidget() {
             val prefs = PreferencesStore(context)
             val units = prefs.getUnitSystem()
             val selected = prefs.getSelected()
-            val repo = WeatherRepository(context)
+            val repo = sharedRepository(context)
             val fresh = if (selected != null) {
                 repo.getWeather(selected.lat, selected.lon, units, placeName = selected.name).getOrNull()
             } else {
@@ -176,6 +200,25 @@ class WeatherWidget : GlanceAppWidget() {
         } catch (e: Exception) {
             LoadedWeather(cached?.first, cachedAt = cached?.second)
         }
+    }
+
+    companion object {
+        // GlanceAppWidget instances are created fresh per update (e.g. every WeatherWidget()
+        // call in WeatherViewModel), so WeatherRepository's 30-minute in-memory cache — an
+        // instance field, see WeatherRepository.kt's `memoryCache` — only helps across calls if
+        // the same repository instance survives them. Held at the class level (not the
+        // GlanceAppWidget instance) so scheduled updates and every onAppWidgetOptionsChanged
+        // (i.e. every resize) within the same process actually hit the cache instead of each
+        // starting a brand-new forecast/air-quality/NWS fetch from scratch — confirmed via the
+        // widget QA harness that this was masking two other bugs: a 25-50s blank-spinner load on
+        // every single update, and options changes racing/restarting an in-flight fetch.
+        @Volatile
+        private var sharedRepo: WeatherRepository? = null
+
+        private fun sharedRepository(context: Context): WeatherRepository =
+            sharedRepo ?: synchronized(this) {
+                sharedRepo ?: WeatherRepository(context.applicationContext).also { sharedRepo = it }
+            }
     }
 }
 
@@ -228,11 +271,16 @@ private fun WidgetContent(loaded: LoadedWeather, c: WColors, transparent: Boolea
     // content stuck in one corner with a blank void elsewhere (B24 in IMPROVEMENTS.md).
     Box(modifier = base, contentAlignment = Alignment.Center) {
         when (LocalSize.current) {
+            // MEDIUM/TALL/WIDE/LARGE's padding is tighter than XLARGE's — those four tiers'
+            // declared canvas is MARGIN dp smaller than the size their content was originally
+            // designed to fill (see the MARGIN comment above), so every dp of padding reclaimed
+            // here is a dp back for content that was otherwise clipping. XLARGE keeps its
+            // original padding — its declared size has slack the others don't.
             XLARGE -> XLargeWidget(GlanceModifier.padding(14.dp), data, loaded.cachedAt, time, c)
-            LARGE  -> LargeWidget(GlanceModifier.padding(12.dp), data, loaded.cachedAt, time, c)
-            WIDE   -> WideWidget(GlanceModifier.padding(horizontal = 12.dp, vertical = 6.dp), data, c)
-            TALL   -> TallWidget(GlanceModifier.padding(12.dp), data, loaded.cachedAt, time, c)
-            MEDIUM -> MediumWidget(GlanceModifier.padding(12.dp), data, time, c)
+            LARGE  -> LargeWidget(GlanceModifier.padding(8.dp), data, loaded.cachedAt, time, c)
+            WIDE   -> WideWidget(GlanceModifier.padding(horizontal = 8.dp, vertical = 2.dp), data, c)
+            TALL   -> TallWidget(GlanceModifier.padding(8.dp), data, loaded.cachedAt, time, c)
+            MEDIUM -> MediumWidget(GlanceModifier.padding(8.dp), data, time, c)
             else   -> SmallWidget(GlanceModifier.padding(8.dp), data, c)
         }
     }
@@ -353,10 +401,10 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
                 maxLines = 1,
             )
             if (data.alerts.isNotEmpty()) {
-                Spacer(GlanceModifier.height(3.dp))
+                Spacer(GlanceModifier.height(2.dp))
                 AlertIndicator(data.alerts, c.isDark, c)
             }
-            Spacer(GlanceModifier.height(6.dp))
+            Spacer(GlanceModifier.height(3.dp))
             when (time) {
                 TimeOfDay.MORNING -> MorningFocus(data, c)
                 TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
@@ -367,29 +415,32 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
     }
 }
 
+// Shared by MediumWidget and TallWidget — tuned to fit MEDIUM's shrunk declared canvas (see
+// MARGIN), the tighter of the two, so both stay clipping-free.
+
 // Morning: today's high + rain chance — plan what to wear
 @Composable
 private fun MorningFocus(data: WeatherData, c: WColors) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        WidgetGlyph(data.currentIcon, data.isDay, 14.dp)
-        Spacer(GlanceModifier.width(4.dp))
+        WidgetGlyph(data.currentIcon, data.isDay, 13.dp)
+        Spacer(GlanceModifier.width(3.dp))
         Text(
             data.condition,
-            style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
+            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
             maxLines = 1,
         )
     }
-    Spacer(GlanceModifier.height(4.dp))
+    Spacer(GlanceModifier.height(2.dp))
     Text(
         "High ${data.highTodayC}°",
-        style = TextStyle(color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold),
+        style = TextStyle(color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold),
     )
     val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
     if (rain > 0) {
-        Spacer(GlanceModifier.height(4.dp))
+        Spacer(GlanceModifier.height(2.dp))
         Text(
             "💧 $rain% chance of rain",
-            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+            style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
         )
     }
 }
@@ -398,46 +449,46 @@ private fun MorningFocus(data: WeatherData, c: WColors) {
 @Composable
 private fun DaytimeFocus(data: WeatherData, c: WColors) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        WidgetGlyph(data.currentIcon, data.isDay, 26.dp)
-        Spacer(GlanceModifier.width(4.dp))
+        WidgetGlyph(data.currentIcon, data.isDay, 22.dp)
+        Spacer(GlanceModifier.width(3.dp))
         Text(
             "${data.currentTempC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 30.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold),
         )
     }
-    Spacer(GlanceModifier.height(2.dp))
+    Spacer(GlanceModifier.height(1.dp))
     Text(
         data.condition,
-        style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
+        style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
         maxLines = 1,
     )
-    Spacer(GlanceModifier.height(4.dp))
+    Spacer(GlanceModifier.height(2.dp))
     Text(
         "H:${data.highTodayC}°  L:${data.lowTodayC}°",
-        style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+        style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
     )
 }
 
 // Night: tomorrow's forecast — wake up informed
 @Composable
 private fun NightFocus(data: WeatherData, c: WColors) {
-    Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 11.sp))
-    Spacer(GlanceModifier.height(6.dp))
+    Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 10.sp))
+    Spacer(GlanceModifier.height(3.dp))
     val tomorrow = data.daily.getOrNull(1)
     if (tomorrow != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetGlyph(tomorrow.icon, true, 14.dp)
-            Spacer(GlanceModifier.width(4.dp))
+            WidgetGlyph(tomorrow.icon, true, 13.dp)
+            Spacer(GlanceModifier.width(3.dp))
             Text(
                 wmoText(tomorrow.icon),
-                style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
+                style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
                 maxLines = 1,
             )
         }
-        Spacer(GlanceModifier.height(4.dp))
+        Spacer(GlanceModifier.height(2.dp))
         Text(
             "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
         )
     }
 }
@@ -471,10 +522,10 @@ private fun TallWidget(
                 maxLines = 1,
             )
             if (data.alerts.isNotEmpty()) {
-                Spacer(GlanceModifier.height(3.dp))
+                Spacer(GlanceModifier.height(2.dp))
                 AlertIndicator(data.alerts, c.isDark, c)
             }
-            Spacer(GlanceModifier.height(6.dp))
+            Spacer(GlanceModifier.height(3.dp))
             when (time) {
                 TimeOfDay.MORNING -> MorningFocus(data, c)
                 TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
@@ -486,7 +537,7 @@ private fun TallWidget(
                 Column(verticalAlignment = Alignment.CenterVertically) {
                     upcoming.forEach { entry ->
                         Row(
-                            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
+                            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 1.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -534,15 +585,15 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
             )
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                WidgetGlyph(data.currentIcon, data.isDay, 16.dp)
-                Spacer(GlanceModifier.width(4.dp))
+                WidgetGlyph(data.currentIcon, data.isDay, 14.dp)
+                Spacer(GlanceModifier.width(3.dp))
                 Text(
                     "${data.currentTempC}°  ·  ${data.locationName}",
-                    style = TextStyle(color = c.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = c.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold),
                     maxLines = 1,
                 )
             }
-            Spacer(GlanceModifier.height(4.dp))
+            Spacer(GlanceModifier.height(1.dp))
             // WIDE is too cramped for both an alert and the hourly line — an active alert is
             // more urgent than routine hourly conditions, so it wins the second line.
             if (data.alerts.isNotEmpty()) {
@@ -563,14 +614,14 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
                             ) {
                                 Text(
                                     entry.hourLabel,
-                                    style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                                    style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
                                 )
                                 Spacer(GlanceModifier.width(2.dp))
-                                WidgetGlyph(entry.icon, entry.isDay, 11.dp)
+                                WidgetGlyph(entry.icon, entry.isDay, 10.dp)
                                 Spacer(GlanceModifier.width(2.dp))
                                 Text(
                                     "${entry.tempC}°",
-                                    style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                                    style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
                                 )
                             }
                         }
@@ -603,7 +654,7 @@ private fun LargeWidget(
         } else {
             if (data.alerts.isNotEmpty()) {
                 AlertIndicator(data.alerts, c.isDark, c)
-                Spacer(GlanceModifier.height(4.dp))
+                Spacer(GlanceModifier.height(2.dp))
             }
             LargeHeader(data, time, c)
             Spacer(GlanceModifier.defaultWeight())
@@ -705,13 +756,13 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                 style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                 maxLines = 1,
             )
-            Spacer(GlanceModifier.height(3.dp))
+            Spacer(GlanceModifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                WidgetGlyph(data.currentIcon, data.isDay, 13.dp)
+                WidgetGlyph(data.currentIcon, data.isDay, 12.dp)
                 Spacer(GlanceModifier.width(3.dp))
                 Text(
                     data.condition,
-                    style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+                    style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                     maxLines = 1,
                 )
             }
@@ -723,24 +774,24 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                 TimeOfDay.MORNING -> {
                     Text(
                         "High ${data.highTodayC}°",
-                        style = TextStyle(color = c.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                        style = TextStyle(color = c.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold),
                     )
                     val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
                     if (rain > 0) {
                         Text(
                             "💧 $rain% rain",
-                            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+                            style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                         )
                     }
                 }
                 TimeOfDay.DAYTIME -> {
                     Text(
                         "${data.currentTempC}°",
-                        style = TextStyle(color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                        style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
                     )
                     Text(
                         "H:${data.highTodayC}°  L:${data.lowTodayC}°",
-                        style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+                        style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                     )
                 }
                 TimeOfDay.NIGHT -> {
@@ -749,7 +800,7 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                     if (tomorrow != null) {
                         Text(
                             "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-                            style = TextStyle(color = c.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                            style = TextStyle(color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold),
                         )
                     }
                 }
@@ -762,11 +813,10 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
 
 @Composable
 private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
-    // Callers already slice to the count that fits their tier (5 for LARGE, 7 for XLARGE).
-    // Columns use defaultWeight() rather than a fixed width so the row always divides the
-    // actual available width evenly, regardless of column count — a fixed 44dp-per-column
-    // width overflowed XLARGE's 7-hour strip (7 * 44dp = 308dp > ~272dp actually available
-    // after padding), clipping the last column(s) against the widget's edge.
+    // Only used by LARGE (XLARGE has its own full-detail HourlyRow list instead). Columns use
+    // defaultWeight() rather than a fixed width so the row always divides the actual available
+    // width evenly regardless of column count — a fixed-width-per-column approach overflowed and
+    // clipped the last column(s) against the widget's edge for any wider column count.
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         hours.forEach { entry ->
             Column(
@@ -778,10 +828,10 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
                     style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
                     maxLines = 1,
                 )
-                WidgetGlyph(entry.icon, entry.isDay, 14.dp)
+                WidgetGlyph(entry.icon, entry.isDay, 12.dp)
                 Text(
                     "${entry.tempC}°",
-                    style = TextStyle(color = c.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = c.textPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold),
                 )
                 val precip = entry.precipChance
                 if (precip != null && precip >= 20) {

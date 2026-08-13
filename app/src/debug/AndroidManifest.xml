@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug-only widget visual QA harness — see WidgetQaActivity's kdoc. Never in release. -->
+        <activity
+            android:name=".widget.WidgetQaActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Weatherly" />
+    </application>
+
+</manifest>

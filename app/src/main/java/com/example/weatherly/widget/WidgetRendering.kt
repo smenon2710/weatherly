@@ -47,8 +47,8 @@ fun renderGlyphBitmap(code: Int, isDay: Boolean, sizePx: Int): Bitmap {
  * Renders a small vertical 2-stop gradient bitmap — [topColor] (the condition's sky tone, from
  * the shared [com.example.weatherly.util.skyColor], same source of truth as the in-app hero) to
  * [bottomColor] (the app's own light/dark background, since Glance has no MaterialTheme to read
- * from) — set as the widget's background via `ImageProvider(bitmap)` with `ContentScale.Crop` so
- * it stretches to whatever the actual widget frame turns out to be. A small bitmap (not a
+ * from) — set as the widget's background via `ImageProvider(bitmap)` with `ContentScale.FillBounds`
+ * so it stretches to whatever the actual widget frame turns out to be. A small bitmap (not a
  * per-pixel-exact one matching the real widget size, which Glance can't report anyway in
  * Responsive mode) is intentional — a vertical gradient scales losslessly.
  */
