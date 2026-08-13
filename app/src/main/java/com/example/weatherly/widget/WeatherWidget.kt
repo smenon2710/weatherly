@@ -19,9 +19,12 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -184,11 +187,15 @@ class WeatherWidget : GlanceAppWidget() {
         return try {
             val prefs = PreferencesStore(context)
             val units = prefs.getUnitSystem()
-            val selected = prefs.getSelected()
             val repo = sharedRepository(context)
-            val fresh = if (selected != null) {
-                repo.getWeather(selected.lat, selected.lon, units, placeName = selected.name).getOrNull()
-            } else {
+            // Deliberately ignores PreferencesStore.getSelected() — the in-app "selected place"
+            // reflects whatever city the user is currently *browsing* in the app (e.g. checking
+            // a different city's forecast), which isn't the same thing as "where I actually am
+            // right now." A home-screen widget is a glance surface, not a navigation state, so it
+            // always resolves to the device's real current location instead of silently mirroring
+            // the app's browsing selection (confirmed as a real, user-reported point of confusion
+            // — the widget kept showing whatever place had last been searched in-app).
+            val fresh = run {
                 val latLon = LocationProvider(context).currentLatLon()
                 if (latLon != null) repo.getWeather(latLon.first, latLon.second, units).getOrNull()
                 else null
@@ -201,26 +208,25 @@ class WeatherWidget : GlanceAppWidget() {
             LoadedWeather(cached?.first, cachedAt = cached?.second)
         }
     }
-
-    companion object {
-        // GlanceAppWidget instances are created fresh per update (e.g. every WeatherWidget()
-        // call in WeatherViewModel), so WeatherRepository's 30-minute in-memory cache — an
-        // instance field, see WeatherRepository.kt's `memoryCache` — only helps across calls if
-        // the same repository instance survives them. Held at the class level (not the
-        // GlanceAppWidget instance) so scheduled updates and every onAppWidgetOptionsChanged
-        // (i.e. every resize) within the same process actually hit the cache instead of each
-        // starting a brand-new forecast/air-quality/NWS fetch from scratch — confirmed via the
-        // widget QA harness that this was masking two other bugs: a 25-50s blank-spinner load on
-        // every single update, and options changes racing/restarting an in-flight fetch.
-        @Volatile
-        private var sharedRepo: WeatherRepository? = null
-
-        private fun sharedRepository(context: Context): WeatherRepository =
-            sharedRepo ?: synchronized(this) {
-                sharedRepo ?: WeatherRepository(context.applicationContext).also { sharedRepo = it }
-            }
-    }
 }
+
+// GlanceAppWidget instances are created fresh per update (e.g. every WeatherWidget() call in
+// WeatherViewModel), so WeatherRepository's 30-minute in-memory cache — an instance field, see
+// WeatherRepository.kt's `memoryCache` — only helps across calls if the same repository instance
+// survives them. Held at file scope (not tied to any single GlanceAppWidget instance) so scheduled
+// updates, every onAppWidgetOptionsChanged (i.e. every resize), and RefreshAction's manual refresh
+// (below) all share one cache instead of each starting a brand-new forecast/air-quality/NWS fetch
+// from scratch — confirmed via the widget QA harness that this was masking two other bugs: a
+// 25-50s blank-spinner load on every single update, and options changes racing/restarting an
+// in-flight fetch.
+private val sharedRepoLock = Any()
+@Volatile
+private var sharedRepo: WeatherRepository? = null
+
+private fun sharedRepository(context: Context): WeatherRepository =
+    sharedRepo ?: synchronized(sharedRepoLock) {
+        sharedRepo ?: WeatherRepository(context.applicationContext).also { sharedRepo = it }
+    }
 
 // ── Root composable ───────────────────────────────────────────────────────────
 
@@ -269,6 +275,14 @@ private fun WidgetContent(loaded: LoadedWeather, c: WColors, transparent: Boolea
     // widget's true on-screen size (see the XLARGE comment above) — centering here means any
     // leftover space around a smaller-than-actual layout reads as balanced padding instead of
     // content stuck in one corner with a blank void elsewhere (B24 in IMPROVEMENTS.md).
+    //
+    // The manual-refresh icon (see RefreshButton below) is NOT placed here as a corner overlay —
+    // an Image (any Image, confirmed even with the already-proven WidgetGlyph) silently fails to
+    // render as a second sibling of a fillMaxSize() child inside a Box, even though a plain
+    // Box+background renders fine in that exact position. Root cause not fully understood (a
+    // RemoteViews/Glance ImageView measurement quirk in that specific nesting shape, most likely)
+    // — worked around by placing RefreshButton inline within each tier's own header row instead,
+    // the same proven pattern every other icon in this file already uses successfully.
     Box(modifier = base, contentAlignment = Alignment.Center) {
         when (LocalSize.current) {
             // MEDIUM/TALL/WIDE/LARGE's padding is tighter than XLARGE's — those four tiers'
@@ -284,6 +298,41 @@ private fun WidgetContent(loaded: LoadedWeather, c: WColors, transparent: Boolea
             else   -> SmallWidget(GlanceModifier.padding(8.dp), data, c)
         }
     }
+}
+
+// ── Manual refresh (shared by every tier except SMALL) ───────────────────────
+
+// System-scheduled updates (android:updatePeriodMillis) run at most every 30 minutes — that's
+// the OS-enforced floor, not something this app controls, so it can't be sped up from the
+// manifest side. This gives an explicit, immediate alternative: tapping the icon forces a real
+// network re-fetch (forceRefresh = true, bypassing WeatherRepository's 30-minute cache) using the
+// same sharedRepository(context) instance loadWeather() reads from, so the result is immediately
+// visible to the normal provideGlance() call that follows.
+class RefreshAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val units = PreferencesStore(context).getUnitSystem()
+        val latLon = LocationProvider(context).currentLatLon()
+        if (latLon != null) {
+            sharedRepository(context).getWeather(latLon.first, latLon.second, units, forceRefresh = true)
+        }
+        WeatherWidget().update(context, glanceId)
+    }
+}
+
+// Deliberately the smallest tappable element in the widget — a plain circular-arrow glyph with no
+// background chip or label, so it reads as a subtle utility affordance rather than competing with
+// the actual weather content for attention. padding() around the small icon widens the real tap
+// target without growing what's visually drawn. Placed inline within each tier's own header row
+// (never as a corner overlay — see the WidgetContent comment above for why that doesn't render).
+@Composable
+private fun RefreshButton(c: WColors) {
+    Text(
+        "↻",
+        style = TextStyle(color = c.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+        modifier = GlanceModifier
+            .padding(horizontal = 4.dp)
+            .clickable(actionRunCallback<RefreshAction>()),
+    )
 }
 
 // ── Alert indicator (shared by MEDIUM/WIDE/LARGE/XLARGE) ─────────────────────
@@ -324,6 +373,20 @@ private fun AlertIndicator(alerts: List<WeatherAlert>, isDark: Boolean, c: WColo
         )
     }
 }
+
+// ── Location name (shortened for the widget's tight width) ───────────────────
+
+// WeatherRepository.reverseGeocode() formats data.locationName as "City, State" (e.g. "Mountain
+// View, California", or a full township + state name that's meaningfully longer). Glance's Text
+// composable has no ellipsize/overflow control at all (confirmed against the library source —
+// maxLines only calls TextView.setMaxLines(), never setEllipsize()), so a real device showed this
+// hard-clipped mid-character rather than nicely truncated with "…" — a real, user-reported bug,
+// not just a cosmetic nicety. Dropping the state/region and showing only the city name is the
+// direct fix given Glance can't ellipsize for us; it keeps the common case short enough to fit
+// every tier that displays it, at the cost of losing the region for same-named cities in
+// different states (an acceptable trade for a glanceable widget over the more detailed in-app
+// screen, which still shows the full name).
+private fun widgetLocationName(name: String): String = name.substringBefore(",").trim().ifBlank { name }
 
 // ── Staleness label (shown when serving cached, not fresh, data) ─────────────
 
@@ -395,11 +458,15 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
             )
         } else {
             Spacer(GlanceModifier.defaultWeight())
-            Text(
-                data.locationName,
-                style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
-                maxLines = 1,
-            )
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    widgetLocationName(data.locationName),
+                    style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+                RefreshButton(c)
+            }
             if (data.alerts.isNotEmpty()) {
                 Spacer(GlanceModifier.height(2.dp))
                 AlertIndicator(data.alerts, c.isDark, c)
@@ -516,11 +583,15 @@ private fun TallWidget(
                 style = TextStyle(color = c.textSecondary, fontSize = 12.sp),
             )
         } else {
-            Text(
-                data.locationName,
-                style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
-                maxLines = 1,
-            )
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    widgetLocationName(data.locationName),
+                    style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+                RefreshButton(c)
+            }
             if (data.alerts.isNotEmpty()) {
                 Spacer(GlanceModifier.height(2.dp))
                 AlertIndicator(data.alerts, c.isDark, c)
@@ -584,14 +655,16 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
                 style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
             )
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 WidgetGlyph(data.currentIcon, data.isDay, 14.dp)
                 Spacer(GlanceModifier.width(3.dp))
                 Text(
-                    "${data.currentTempC}°  ·  ${data.locationName}",
+                    "${data.currentTempC}°  ·  ${widgetLocationName(data.locationName)}",
                     style = TextStyle(color = c.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold),
                     maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight(),
                 )
+                RefreshButton(c)
             }
             Spacer(GlanceModifier.height(1.dp))
             // WIDE is too cramped for both an alert and the hourly line — an active alert is
@@ -752,7 +825,7 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
         // Left: location + current condition (always shown)
         Column(modifier = GlanceModifier.width(116.dp)) {
             Text(
-                data.locationName,
+                widgetLocationName(data.locationName),
                 style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                 maxLines = 1,
             )
@@ -768,43 +841,47 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
             }
         }
         Spacer(GlanceModifier.width(8.dp))
-        // Right: chrono-dynamic key metric
-        Column {
-            when (time) {
-                TimeOfDay.MORNING -> {
-                    Text(
-                        "High ${data.highTodayC}°",
-                        style = TextStyle(color = c.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold),
-                    )
-                    val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
-                    if (rain > 0) {
+        // Right: chrono-dynamic key metric, plus the manual-refresh icon pinned to the far right
+        // via this Row's own defaultWeight() + the inner Column's matching defaultWeight().
+        Row(modifier = GlanceModifier.defaultWeight(), verticalAlignment = Alignment.Top) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                when (time) {
+                    TimeOfDay.MORNING -> {
                         Text(
-                            "💧 $rain% rain",
+                            "High ${data.highTodayC}°",
+                            style = TextStyle(color = c.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold),
+                        )
+                        val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
+                        if (rain > 0) {
+                            Text(
+                                "💧 $rain% rain",
+                                style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                            )
+                        }
+                    }
+                    TimeOfDay.DAYTIME -> {
+                        Text(
+                            "${data.currentTempC}°",
+                            style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                        )
+                        Text(
+                            "H:${data.highTodayC}°  L:${data.lowTodayC}°",
                             style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                         )
                     }
-                }
-                TimeOfDay.DAYTIME -> {
-                    Text(
-                        "${data.currentTempC}°",
-                        style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
-                    )
-                    Text(
-                        "H:${data.highTodayC}°  L:${data.lowTodayC}°",
-                        style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
-                    )
-                }
-                TimeOfDay.NIGHT -> {
-                    val tomorrow = data.daily.getOrNull(1)
-                    Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 10.sp))
-                    if (tomorrow != null) {
-                        Text(
-                            "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-                            style = TextStyle(color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold),
-                        )
+                    TimeOfDay.NIGHT -> {
+                        val tomorrow = data.daily.getOrNull(1)
+                        Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 10.sp))
+                        if (tomorrow != null) {
+                            Text(
+                                "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
+                                style = TextStyle(color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                            )
+                        }
                     }
                 }
             }
+            RefreshButton(c)
         }
     }
 }
