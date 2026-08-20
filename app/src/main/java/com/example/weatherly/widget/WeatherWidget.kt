@@ -473,10 +473,22 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
                 AlertIndicator(data.alerts, c.isDark, c)
             }
             Spacer(GlanceModifier.height(3.dp))
-            when (time) {
-                TimeOfDay.MORNING -> MorningFocus(data, c)
-                TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
-                TimeOfDay.NIGHT   -> NightFocus(data, c)
+            // Wrapped in its own Column (mirrors LargeHeader's already-correct pattern) —
+            // MorningFocus/DaytimeFocus/NightFocus each emit several direct Text/Row/Spacer
+            // elements with no wrapping container of their own, so calling one inline here would
+            // flatten all of them as siblings of everything else in MediumWidget's root Column
+            // instead of counting as one child. DaytimeFocus alone emits 5 elements; combined with
+            // this Column's other conditional children (alert, upcoming-hours block, staleness
+            // label) that flattening was enough to exceed Glance's hard 10-child-per-container cap
+            // on real devices with an active alert, silently truncating content (B29 in
+            // IMPROVEMENTS.md, found investigating the B28 fix's residual "Column container
+            // cannot have more than 10 elements" log line).
+            Column {
+                when (time) {
+                    TimeOfDay.MORNING -> MorningFocus(data, c)
+                    TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
+                    TimeOfDay.NIGHT   -> NightFocus(data, c)
+                }
             }
             Spacer(GlanceModifier.defaultWeight())
         }
@@ -598,10 +610,16 @@ private fun TallWidget(
                 AlertIndicator(data.alerts, c.isDark, c)
             }
             Spacer(GlanceModifier.height(3.dp))
-            when (time) {
-                TimeOfDay.MORNING -> MorningFocus(data, c)
-                TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
-                TimeOfDay.NIGHT   -> NightFocus(data, c)
+            // See the matching comment in MediumWidget — same flattening risk, worse here since
+            // TallWidget's root Column also has the upcoming-hours block and staleness label as
+            // further direct children (measured at 13 total with DaytimeFocus + alert + upcoming
+            // hours active, confirmed via the QA harness against live alert data).
+            Column {
+                when (time) {
+                    TimeOfDay.MORNING -> MorningFocus(data, c)
+                    TimeOfDay.DAYTIME -> DaytimeFocus(data, c)
+                    TimeOfDay.NIGHT   -> NightFocus(data, c)
+                }
             }
             val upcoming = data.hourly.drop(1).take(4)
             if (upcoming.isNotEmpty()) {
