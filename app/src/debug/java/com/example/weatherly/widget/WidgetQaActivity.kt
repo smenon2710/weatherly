@@ -54,6 +54,23 @@ class WidgetQaActivity : Activity() {
         Tier("7_xlarge_oversized_host", 300, 250, 400, 340),
         Tier("8_tall_oversized_host", 110, 220, 140, 340),
         Tier("9_medium_oversized_host", 110, 110, 160, 170),
+        // The TRUE tightest real host each tier can still be matched at — nominal minus MARGIN
+        // (16dp) on both dimensions (see the MARGIN comment above WeatherWidget.kt's breakpoint
+        // consts). Plus binary-search probes across LARGE's real window between "too tight,
+        // downgrades to SMALL" and "comfortable" — this whole window used to render either
+        // visibly clipped (missing hourly temps) or completely blank at some real sizes; fixed by
+        // making HourlyStrip's icon+temp share one line instead of stacking separately
+        // (B28 in IMPROVEMENTS.md, 2026-08-20). Kept here permanently so this real-size gap in
+        // coverage — the original tiers above only test generous or exact-nominal sizes, never
+        // this narrow real window — doesn't silently reopen.
+        Tier("10_medium_tight", 94, 94, 94, 94),
+        Tier("11_tall_tight", 94, 204, 94, 204),
+        Tier("12_wide_tight", 234, 34, 234, 34),
+        Tier("13_large_tight", 234, 94, 234, 94),
+        Tier("14_xlarge_tight", 284, 234, 284, 234),
+        Tier("15_large_probe_a", 240, 98, 240, 98),
+        Tier("16_large_probe_b", 244, 102, 244, 102),
+        Tier("17_large_probe_c", 248, 106, 248, 106),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,7 +125,7 @@ class WidgetQaActivity : Activity() {
         // WeatherRepository across provideGlance() calls — later tiers should hit that repo's
         // 30-minute cache and resolve quickly. A short delay here is deliberate: it's the test
         // for whether the cache-reuse fix actually worked.
-        delay(if (first) 40000 else 6000)
+        delay(if (first) 60000 else 8000)
 
         root.measure(
             View.MeasureSpec.makeMeasureSpec(realWpx, View.MeasureSpec.EXACTLY),

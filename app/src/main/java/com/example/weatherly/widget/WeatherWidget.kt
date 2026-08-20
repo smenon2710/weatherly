@@ -47,6 +47,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.weatherly.MainActivity
 import com.example.weatherly.data.model.AlertSeverity
+import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
@@ -772,11 +773,51 @@ private fun XLargeWidget(
             Column {
                 data.hourly.take(6).forEach { entry -> HourlyRow(entry, c) }
             }
+            // 3-day outlook, added so XLARGE's already-slack nominal canvas (see the MARGIN
+            // comment above) has more real content — not just wider Spacer(defaultWeight())
+            // gaps — for the common case of a user resizing this, the largest tier, even
+            // bigger than its own 300x250dp nominal size. drop(1) skips today (already covered
+            // by the hourly list above).
+            val outlook = data.daily.drop(1).take(3)
+            if (outlook.isNotEmpty()) {
+                Spacer(GlanceModifier.height(6.dp))
+                Column {
+                    outlook.forEach { day -> DailyOutlookRow(day, c) }
+                }
+            }
             Spacer(GlanceModifier.defaultWeight())
             stalenessLabel(cachedAt)?.let {
                 Text(it, style = TextStyle(color = c.textSecondary, fontSize = 9.sp))
             }
         }
+    }
+}
+
+@Composable
+private fun DailyOutlookRow(day: DayEntry, c: WColors) {
+    // Same weighted-spacer overflow-safety pattern as HourlyRow, mirroring the in-app
+    // DailyCard's convention of always using the day-variant glyph for daily rows (no isDay
+    // field exists on DayEntry — see WeatherComponents.kt's DailyCard for the same default).
+    Row(
+        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            day.dayLabel,
+            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+            modifier = GlanceModifier.width(42.dp),
+        )
+        WidgetGlyph(day.icon, isDay = true, 15.dp)
+        Spacer(GlanceModifier.defaultWeight())
+        Text(
+            "${day.lowC}°",
+            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+        )
+        Spacer(GlanceModifier.width(10.dp))
+        Text(
+            "${day.highC}°",
+            style = TextStyle(color = c.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+        )
     }
 }
 
@@ -894,6 +935,12 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
     // defaultWeight() rather than a fixed width so the row always divides the actual available
     // width evenly regardless of column count — a fixed-width-per-column approach overflowed and
     // clipped the last column(s) against the widget's edge for any wider column count.
+    //
+    // Icon and temp share one Row (rather than three separate stacked Text/Image lines) so this
+    // strip needs only ~2 lines of height instead of ~3-4 — LARGE's real available height after
+    // an active alert banner eats into it (94dp usable at a real 250x110dp host, confirmed via the
+    // QA harness) wasn't enough for the old 3-4-line-tall layout, silently clipping the temp line
+    // off the bottom entirely (B28 in IMPROVEMENTS.md — found via real launcher resize testing).
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         hours.forEach { entry ->
             Column(
@@ -905,16 +952,21 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
                     style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
                     maxLines = 1,
                 )
-                WidgetGlyph(entry.icon, entry.isDay, 12.dp)
-                Text(
-                    "${entry.tempC}°",
-                    style = TextStyle(color = c.textPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    WidgetGlyph(entry.icon, entry.isDay, 11.dp)
+                    Spacer(GlanceModifier.width(2.dp))
+                    Text(
+                        "${entry.tempC}°",
+                        style = TextStyle(color = c.textPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                    )
+                }
                 val precip = entry.precipChance
                 if (precip != null && precip >= 20) {
                     Text(
                         "$precip%",
-                        style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
+                        style = TextStyle(color = c.textSecondary, fontSize = 8.sp),
+                        maxLines = 1,
                     )
                 }
             }
