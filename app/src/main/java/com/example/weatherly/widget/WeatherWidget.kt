@@ -47,7 +47,6 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.weatherly.MainActivity
 import com.example.weatherly.data.model.AlertSeverity
-import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
@@ -58,6 +57,7 @@ import com.example.weatherly.location.LocationProvider
 import com.example.weatherly.util.skyColor
 import com.example.weatherly.util.wmoText
 import java.util.Calendar
+import kotlin.math.roundToInt
 
 // ── Size breakpoints ──────────────────────────────────────────────────────────
 // Glance picks the largest size that fits the widget's actual dimensions, but in Responsive
@@ -350,6 +350,41 @@ private fun widgetAlertColor(severity: AlertSeverity, isDark: Boolean): Color = 
         if (isDark) Color(0xFF7FA8C9) else Color(0xFF3F5670)
 }
 
+// ── Temperature color (shared by every hero/list temperature in the widget) ──
+
+// Same 6-bucket cool-to-warm concept as the in-app DailyCard's tempColor() (WeatherComponents.kt),
+// but with its own theme-aware light/dark color pairs per bucket rather than reusing that
+// function's values directly — tempColor() fills a Canvas bar (any lightness reads fine there);
+// here the same hues sit as *text* directly on the widget's own background, so each bucket needs
+// its own light-mode (darker, more saturated) and dark-mode (lighter, more saturated) variant to
+// hold contrast in both — the same isDark-branching pattern widgetAlertColor() already uses just
+// above. User-requested (2026-08-21, found via real-device testing) — every temperature in the
+// widget previously rendered in the same flat textPrimary tone, reading as visually plain for a
+// home-screen widget.
+private fun widgetTempColor(tempC: Int, metric: Boolean, isDark: Boolean): Color {
+    val c = if (metric) tempC else ((tempC - 32) * 5.0 / 9.0).roundToInt()
+    return when {
+        c <= 0 -> if (isDark) Color(0xFF9CC5E8) else Color(0xFF3F6B8C)
+        c <= 8 -> if (isDark) Color(0xFFA8D4DE) else Color(0xFF4A7A87)
+        c <= 15 -> if (isDark) Color(0xFFAEDDA0) else Color(0xFF4F7A45)
+        c <= 22 -> if (isDark) Color(0xFFE8D28A) else Color(0xFF8A7223)
+        c <= 28 -> if (isDark) Color(0xFFE8B98A) else Color(0xFF9C5F23)
+        else -> if (isDark) Color(0xFFE89A9C) else Color(0xFF9C3B3E)
+    }
+}
+
+// Shared hour-label/temperature sizes for every per-hour list entry across all six tiers
+// (HourlyStrip on LARGE, HourlyRow on XLARGE, the upcoming-hours rows on WIDE and TALL) — user-
+// requested (2026-08-21, real-device testing): these previously ranged from 9sp to 13sp depending
+// on which tier happened to render them, sized down ad hoc to fit each tier's own cramped real
+// estate. Fixed to XLARGE's values (the roomiest tier, so the ones that were never fighting for
+// space) rather than scaling per tier, so the same hour/temperature reads at the same size no
+// matter which widget size it's viewed in. Entry counts per tier were re-verified against the
+// larger footprint via the QA harness and trimmed further where needed rather than shrinking the
+// text back down.
+private val HOURLY_TIME_SP = 11.sp
+private val HOURLY_TEMP_SP = 13.sp
+
 @Composable
 private fun AlertIndicator(alerts: List<WeatherAlert>, isDark: Boolean, c: WColors) {
     val top = alerts.firstOrNull() ?: return
@@ -363,11 +398,17 @@ private fun AlertIndicator(alerts: List<WeatherAlert>, isDark: Boolean, c: WColo
         )
         Spacer(GlanceModifier.width(4.dp))
         val label = if (alerts.size > 1) "${top.event} +${alerts.size - 1}" else top.event
+        // 9sp, not 10sp — a small amount of extra height margin for LARGE specifically, whose real
+        // available height is tightest of all the tiers that show both an alert and hourly content
+        // together; found overflowing under MORNING+alert+6-entry-HourlyStrip during the
+        // HOURLY_TIME_SP/HOURLY_TEMP_SP rollout (2026-08-21) but the live NWS alert that reproduced
+        // it had cleared before this specific trim could be re-verified against it directly — kept
+        // as a deliberate safety margin rather than assumed unnecessary.
         Text(
             label,
             style = TextStyle(
                 color = ColorProvider(widgetAlertColor(top.severity, isDark)),
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
             ),
             maxLines = 1,
@@ -436,7 +477,11 @@ private fun SmallWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
                 Spacer(GlanceModifier.width(4.dp))
                 Text(
                     "${data.currentTempC}°",
-                    style = TextStyle(color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(
+                        color = ColorProvider(widgetTempColor(data.currentTempC, data.windUnit == "km/h", c.isDark)),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
                 )
             }
         }
@@ -472,7 +517,7 @@ private fun MediumWidget(mod: GlanceModifier, data: WeatherData?, time: TimeOfDa
                 Spacer(GlanceModifier.height(2.dp))
                 AlertIndicator(data.alerts, c.isDark, c)
             }
-            Spacer(GlanceModifier.height(3.dp))
+            Spacer(GlanceModifier.height(2.dp))
             // Wrapped in its own Column (mirrors LargeHeader's already-correct pattern) —
             // MorningFocus/DaytimeFocus/NightFocus each emit several direct Text/Row/Spacer
             // elements with no wrapping container of their own, so calling one inline here would
@@ -510,17 +555,27 @@ private fun MorningFocus(data: WeatherData, c: WColors) {
             maxLines = 1,
         )
     }
-    Spacer(GlanceModifier.height(2.dp))
+    Spacer(GlanceModifier.height(1.dp))
+    val metric = data.windUnit == "km/h"
     Text(
         "High ${data.highTodayC}°",
-        style = TextStyle(color = c.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold),
+        style = TextStyle(
+            color = ColorProvider(widgetTempColor(data.highTodayC, metric, c.isDark)),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        ),
     )
     val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
     if (rain > 0) {
-        Spacer(GlanceModifier.height(2.dp))
+        Spacer(GlanceModifier.height(1.dp))
+        // Shortened to match LargeHeader's own MORNING-branch copy of this same line ("💧 X% rain")
+        // — this longer wording was wrapping to 2 lines on MEDIUM/TALL's narrow real widths, a real
+        // contributor to content overflowing past the bottom of the widget (found investigating a
+        // real-device report that the "Updated Xm ago" label had disappeared entirely on TALL).
         Text(
-            "💧 $rain% chance of rain",
+            "💧 $rain% rain",
             style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+            maxLines = 1,
         )
     }
 }
@@ -533,7 +588,11 @@ private fun DaytimeFocus(data: WeatherData, c: WColors) {
         Spacer(GlanceModifier.width(3.dp))
         Text(
             "${data.currentTempC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(
+                color = ColorProvider(widgetTempColor(data.currentTempC, data.windUnit == "km/h", c.isDark)),
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+            ),
         )
     }
     Spacer(GlanceModifier.height(1.dp))
@@ -568,7 +627,11 @@ private fun NightFocus(data: WeatherData, c: WColors) {
         Spacer(GlanceModifier.height(2.dp))
         Text(
             "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(
+                color = ColorProvider(widgetTempColor(tomorrow.highC, data.windUnit == "km/h", c.isDark)),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            ),
         )
     }
 }
@@ -621,8 +684,14 @@ private fun TallWidget(
                     TimeOfDay.NIGHT   -> NightFocus(data, c)
                 }
             }
-            val upcoming = data.hourly.drop(1).take(4)
+            // 3 entries, not 4 — even after shortening MorningFocus's rain line (see above), TALL's
+            // real available height at its own nominal size still wasn't quite enough to fit 4
+            // hourly rows AND the staleness label below; confirmed via the QA harness that 3 rows
+            // reliably leaves it visible (real-device report, 2026-08-21: "Updated Xm ago" was
+            // gone entirely, not just cropped).
+            val upcoming = data.hourly.drop(1).take(3)
             if (upcoming.isNotEmpty()) {
+                val metric = data.windUnit == "km/h"
                 Spacer(GlanceModifier.defaultWeight())
                 Column(verticalAlignment = Alignment.CenterVertically) {
                     upcoming.forEach { entry ->
@@ -632,18 +701,20 @@ private fun TallWidget(
                         ) {
                             Text(
                                 entry.hourLabel,
-                                style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
+                                style = TextStyle(color = c.textSecondary, fontSize = HOURLY_TIME_SP),
                                 modifier = GlanceModifier.defaultWeight(),
+                                maxLines = 1,
                             )
                             WidgetGlyph(entry.icon, entry.isDay, 13.dp)
                             Spacer(GlanceModifier.width(6.dp))
                             Text(
                                 "${entry.tempC}°",
                                 style = TextStyle(
-                                    color = c.textPrimary,
-                                    fontSize = 10.sp,
+                                    color = ColorProvider(widgetTempColor(entry.tempC, metric, c.isDark)),
+                                    fontSize = HOURLY_TEMP_SP,
                                     fontWeight = FontWeight.Bold,
                                 ),
+                                maxLines = 1,
                             )
                         }
                     }
@@ -691,8 +762,13 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
             if (data.alerts.isNotEmpty()) {
                 AlertIndicator(data.alerts, c.isDark, c)
             } else {
-                val upcoming = data.hourly.drop(1).take(4)
+                // 3 entries, not 4 — bumping hourLabel/temp to the shared HOURLY_TIME_SP/
+                // HOURLY_TEMP_SP sizes (2026-08-21, real-device request for consistent text sizes
+                // across tiers) needs more width per entry than WIDE's 250dp row can give 4 columns
+                // without crowding; re-verified via the QA harness that 3 fits cleanly.
+                val upcoming = data.hourly.drop(1).take(3)
                 if (upcoming.isNotEmpty()) {
+                    val metric = data.windUnit == "km/h"
                     // Same fix as HourlyStrip: fillMaxWidth() + defaultWeight() per entry so the
                     // row always divides the actual available width, instead of a fixed-spacer
                     // sequence that overflows the card and clips the last entry (confirmed via a
@@ -706,14 +782,20 @@ private fun WideWidget(mod: GlanceModifier, data: WeatherData?, c: WColors) {
                             ) {
                                 Text(
                                     entry.hourLabel,
-                                    style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
+                                    style = TextStyle(color = c.textSecondary, fontSize = HOURLY_TIME_SP),
+                                    maxLines = 1,
                                 )
                                 Spacer(GlanceModifier.width(2.dp))
                                 WidgetGlyph(entry.icon, entry.isDay, 10.dp)
                                 Spacer(GlanceModifier.width(2.dp))
                                 Text(
                                     "${entry.tempC}°",
-                                    style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
+                                    style = TextStyle(
+                                        color = ColorProvider(widgetTempColor(entry.tempC, metric, c.isDark)),
+                                        fontSize = HOURLY_TEMP_SP,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 1,
                                 )
                             }
                         }
@@ -750,7 +832,10 @@ private fun LargeWidget(
             }
             LargeHeader(data, time, c)
             Spacer(GlanceModifier.defaultWeight())
-            HourlyStrip(data.hourly.take(5), c)
+            // 6 entries (not 5) — user-requested (2026-08-21, real-device testing): LARGE has the
+            // width to spare, and 6 divides the row more evenly than leaving a visibly wider gap
+            // on the right with only 5.
+            HourlyStrip(data.hourly.take(6), data.windUnit == "km/h", c)
             Spacer(GlanceModifier.defaultWeight())
             stalenessLabel(cachedAt)?.let {
                 Text(it, style = TextStyle(color = c.textSecondary, fontSize = 8.sp))
@@ -788,21 +873,15 @@ private fun XLargeWidget(
             // precip%) instead of LARGE's compact column strip — referencing another weather
             // app's widget design, user-requested, using this app's own wording ("Feels like",
             // not that app's trademarked term).
+            val metric = data.windUnit == "km/h"
             Column {
-                data.hourly.take(6).forEach { entry -> HourlyRow(entry, c) }
+                data.hourly.take(6).forEach { entry -> HourlyRow(entry, metric, c) }
             }
-            // 3-day outlook, added so XLARGE's already-slack nominal canvas (see the MARGIN
-            // comment above) has more real content — not just wider Spacer(defaultWeight())
-            // gaps — for the common case of a user resizing this, the largest tier, even
-            // bigger than its own 300x250dp nominal size. drop(1) skips today (already covered
-            // by the hourly list above).
-            val outlook = data.daily.drop(1).take(3)
-            if (outlook.isNotEmpty()) {
-                Spacer(GlanceModifier.height(6.dp))
-                Column {
-                    outlook.forEach { day -> DailyOutlookRow(day, c) }
-                }
-            }
+            // The 3-day outlook this section briefly had (added to fill XLARGE's leftover real
+            // estate when resized past its nominal size) was removed at user request (2026-08-21,
+            // real-device testing) — not wanted, and it had also pushed the staleness label below
+            // out of the widget's real available height at ordinary (non-oversized) real sizes,
+            // the same class of clipping bug as B28. Reverting it fixes both at once.
             Spacer(GlanceModifier.defaultWeight())
             stalenessLabel(cachedAt)?.let {
                 Text(it, style = TextStyle(color = c.textSecondary, fontSize = 9.sp))
@@ -812,35 +891,7 @@ private fun XLargeWidget(
 }
 
 @Composable
-private fun DailyOutlookRow(day: DayEntry, c: WColors) {
-    // Same weighted-spacer overflow-safety pattern as HourlyRow, mirroring the in-app
-    // DailyCard's convention of always using the day-variant glyph for daily rows (no isDay
-    // field exists on DayEntry — see WeatherComponents.kt's DailyCard for the same default).
-    Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            day.dayLabel,
-            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
-            modifier = GlanceModifier.width(42.dp),
-        )
-        WidgetGlyph(day.icon, isDay = true, 15.dp)
-        Spacer(GlanceModifier.defaultWeight())
-        Text(
-            "${day.lowC}°",
-            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
-        )
-        Spacer(GlanceModifier.width(10.dp))
-        Text(
-            "${day.highC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold),
-        )
-    }
-}
-
-@Composable
-private fun HourlyRow(entry: HourEntry, c: WColors) {
+private fun HourlyRow(entry: HourEntry, metric: Boolean, c: WColors) {
     // Fixed widths for the short, bounded-length fields (hour label, temp) plus a
     // defaultWeight() spacer to absorb whatever real width XLARGE's actual host has — same
     // overflow-safety reasoning as HourlyStrip's per-column weighting, just horizontal here.
@@ -850,14 +901,18 @@ private fun HourlyRow(entry: HourEntry, c: WColors) {
     ) {
         Text(
             entry.hourLabel,
-            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+            style = TextStyle(color = c.textSecondary, fontSize = HOURLY_TIME_SP),
             modifier = GlanceModifier.width(42.dp),
         )
         WidgetGlyph(entry.icon, entry.isDay, 16.dp)
         Spacer(GlanceModifier.width(6.dp))
         Text(
             "${entry.tempC}°",
-            style = TextStyle(color = c.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(
+                color = ColorProvider(widgetTempColor(entry.tempC, metric, c.isDark)),
+                fontSize = HOURLY_TEMP_SP,
+                fontWeight = FontWeight.Bold,
+            ),
             modifier = GlanceModifier.width(38.dp),
         )
         Spacer(GlanceModifier.defaultWeight())
@@ -903,12 +958,22 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
         // Right: chrono-dynamic key metric, plus the manual-refresh icon pinned to the far right
         // via this Row's own defaultWeight() + the inner Column's matching defaultWeight().
         Row(modifier = GlanceModifier.defaultWeight(), verticalAlignment = Alignment.Top) {
+            val metric = data.windUnit == "km/h"
             Column(modifier = GlanceModifier.defaultWeight()) {
                 when (time) {
                     TimeOfDay.MORNING -> {
+                        // Stepped down from 17sp — LARGE's real available height, with an active
+                        // alert and the now-larger 6-entry HourlyStrip (HOURLY_TIME_SP/
+                        // HOURLY_TEMP_SP, 2026-08-21) both competing for room, no longer had
+                        // enough left over for the hero at its old size; the hourly text itself was
+                        // the one explicitly asked to stay large, so this (not that) is what gives.
                         Text(
                             "High ${data.highTodayC}°",
-                            style = TextStyle(color = c.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold),
+                            style = TextStyle(
+                                color = ColorProvider(widgetTempColor(data.highTodayC, metric, c.isDark)),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
                         )
                         val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
                         if (rain > 0) {
@@ -921,7 +986,11 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                     TimeOfDay.DAYTIME -> {
                         Text(
                             "${data.currentTempC}°",
-                            style = TextStyle(color = c.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                            style = TextStyle(
+                                color = ColorProvider(widgetTempColor(data.currentTempC, metric, c.isDark)),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
                         )
                         Text(
                             "H:${data.highTodayC}°  L:${data.lowTodayC}°",
@@ -934,7 +1003,11 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                         if (tomorrow != null) {
                             Text(
                                 "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-                                style = TextStyle(color = c.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                                style = TextStyle(
+                                    color = ColorProvider(widgetTempColor(tomorrow.highC, metric, c.isDark)),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
                             )
                         }
                     }
@@ -948,7 +1021,7 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
 // ── Shared hourly strip ───────────────────────────────────────────────────────
 
 @Composable
-private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
+private fun HourlyStrip(hours: List<HourEntry>, metric: Boolean, c: WColors) {
     // Only used by LARGE (XLARGE has its own full-detail HourlyRow list instead). Columns use
     // defaultWeight() rather than a fixed width so the row always divides the actual available
     // width evenly regardless of column count — a fixed-width-per-column approach overflowed and
@@ -967,7 +1040,7 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
             ) {
                 Text(
                     entry.hourLabel,
-                    style = TextStyle(color = c.textSecondary, fontSize = 9.sp),
+                    style = TextStyle(color = c.textSecondary, fontSize = HOURLY_TIME_SP),
                     maxLines = 1,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -975,7 +1048,11 @@ private fun HourlyStrip(hours: List<HourEntry>, c: WColors) {
                     Spacer(GlanceModifier.width(2.dp))
                     Text(
                         "${entry.tempC}°",
-                        style = TextStyle(color = c.textPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                        style = TextStyle(
+                            color = ColorProvider(widgetTempColor(entry.tempC, metric, c.isDark)),
+                            fontSize = HOURLY_TEMP_SP,
+                            fontWeight = FontWeight.Bold,
+                        ),
                         maxLines = 1,
                     )
                 }
