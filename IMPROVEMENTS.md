@@ -1429,3 +1429,30 @@ Average weather app session: **60–90 seconds, 3–5 sessions/day.** Sessions a
 The AI's job is the **weekly planning query**: *"What's the best day for a BBQ this week?"*, *"I'm hiking Saturday — what gear do I need?"* These require multi-day synthesis and personal context that no chart can answer. The name "SkySpeak" makes AI load-bearing to the brand — removing it would create a bigger problem than keeping it.
 
 **One fix needed before ship:** `ChatViewModel.hasKey` is defined but `ChatScreen` never checks it. A user with no API key hits a dead chat input with no explanation. Fix this as part of D4 (empty state) or item 25 (key-entry settings UI).
+
+---
+
+## AI Chat — Keep, but Tighten LLM Usage + Add Guardrails (2026-08-24)
+
+**Decision:** AI chat stays (not removing it — reaffirms the Strategic Note above). Direction going forward: route as little as possible through the actual LLM call, and put explicit guardrails around the calls that do happen. Not yet implemented — this is the agreed direction, logged for a future session to build.
+
+### Local-first routing (minimize LLM calls)
+
+**Current state:** the six quick-suggestion chips (umbrella, jacket, walk/jog, driving, hiking, what to wear) already answer for free via `WeatherAdvisor` + `ChatViewModel.addLocalExchange()` — zero network, zero cost (see README/CLAUDE.md). But a **typed** question that means the exact same thing (e.g. "should I bring an umbrella today?") always goes through `ChatViewModel.send()` → `ChatRepository.askStreaming()` → OpenRouter, even though `WeatherAdvisor.advise(AdviceIntent.UMBRELLA, ...)` could answer it identically for free. Free-form text has no local-match check at all today.
+
+**Change:** before `ChatViewModel.send()` calls into `ChatRepository`, run the trimmed input through a lightweight keyword/pattern matcher against `WeatherAdvisor`'s six existing `AdviceIntent` values (umbrella/rain, jacket/coat, walk/jog, drive/driving, hike/hiking, wear/clothing — the same vocabulary the chip labels already use). On a match, call `addLocalExchange()` with `WeatherAdvisor.advise(...)` instead of `askStreaming()` — same six intents already implemented, just reachable from typed text, not only chip taps. Only fall through to the real LLM call when nothing matches, reserving OpenRouter for the genuinely open-ended/multi-day "weekly planning" questions the Strategic Note above says are its actual job (e.g. "what's the best day for a BBQ this week").
+
+**Open question:** how aggressive the keyword match should be — a narrow match (exact phrase) under-triggers and still burns LLM calls on obvious cases; a broad match risks misrouting a genuinely open-ended question (e.g. "should I bring an umbrella or just reschedule the trip?") into a local answer that ignores half the question. Needs real examples tried against the matcher before picking a threshold.
+
+**Files:** `app/src/main/java/com/example/weatherly/ui/ChatViewModel.kt` (`send()`), a new matcher (either a function on `WeatherAdvisor` or a small standalone classifier).
+
+### Guardrails
+
+`ChatRepository.systemPrompt()`'s rules today only cover data accuracy ("Base every answer ONLY on the weather data below — do not invent numbers", the rain-vs-snow instruction). Nothing scopes *what kind* of question the assistant should engage with, which matters more here than in most chat features since most real users hit the **developer's own shared build-time key** (`BuildConfig.OPENROUTER_API_KEY`), not a key they entered themselves — see `PreferencesStore.getOpenRouterKey()`'s fallback order. Proposed additions:
+
+1. **Topic scope** — instruct the model to decline/redirect anything not about weather, the forecast, or weather-driven practical advice. Today a user could ask it to write code or translate a paragraph and it would likely try, burning the developer's own key on off-brand requests.
+2. **Safety/liability tone** — for driving/hiking-type questions, avoid definitive-sounding safety claims beyond what the official NWS alert data actually says (e.g. don't assert "it's safe to drive" outright; frame as "no active advisories, but conditions can change").
+3. **Untrusted-data awareness** — location names, condition text, and NWS alert `headline`/`description` text are all external data (Open-Meteo geocoding, NWS CAP feed) interpolated into the system prompt alongside the actual instructions. Low realistic risk today (no user ever chooses their own NWS alert text), but worth one explicit line telling the model to treat the WEATHER DATA block as data, not instructions, same principle as untrusted content anywhere else.
+4. **Usage cap on LLM-routed messages** — no current limit on how many free-form (LLM-routed) messages a session can send using the developer's fallback key. Once local-first routing (above) is in place, add a soft on-device counter (`PreferencesStore`) capping *only* the messages that actually reach OpenRouter — chip taps and local-intent matches stay free and uncounted, since they cost nothing. Exact cap number is an open question, not decided here.
+
+**Files:** `app/src/main/java/com/example/weatherly/data/repository/ChatRepository.kt` (`systemPrompt()`), `app/src/main/java/com/example/weatherly/data/prefs/PreferencesStore.kt` (if a usage cap is adopted).
