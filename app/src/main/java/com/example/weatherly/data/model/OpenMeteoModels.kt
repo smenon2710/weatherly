@@ -28,7 +28,11 @@ data class CurrentBlock(
     // for rain/showers (mm/inch); snowfall's own unit is cm/inch — see UnitSystem.snowLabel.
     @Json(name = "rain") val rain: Double?,
     @Json(name = "showers") val showers: Double?,
-    @Json(name = "snowfall") val snowfall: Double?
+    @Json(name = "snowfall") val snowfall: Double?,
+    // A more accurate "how muggy it'll actually feel" signal than relative humidity alone — the
+    // same humidity % means something very different at 50°F vs. 90°F, but dew point doesn't.
+    // Already in the requested temperature_unit, same as temperature/apparentTemperature above.
+    @Json(name = "dew_point_2m") val dewPoint: Double?
 )
 
 data class HourlyBlock(
@@ -39,12 +43,16 @@ data class HourlyBlock(
     @Json(name = "uv_index") val uvIndex: List<Double?>?,
     @Json(name = "visibility") val visibility: List<Double?>?,
     @Json(name = "wind_speed_10m") val windSpeed: List<Double?>?,
+    // Forecast gust series — previously only the *current* gust was fetched (CurrentBlock.windGusts),
+    // so an upcoming windy day had no forecast signal at all.
+    @Json(name = "wind_gusts_10m") val windGusts: List<Double?>?,
     @Json(name = "apparent_temperature") val apparentTemperature: List<Double?>?,
     @Json(name = "relative_humidity_2m") val humidity: List<Int?>?,
     @Json(name = "surface_pressure") val surfacePressure: List<Double?>?,
     @Json(name = "rain") val rain: List<Double?>?,
     @Json(name = "showers") val showers: List<Double?>?,
-    @Json(name = "snowfall") val snowfall: List<Double?>?
+    @Json(name = "snowfall") val snowfall: List<Double?>?,
+    @Json(name = "dew_point_2m") val dewPoint: List<Double?>?
 )
 
 data class DailyBlock(
@@ -58,5 +66,6 @@ data class DailyBlock(
     @Json(name = "precipitation_sum") val precipitationSum: List<Double?>?,
     @Json(name = "precipitation_probability_max") val precipProbMax: List<Int?>?,
     @Json(name = "wind_speed_10m_max") val windSpeedMax: List<Double?>?,
+    @Json(name = "wind_gusts_10m_max") val windGustsMax: List<Double?>?,
     @Json(name = "snowfall_sum") val snowfallSum: List<Double?>?
 )

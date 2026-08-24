@@ -129,6 +129,7 @@ class WeatherRepository(private val context: Context) {
         val dUv = r.daily?.uvIndexMax ?: emptyList()
         val dPop = r.daily?.precipProbMax ?: emptyList()
         val dWind = r.daily?.windSpeedMax ?: emptyList()
+        val dWindGust = r.daily?.windGustsMax ?: emptyList()
         val dPrecip = r.daily?.precipitationSum ?: emptyList()
         val dSnowSum = r.daily?.snowfallSum ?: emptyList()
 
@@ -155,6 +156,7 @@ class WeatherRepository(private val context: Context) {
         }
         val hourlyUv = window.map { (r.hourly?.uvIndex?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyWind = window.map { (r.hourly?.windSpeed?.getOrNull(it) ?: 0.0).roundToInt() }
+        val hourlyWindGust = window.map { (r.hourly?.windGusts?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyFeels = window.map { (r.hourly?.apparentTemperature?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyHumidity = window.map { r.hourly?.humidity?.getOrNull(it) ?: 0 }
         val hourlyVisibility = window.map { visToUnit(r.hourly?.visibility?.getOrNull(it) ?: 0.0) }
@@ -193,7 +195,8 @@ class WeatherRepository(private val context: Context) {
                         precipProbMax = dPop.getOrNull(i),
                         windMaxKmh = dWind.getOrNull(i)?.roundToInt(),
                         precipSumMm = dPrecip.getOrNull(i),
-                        snowfallSum = dSnowSum.getOrNull(i)
+                        snowfallSum = dSnowSum.getOrNull(i),
+                        windGustMaxKmh = dWindGust.getOrNull(i)?.roundToInt()
                     )
                 )
             }
@@ -274,7 +277,9 @@ class WeatherRepository(private val context: Context) {
             daily = daily,
             alerts = mapAlerts(alerts),
             hourlyPrecipAmount = hourlyPrecipAmount,
-            hourlySnowfall = hourlySnowfall
+            hourlySnowfall = hourlySnowfall,
+            dewPointC = current?.dewPoint?.roundToInt(),
+            hourlyWindGust = hourlyWindGust
         )
     }
 

@@ -57,7 +57,13 @@ data class WeatherData(
     // Real per-hour amounts (not probability) — rain+showers combined, and snowfall separately.
     // Same defaulting reason as `alerts`.
     val hourlyPrecipAmount: List<Double> = emptyList(),
-    val hourlySnowfall: List<Double> = emptyList()
+    val hourlySnowfall: List<Double> = emptyList(),
+    // A more accurate "how muggy it'll actually feel" signal than relative humidity alone — see
+    // CurrentBlock.dewPoint's doc comment. Same defaulting reason as `alerts`.
+    val dewPointC: Int? = null,
+    // Forecast gust series, distinct from the current-only `windGustKmh` above — same defaulting
+    // reason as `alerts`.
+    val hourlyWindGust: List<Int> = emptyList()
 ) {
     val hourLabels: List<String> get() = hourly.map { it.hourLabel }
 }
@@ -131,5 +137,8 @@ data class DayEntry(
     val precipProbMax: Int?,
     val windMaxKmh: Int?,
     val precipSumMm: Double?,
-    val snowfallSum: Double? = null
+    val snowfallSum: Double? = null,
+    // Today's forecast peak gust — distinct from windMaxKmh (sustained speed). Same defaulting
+    // reason as WeatherData.alerts (ForecastCache backward-compat with pre-existing cached JSON).
+    val windGustMaxKmh: Int? = null
 )

@@ -183,6 +183,9 @@ class ChatRepository {
         )
         val line = buildList {
             w.humidity?.let { add("humidity $it%") }
+            // More accurate "how muggy it'll actually feel" than humidity % alone, which reads
+            // very differently at different temperatures.
+            w.dewPointC?.let { add("dew point $it$t") }
             w.windKmh?.let { add("wind $it ${w.windUnit}" + (w.windDir?.let { d -> " $d" } ?: "")) }
             w.windGustKmh?.let { add("gusts $it ${w.windUnit}") }
             w.cloudCoverPct?.let { add("cloud $it%") }

@@ -6,6 +6,8 @@ import android.content.res.Configuration
 import android.os.Build
 import androidx.annotation.ColorRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -177,37 +179,48 @@ class WeatherWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, TALL, WIDE, LARGE, XLARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val loaded = loadWeather(context)
         val colors = resolveWidgetColors(context)
         val transparent = PreferencesStore(context).getWidgetTransparent()
-        provideContent { WidgetContent(loaded, colors, transparent) }
+        // Fast, local (SharedPreferences) read, done up front so the very first composition
+        // below already has something real to show.
+        val cached = ForecastCache(context).load()
+
+        provideContent {
+            // Stale-while-revalidate: produceState's initial value is the cached forecast, shown
+            // immediately on this composition rather than blocking on a network fetch first.
+            // sharedRepository()'s own 30-minute in-memory cache is empty on a cold process
+            // (reboot, app update, low-memory kill), so without this every cold start left the
+            // widget blank (or the "Open SkySpeak to set up" state) for the full 25-50s a real
+            // fetch can take, despite ForecastCache holding perfectly good recent data. Once the
+            // background fetch below completes, updating `value` recomposes this content with
+            // the fresh data and Glance pushes the updated RemoteViews — the same reactive-state
+            // mechanism the rest of this file already relies on (see the size-breakpoint `when`
+            // in WidgetContent), just driving a second render instead of the first.
+            val loaded by produceState(initialValue = LoadedWeather(cached?.first, cached?.second)) {
+                val fresh = fetchFreshWeather(context)
+                // Only overwrite the cached render if the fetch actually produced something — a
+                // failed fetch or missing location leaves the cached (or empty) state as the
+                // final one, rather than replacing it with an identical or worse render.
+                if (fresh != null) value = LoadedWeather(fresh, cachedAt = null)
+            }
+            WidgetContent(loaded, colors, transparent)
+        }
     }
 
-    private suspend fun loadWeather(context: Context): LoadedWeather {
-        val cached = ForecastCache(context).load()
-        return try {
-            val prefs = PreferencesStore(context)
-            val units = prefs.getUnitSystem()
-            val repo = sharedRepository(context)
-            // Deliberately ignores PreferencesStore.getSelected() — the in-app "selected place"
-            // reflects whatever city the user is currently *browsing* in the app (e.g. checking
-            // a different city's forecast), which isn't the same thing as "where I actually am
-            // right now." A home-screen widget is a glance surface, not a navigation state, so it
-            // always resolves to the device's real current location instead of silently mirroring
-            // the app's browsing selection (confirmed as a real, user-reported point of confusion
-            // — the widget kept showing whatever place had last been searched in-app).
-            val fresh = run {
-                val latLon = LocationProvider(context).currentLatLon()
-                if (latLon != null) repo.getWeather(latLon.first, latLon.second, units).getOrNull()
-                else null
-            }
-            // Fall back to the app's last cached forecast so the widget always
-            // shows real data once the user has opened the app at least once.
-            if (fresh != null) LoadedWeather(fresh, cachedAt = null)
-            else LoadedWeather(cached?.first, cachedAt = cached?.second)
-        } catch (e: Exception) {
-            LoadedWeather(cached?.first, cachedAt = cached?.second)
-        }
+    private suspend fun fetchFreshWeather(context: Context): WeatherData? = try {
+        val units = PreferencesStore(context).getUnitSystem()
+        val repo = sharedRepository(context)
+        // Deliberately ignores PreferencesStore.getSelected() — the in-app "selected place"
+        // reflects whatever city the user is currently *browsing* in the app (e.g. checking
+        // a different city's forecast), which isn't the same thing as "where I actually am
+        // right now." A home-screen widget is a glance surface, not a navigation state, so it
+        // always resolves to the device's real current location instead of silently mirroring
+        // the app's browsing selection (confirmed as a real, user-reported point of confusion
+        // — the widget kept showing whatever place had last been searched in-app).
+        val latLon = LocationProvider(context).currentLatLon()
+        if (latLon != null) repo.getWeather(latLon.first, latLon.second, units).getOrNull() else null
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -611,29 +624,53 @@ private fun DaytimeFocus(data: WeatherData, c: WColors) {
 // Night: tomorrow's forecast — wake up informed
 @Composable
 private fun NightFocus(data: WeatherData, c: WColors) {
-    Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 10.sp))
-    Spacer(GlanceModifier.height(3.dp))
     val tomorrow = data.daily.getOrNull(1)
-    if (tomorrow != null) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetGlyph(tomorrow.icon, true, 13.dp)
-            Spacer(GlanceModifier.width(3.dp))
-            Text(
-                wmoText(tomorrow.icon),
-                style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
-                maxLines = 1,
-            )
-        }
-        Spacer(GlanceModifier.height(2.dp))
+    if (tomorrow == null) {
+        Text("Tomorrow", style = TextStyle(color = c.textSecondary, fontSize = 10.sp))
+        return
+    }
+    // "Tomorrow" merged into the icon+condition row (was its own line above it) — frees the
+    // ~17dp that line + its spacer cost, which MEDIUM's real ~78dp-wide budget (94dp declared
+    // canvas minus MediumWidget's 8dp+8dp padding) didn't actually have room for on top of the
+    // rest of this composable's content. Confirmed via the widget QA harness at MEDIUM's real
+    // target size (110x110dp) during actual NIGHT hours (the chrono-dynamic variant IMPROVEMENTS.md
+    // had flagged as never independently verified) — content overflowed the widget's own bottom
+    // edge, silently cropping "L:60°" mid-character.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        WidgetGlyph(tomorrow.icon, true, 13.dp)
+        Spacer(GlanceModifier.width(3.dp))
         Text(
-            "H:${tomorrow.highC}°  L:${tomorrow.lowC}°",
-            style = TextStyle(
-                color = ColorProvider(widgetTempColor(tomorrow.highC, data.windUnit == "km/h", c.isDark)),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            ),
+            "Tomorrow: ${wmoText(tomorrow.icon)}",
+            style = TextStyle(color = c.textSecondary, fontSize = 11.sp),
+            maxLines = 1,
         )
     }
+    Spacer(GlanceModifier.height(2.dp))
+    // High/low were previously one "H:X°  L:Y°" string with no maxLines — at MEDIUM's narrow
+    // width it silently word-wrapped onto two lines, which this composable's layout wasn't
+    // budgeting height for (the wrap was invisible in isolation; only the container clipping the
+    // second line made it visible). Split into two explicit single-line Texts instead of relying
+    // on wrapping to land the same way — deterministic, and each half also picks up its own true
+    // widgetTempColor now rather than the high's color being applied to the low too.
+    val metric = data.windUnit == "km/h"
+    Text(
+        "H:${tomorrow.highC}°",
+        style = TextStyle(
+            color = ColorProvider(widgetTempColor(tomorrow.highC, metric, c.isDark)),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        ),
+        maxLines = 1,
+    )
+    Text(
+        "L:${tomorrow.lowC}°",
+        style = TextStyle(
+            color = ColorProvider(widgetTempColor(tomorrow.lowC, metric, c.isDark)),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        ),
+        maxLines = 1,
+    )
 }
 
 // ── Tall (2×4-ish): MEDIUM content + a vertical mini hourly list ─────────────

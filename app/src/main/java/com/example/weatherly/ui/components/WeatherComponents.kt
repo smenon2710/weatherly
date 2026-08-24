@@ -774,6 +774,10 @@ data class MetricTileData(
     val description: String,
     val chart: MetricChart? = null,
     val gaugeFraction: Float? = null,
+    // Short, tile-length "so what does this mean for me today" callout (see PrimaryStatCell's
+    // matching doc comment) — populated only for UV Index and Air Quality initially, since those
+    // are the two tiles with a natural "what should I do" phrase already computed.
+    val advisory: String? = null,
 )
 
 /** Arc-gauge tile: UV, AQI, Humidity, Pressure, Visibility. */
@@ -816,6 +820,15 @@ fun ArcGaugeTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier =
                         Text(it, color = textSecColor, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                     }
                 }
+            }
+            // Outside the arc, not crammed inside it — the 88dp circle is already tight with
+            // value+sub, and this callout is meant to be scannable on its own, not squeezed in.
+            data.advisory?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    it, color = data.accent, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -1157,6 +1170,9 @@ sealed interface DetailSheet {
         // Extra context for specialized detail views
         val windDir: String? = null,
         val windGust: String? = null,
+        // Today's forecast peak gust, distinct from `windGust` (current gust only) — lets
+        // WindDetailContent show "gusts up to X later today" instead of just the current reading.
+        val windGustMax: String? = null,
         val hourlyActualTemps: List<Int>? = null,
         // Aligned with `chart.values` by index — lets PrecipDetailContent color each hour's bar by
         // its real type (rain vs snow) rather than a single rain-only intensity palette applied
@@ -1190,6 +1206,16 @@ private fun PrimaryStatCell(data: MetricTileData, modifier: Modifier = Modifier,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
+        // Short, tile-length "so what does this mean for me today" callout — teaches the number's
+        // meaning in the moment, no tap required. Populated only for tiles with a natural
+        // "what should I do" phrase (UV, Wind, Humidity); null elsewhere, so cells without one
+        // (e.g. Humidity with no dew point data yet) simply render one line shorter.
+        data.advisory?.let {
+            Text(
+                it, color = data.accent, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -1218,6 +1244,7 @@ fun MetricsGrid(
                             t.icon, t.accent, t.label, t.value, t.description, t.chart,
                             windDir = data.windDir,
                             windGust = data.windGustKmh?.let { "$it ${data.windUnit}" },
+                            windGustMax = data.daily.firstOrNull()?.windGustMaxKmh?.let { "$it ${data.windUnit}" },
                         ))
                     }
                 }
@@ -1276,11 +1303,22 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         "Extreme" -> "Avoid sun exposure midday; take all precautions."
         else -> "Sun strength for today."
     }
+    // Short, tile-length counterpart to uvAdvice above — same tiers, a few words instead of a
+    // sentence, for the on-tile advisory line (see PrimaryStatCell's doc comment).
+    val uvShortAdvisory = when (d.uvLabel) {
+        "Low" -> "Low risk"
+        "Moderate" -> "Wear SPF"
+        "High" -> "Use SPF 30+"
+        "Very High" -> "Avoid midday sun"
+        "Extreme" -> "Stay in shade"
+        else -> null
+    }
     add(MetricTileData(Icons.Filled.WbSunny, "UV Index", d.uvIndex?.toString() ?: "--", d.uvLabel, Amber,
         "The UV index measures the strength of the sun's ultraviolet radiation. " +
             "Current level: ${d.uvLabel ?: "unknown"}. $uvAdvice",
         chart(d.hourlyUv, ""),
-        gaugeFraction = d.uvIndex?.let { (it / 11f).coerceIn(0f, 1f) }))
+        gaugeFraction = d.uvIndex?.let { (it / 11f).coerceIn(0f, 1f) },
+        advisory = uvShortAdvisory))
 
     val aqiAdvice = when {
         d.aqi == null -> "Air quality data isn't available right now."
@@ -1291,11 +1329,22 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         d.aqi <= 300 -> "Health alert — everyone may experience more serious effects. Limit time outdoors."
         else -> "Hazardous air. Avoid outdoor activity and keep windows closed."
     }
+    // Short, tile-length counterpart to aqiAdvice above — same tiers as the description text.
+    val aqiShortAdvisory = when {
+        d.aqi == null -> null
+        d.aqi <= 50 -> "Great for outdoors"
+        d.aqi <= 100 -> "OK for most people"
+        d.aqi <= 150 -> "Sensitive: limit time out"
+        d.aqi <= 200 -> "Limit outdoor exertion"
+        d.aqi <= 300 -> "Avoid time outdoors"
+        else -> "Stay indoors"
+    }
     add(MetricTileData(Icons.Filled.Eco, "Air Quality", d.aqi?.toString() ?: "--", d.aqiLabel, aqiColor(d.aqi),
         "The US Air Quality Index (AQI) summarises pollutants like fine particles and ozone on a 0–500+ scale " +
             "(lower is better). Current reading: ${d.aqiLabel ?: "unknown"}. $aqiAdvice",
         if (d.aqi != null) chart(d.hourlyAqi, "") else null,
-        gaugeFraction = d.aqi?.let { (it / 200f).coerceIn(0f, 1f) }))
+        gaugeFraction = d.aqi?.let { (it / 200f).coerceIn(0f, 1f) },
+        advisory = aqiShortAdvisory))
 
     val tomorrowSunrise = d.daily.getOrNull(1)?.sunrise
     // sub encodes: "Sunset HH:MM|TomorrowRise HH:MM" so SunTile can parse both
@@ -1316,21 +1365,50 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         "$moonName · $moonIllum% illuminated. $nextEventStr.",
         gaugeFraction = moonPhase.toFloat()))
 
+    // Today's forecast peak gust (Open-Meteo's wind_gusts_10m_max) — real signal, not current
+    // conditions guessed forward: an upcoming windy day couldn't be flagged at all before this.
+    val windGustMaxToday = d.daily.firstOrNull()?.windGustMaxKmh
+    val windShortAdvisory = when {
+        windGustMaxToday == null -> null
+        windGustMaxToday < 10 -> "Calm all day"
+        windGustMaxToday < 20 -> "Light breeze"
+        windGustMaxToday < 40 -> "Breezy"
+        windGustMaxToday < 60 -> "Windy"
+        else -> "Strong gusts"
+    }
     add(MetricTileData(Icons.Filled.Air, "Wind", d.windKmh?.let { "$it ${d.windUnit}" } ?: "--",
         listOfNotNull(d.windDir, d.windGustKmh?.let { "gusts $it" }).joinToString(" · ").ifBlank { null }, Teal,
         "Wind is blowing" + (d.windDir?.let { " from the $it" } ?: "") +
             " at ${d.windKmh ?: 0} ${d.windUnit}" + (d.windGustKmh?.let { ", with gusts up to $it ${d.windUnit}." } ?: "."),
-        chart(d.hourlyWind, d.windUnit)))
+        chart(d.hourlyWind, d.windUnit),
+        advisory = windShortAdvisory))
     add(MetricTileData(Icons.Filled.Thermostat, "Feels like", d.realFeelC?.let { "$it°" } ?: "--", "Apparent temp", Coral,
         "Apparent temperature combines the air temperature with humidity and wind. " +
             "Right now it feels like ${d.realFeelC ?: d.currentTempC}°, while the actual air temperature is ${d.currentTempC}°.",
         chart(d.hourlyFeels, "°")))
+    // Dew point is a more accurate "how muggy it'll actually feel" signal than relative humidity
+    // alone — the same % means something very different at 50°F vs. 90°F. dewPointC is unit-
+    // ambiguous like every other "C"-suffixed WeatherData field (see CLAUDE.md's Key invariants),
+    // so it's converted to true Celsius before threshold comparison, same pattern as tempColor().
+    val metric = d.windUnit == "km/h"
+    val dewC = d.dewPointC?.let { toCelsius(it, metric) }
+    val humidityShortAdvisory = when {
+        dewC == null -> null
+        dewC < 10 -> "Dry air"
+        dewC < 15 -> "Comfortable"
+        dewC < 18 -> "Slightly humid"
+        dewC < 21 -> "Muggy"
+        dewC < 24 -> "Very muggy"
+        else -> "Oppressive"
+    }
     add(MetricTileData(Icons.Filled.WaterDrop, "Humidity", d.humidity?.let { "$it%" } ?: "--",
         d.cloudCoverPct?.let { "Cloud $it%" }, Cyan,
         "Relative humidity is ${d.humidity ?: 0}%" + (d.cloudCoverPct?.let { ", with $it% cloud cover" } ?: "") +
-            ". Higher humidity makes warm air feel hotter and cold air feel colder.",
+            ". Higher humidity makes warm air feel hotter and cold air feel colder." +
+            (d.dewPointC?.let { " Dew point is $it°, which is what actually determines how muggy the air feels." } ?: ""),
         chart(d.hourlyHumidity, "%"),
-        gaugeFraction = d.humidity?.let { it / 100f }))
+        gaugeFraction = d.humidity?.let { it / 100f },
+        advisory = humidityShortAdvisory))
     add(MetricTileData(Icons.Filled.Visibility, "Visibility", d.visibility?.let { "$it ${d.visibilityUnit}" } ?: "--", null, Indigo,
         "You can currently see clearly for about ${d.visibility ?: 0} ${d.visibilityUnit}.",
         chart(d.hourlyVisibility, d.visibilityUnit),
@@ -1479,6 +1557,18 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
                     fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                 Spacer(Modifier.height(4.dp))
                 Text(sheet.windGust, color = textPrimary, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        // Today's forecast peak gust — a real forecast signal (Open-Meteo's wind_gusts_10m_max),
+        // distinct from GUSTS above (current reading only). Smaller/lighter than the other two
+        // columns since it's supplementary context, not the headline reading.
+        if (!sheet.windGustMax.isNullOrBlank()) {
+            Box(Modifier.width(1.dp).height(52.dp).background(textSec.copy(alpha = 0.18f)))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("PEAK TODAY", color = textSec, fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(sheet.windGustMax, color = textSec, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
