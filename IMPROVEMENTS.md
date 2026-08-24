@@ -1386,6 +1386,42 @@ Also: check `viewModel.hasKey` here. If false, show an additional note: *"Tip: a
 
 ---
 
+### D7. Live advisory text on UV/AQI tiles, instead of a metrics glossary (2026-08-24)
+
+**What:** Considered (not yet built) as a lower-overkill alternative to a Pixel-Weather-style expandable "what the numbers mean" glossary section. A full glossary explaining all ~10 metric tiles (UV, Humidity, Wind, Feels like, Precipitation, Air Quality, Pressure, Sunrise, Visibility, Moon Phase) was judged likely overkill: half the metrics are self-evident (Wind, Sunrise, Visibility, Feels like), and the non-obvious ones already have contextual explanation one tap away in the existing `DetailSheet` (e.g. Pressure's description already reads "Atmospheric pressure is 1013 hPa. Around 1013 hPa is average; falling pressure often signals incoming unsettled weather..."). A glossary card would mostly duplicate that.
+
+The higher-value version: surface the "so what does this mean for me today" advisory **directly on the tile**, live, with zero taps — teaching meaning in the moment instead of requiring the user to seek out and expand a separate section.
+
+**Change:**
+- `buildMetricTiles()` already computes full-sentence `uvAdvice`/`aqiAdvice` strings used in `DetailSheet.Metric.description` (e.g. "Wear sunscreen and a hat on bright days.", "Air quality is good — a great time to be outdoors."). These are too long for a tile — add a short, tile-length counterpart for each (a few words, e.g. "Wear SPF", "Great for outdoors").
+- Add an optional `advisory: String?` field to `MetricTileData`, populated only for **UV Index** and **Air Quality** initially — Wind/Pressure/Visibility/Humidity/Feels like don't currently have a natural "what should I do" phrase computed for them, and shouldn't get a placeholder just to fill the slot.
+- `PrimaryStatCell` (the UV/Humidity/Wind strip): render `advisory` as an optional 4th line below `sub`, for the UV cell only.
+- `ArcGaugeTile` (AQI, Pressure): render `advisory` as a second line under the existing `sub` (AQI's band label, e.g. "Good") inside the arc.
+
+**Open question before building:** tile-space is already tight (`sub` is capped at `maxLines = 1` in `PrimaryStatCell`) — needs a real on-device check that a 4th line doesn't push the primary strip's height into visibly uneven card sizing next to Humidity/Wind cells that won't have an advisory line.
+
+**File:** `app/src/main/java/com/example/weatherly/ui/components/WeatherComponents.kt` (`MetricTileData`, `buildMetricTiles`, `PrimaryStatCell`, `ArcGaugeTile`)
+
+---
+
+### D8. Real Open-Meteo data points the app doesn't request yet (2026-08-24)
+
+**What:** Audited `OpenMeteoApi.kt`'s `current`/`hourly`/`daily` query params and `AirQualityApi.kt`'s params against Open-Meteo's full variable catalog. Nothing already fetched is going unused — but several real, free variables aren't requested at all. Ranked by likely value:
+
+1. **`wind_gusts_10m` (hourly, and `_max` daily) — highest value.** Only the *current* gust is fetched today (`CurrentBlock.windGusts`); there's no gust forecast at all. The existing Wind detail sheet (compass rose + intensity bars) and `WeatherBackground`'s `severeWind` blizzard-streak effect (see CLAUDE.md) both only react to right-now gust — an upcoming windy day can't be shown or forecast-visualized without this.
+2. **`dew_point_2m` (current/hourly) — high value.** Not fetched anywhere. A more accurate "how muggy it'll actually feel" signal than relative humidity alone (the same % means something very different at 50°F vs. 90°F). Fits the app's existing pattern of preferring the real physical signal over an approximation — same instinct that drove the rain-vs-snow accuracy work.
+3. **Air quality pollutant breakdown (`pm2_5`, `pm10`, `ozone`, `carbon_monoxide`, `nitrogen_dioxide`) — moderate value, bigger lift.** `AirQualityApi.kt` only requests `us_aqi` (the composite number). The AQI tile can say the air is bad but never *why* — smoke (PM2.5) vs. ozone vs. traffic pollution reads very differently for someone with asthma. Needs a new sub-view, not just a new field, so more UI work than the other items here.
+4. **`snow_depth` (current/hourly) — moderate value.** Ground accumulation, distinct from `snowfall` (rate) which is all the app currently tracks. Natural complement to the existing rain-vs-snow-amount work: "how much snow is already on the ground," not just "how much fell in the last hour."
+5. **`apparent_temperature_max`/`_min` (daily) — low-moderate value.** `HourEntry` already has per-hour feels-like; `DayEntry` doesn't, so the 7-day forecast can't show a daily feels-like range, only raw high/low.
+6. **`precipitation_hours` (daily) — low value.** How many hours of the day actually see precip, distinct from the probability/amount already shown (distinguishes "brief shower" from "rain most of the day").
+7. **`sunshine_duration`/`daylight_duration` (daily) — low value, niche.** Not fetched; lowest priority of this list.
+
+**Change:** For each adopted item, add the query param to `OpenMeteoApi.kt` (or `AirQualityApi.kt` for #3), the corresponding field(s) to `OpenMeteoModels.kt`/`AirQualityModels.kt`, map into `WeatherData`/`DayEntry`/`HourEntry` in `WeatherRepository.kt`, then wire into whichever UI already has a natural home for it (Wind detail sheet for #1, Humidity tile/chat brief for #2, a new AQI breakdown sub-view for #3, Precipitation tile for #4, `DailyCard`/`DetailSheet.Day` for #5–6).
+
+**File:** `app/src/main/java/com/example/weatherly/data/remote/OpenMeteoApi.kt`, `AirQualityApi.kt`, `app/src/main/java/com/example/weatherly/data/model/OpenMeteoModels.kt`, `AirQualityModels.kt`, `app/src/main/java/com/example/weatherly/data/repository/WeatherRepository.kt`
+
+---
+
 ## AI Assistant — Strategic Note (2026-06-30)
 
 Average weather app session: **60–90 seconds, 3–5 sessions/day.** Sessions are too short for a conversational interface to be the primary interaction model — which is why the local `WeatherAdvisor` chips (zero latency, zero API cost) should handle the daily-use questions.
