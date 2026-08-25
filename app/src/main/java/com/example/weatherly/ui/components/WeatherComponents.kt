@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Water
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Brightness3
 import androidx.compose.material.icons.filled.WbSunny
@@ -92,6 +93,8 @@ import androidx.compose.ui.unit.sp
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.MetricChart
+import com.example.weatherly.data.model.TideEvent
+import com.example.weatherly.data.model.TideType
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherAlert
@@ -1103,6 +1106,27 @@ fun MoonTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Mod
     }
 }
 
+/** Full-width card for the "Tides" tile, same general shape as [MoonTile] (icon left, values
+ * right) but a plain [Icon] instead of a bespoke Canvas illustration — a wave glyph doesn't need
+ * one the way the moon's actual phase does. Only ever composed for coastal/tidally-influenced
+ * locations; see [buildMetricTiles]'s `d.tides?.let { }` gate. */
+@Composable
+fun TideTile(data: MetricTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = data.accent
+    GlassCard(modifier = modifier, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(data.icon, contentDescription = null, tint = accent, modifier = Modifier.size(36.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(data.label.uppercase(), color = TextSecondary, fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Text(data.value, color = accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                data.sub?.let { Text(it, color = TextPrimary, fontSize = 14.sp) }
+            }
+        }
+    }
+}
+
 /**
  * Draws the illuminated portion of the moon disk for the given phase (0=new, 0.5=full, 1=new).
  * Uses an arc-based path: a semicircle on the lit side closed by an ellipse (the terminator).
@@ -1178,6 +1202,8 @@ sealed interface DetailSheet {
         // its real type (rain vs snow) rather than a single rain-only intensity palette applied
         // uniformly regardless of what's actually falling that hour.
         val hourlySnowfall: List<Double>? = null,
+        // Today's full high/low tide predictions — only ever non-null for the "Tides" tile.
+        val tideEvents: List<TideEvent>? = null,
     ) : DetailSheet
 
     data class Day(val day: DayEntry, val windUnit: String, val precipUnit: String) : DetailSheet
@@ -1283,6 +1309,16 @@ fun MetricsGrid(
             m["Visibility"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
         }
         m["Moon Phase"]?.let { t -> MoonTile(t, { click(t) }, Modifier.fillMaxWidth()) }
+        // Only present for coastal/tidally-influenced locations (TideStations.nearest()'s gate)
+        // — absent entirely for every inland location, not shown empty/disabled.
+        m["Tides"]?.let { t ->
+            TideTile(t, onClick = {
+                onMetricClick(DetailSheet.Metric(
+                    t.icon, t.accent, t.label, t.value, t.description, t.chart,
+                    tideEvents = data.tides?.events,
+                ))
+            }, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -1365,6 +1401,19 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         "$moonName · $moonIllum% illuminated. $nextEventStr.",
         gaugeFraction = moonPhase.toFloat()))
 
+    // Only present for coastal/tidally-influenced locations — see TideStations.nearest()'s
+    // doc comment for the "how close counts as coastal" gate. d.tides is null everywhere else,
+    // so this tile simply doesn't exist for an inland location rather than showing empty.
+    d.tides?.let { tide ->
+        val next = tide.events.firstOrNull()
+        val nextLabel = next?.let { "${if (it.type == TideType.HIGH) "High" else "Low"} tide at ${it.timeLabel}" }
+        add(MetricTileData(Icons.Filled.Water, "Tides", next?.heightLabel ?: "--", nextLabel, Indigo,
+            "Today's tide predictions for ${tide.stationName}, the nearest NOAA tide-prediction station. " +
+                tide.events.joinToString("; ") { e ->
+                    "${if (e.type == TideType.HIGH) "High" else "Low"} tide at ${e.timeLabel} (${e.heightLabel})"
+                } + "."))
+    }
+
     // Today's forecast peak gust (Open-Meteo's wind_gusts_10m_max) — real signal, not current
     // conditions guessed forward: an upcoming windy day couldn't be flagged at all before this.
     val windGustMaxToday = d.daily.firstOrNull()?.windGustMaxKmh
@@ -1401,11 +1450,23 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
         dewC < 24 -> "Very muggy"
         else -> "Oppressive"
     }
+    // The description names the dew point *and* what it means (the comfort label, e.g.
+    // "Comfortable"/"Muggy"), plus a plain-language explanation of what dew point actually
+    // measures and which direction is worse — "the higher, the muggier" alone doesn't tell a
+    // reader whether the number they're looking at is high or low. Reuses humidityShortAdvisory
+    // (computed above) rather than a second threshold table, so the tile's short advisory and the
+    // sheet's full description can never disagree about which band the current reading is in.
     add(MetricTileData(Icons.Filled.WaterDrop, "Humidity", d.humidity?.let { "$it%" } ?: "--",
         d.cloudCoverPct?.let { "Cloud $it%" }, Cyan,
         "Relative humidity is ${d.humidity ?: 0}%" + (d.cloudCoverPct?.let { ", with $it% cloud cover" } ?: "") +
             ". Higher humidity makes warm air feel hotter and cold air feel colder." +
-            (d.dewPointC?.let { " Dew point is $it°, which is what actually determines how muggy the air feels." } ?: ""),
+            (d.dewPointC?.let {
+                " Dew point is $it°${humidityShortAdvisory?.let { l -> " ($l)" } ?: ""} — a more reliable measure " +
+                    "of how muggy the air actually feels than humidity alone. Dew point is the temperature air " +
+                    "would need to cool to for dew to form: the higher it is, the more moisture is in the air " +
+                    "and the stickier it feels, regardless of the actual temperature; the lower it is, the drier " +
+                    "and more comfortable it feels."
+            } ?: ""),
         chart(d.hourlyHumidity, "%"),
         gaugeFraction = d.humidity?.let { it / 100f },
         advisory = humidityShortAdvisory))
@@ -1538,7 +1599,12 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
     Text(sheet.description, color = textSec, fontSize = 15.sp, lineHeight = 22.sp)
     Spacer(Modifier.height(24.dp))
 
-    // Speed + gust row
+    // Speed + gust row. Deliberately just these two, at their original spacious size — a third
+    // column (PEAK TODAY) was tried here and found to crowd/compete for space at larger system
+    // font sizes (user-reported, real device, larger Display size setting): three Bold values in
+    // one SpaceEvenly Row don't leave enough slack to absorb Android's font-scale multiplier the
+    // way two did. Peak gust is shown as its own line below instead — a single short line has no
+    // sibling to compete with, so it scales safely regardless of system text size.
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1559,18 +1625,24 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
                 Text(sheet.windGust, color = textPrimary, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        // Today's forecast peak gust — a real forecast signal (Open-Meteo's wind_gusts_10m_max),
-        // distinct from GUSTS above (current reading only). Smaller/lighter than the other two
-        // columns since it's supplementary context, not the headline reading.
-        if (!sheet.windGustMax.isNullOrBlank()) {
-            Box(Modifier.width(1.dp).height(52.dp).background(textSec.copy(alpha = 0.18f)))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("PEAK TODAY", color = textSec, fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(sheet.windGustMax, color = textSec, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
+    }
+
+    // Today's forecast peak gust (Open-Meteo's wind_gusts_10m_max) — a real forecast signal,
+    // distinct from GUSTS above (current reading only). Its own line, not a third competing
+    // column, and not capped at maxLines = 1 — at a large system font size this may still wrap,
+    // but wrapping a single supplementary line is harmless (unlike the widget's Glance Text,
+    // Compose's Text here can grow the layout to fit rather than getting clipped by a fixed
+    // container).
+    if (!sheet.windGustMax.isNullOrBlank()) {
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Peak gust today: ${sheet.windGustMax}",
+            color = textSec,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     Spacer(Modifier.height(28.dp))
@@ -1964,16 +2036,50 @@ private fun MoonDetailContent(sheet: DetailSheet.Metric) {
 
     // Phase cycle description
     val phaseDesc = when {
-        moonPhase < 0.0625 || moonPhase >= 0.9375 -> "The moon is not visible tonight. New moons mark the start of the lunar cycle and often bring darker, star-filled skies."
+        moonPhase < 0.0625 || moonPhase >= 0.9375 -> "The moon is not visible tonight. New moons mark the start of the lunar cycle and often bring darker, star-filled skies. Sun and moon are aligned, so this is also when tides swing the most (spring tides) — the highest highs and lowest lows of the month."
         moonPhase < 0.1875 -> "A thin crescent is visible in the western sky after sunset. The lit sliver grows each night."
-        moonPhase < 0.3125 -> "Half of the moon is illuminated. The right side is lit in the northern hemisphere. Expect moderate tidal ranges."
+        moonPhase < 0.3125 -> "Half of the moon is illuminated. The right side is lit in the northern hemisphere. Sun and moon are at right angles now, giving the weakest tidal swings of the month (neap tides)."
         moonPhase < 0.4375 -> "More than half the moon is lit. The full disk is approaching; expect brighter nights."
-        moonPhase < 0.5625 -> "The moon is fully illuminated, rising at sunset and setting at sunrise. The brightest nights of the month."
+        moonPhase < 0.5625 -> "The moon is fully illuminated, rising at sunset and setting at sunrise. The brightest nights of the month — and, like the new moon, a spring-tide period with the month's biggest tidal swings."
         moonPhase < 0.6875 -> "The lit area is now shrinking from the right. The moon rises after sunset and sets after sunrise."
         moonPhase < 0.8125 -> "The left side is now lit. The moon rises around midnight and is high in the morning sky."
         else               -> "A thin crescent in the eastern sky before sunrise. The cycle is nearly complete."
     }
     Text(phaseDesc, color = textSec, fontSize = 14.sp, lineHeight = 21.sp)
+}
+
+// ── Tides: today's high/low predictions ───────────────────────────────────────
+
+@Composable
+private fun TideDetailContent(sheet: DetailSheet.Metric) {
+    val accent = sheet.accent
+    val textSec = TextSecondary
+    val events = sheet.tideEvents.orEmpty()
+
+    SectionLabel(sheet.icon, sheet.title, accent)
+    Spacer(Modifier.height(14.dp))
+    // description = "Today's tide predictions for <station>, the nearest NOAA tide-prediction
+    // station. <events...>." — the station-name sentence reads better on its own up top than
+    // repeated ahead of every row below.
+    val stationSentence = sheet.description.substringBefore(". ") + "."
+    Text(stationSentence, color = textSec, fontSize = 14.sp, lineHeight = 21.sp)
+    Spacer(Modifier.height(20.dp))
+
+    if (events.isEmpty()) {
+        Text("No tide predictions available for today.", color = textSec, fontSize = 14.sp)
+    } else {
+        events.forEach { e ->
+            DetailRow(
+                "${if (e.type == TideType.HIGH) "High tide" else "Low tide"} · ${e.timeLabel}",
+                e.heightLabel
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "Tide predictions from NOAA's Center for Operational Oceanographic Products and Services (CO-OPS), public domain, US coastal and tidally-influenced waters only.",
+        color = textSec, fontSize = 11.sp, lineHeight = 16.sp
+    )
 }
 
 @Composable
@@ -1996,6 +2102,7 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 "Feels like"    -> FeelsLikeDetailContent(sheet)
                 "Precipitation" -> PrecipDetailContent(sheet)
                 "Moon Phase"    -> MoonDetailContent(sheet)
+                "Tides"         -> TideDetailContent(sheet)
                 else            -> DefaultMetricContent(sheet)
             }
             is DetailSheet.Day -> {
@@ -2008,6 +2115,18 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                     Column {
                         Text(day.phrase ?: "", color = TextPrimary, fontSize = 18.sp)
                         Text("H:${day.highC}°   L:${day.lowC}°", color = TextSecondary, fontSize = 16.sp)
+                    }
+                }
+                // Practical "how to plan around this day" advice — conclusion first, before the
+                // raw numbers below. Same TipBanner visual language as the hero's tip (editorial
+                // left-accent-bar style, not a full card), reused rather than a new treatment.
+                if (day.tips.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Column {
+                        day.tips.forEachIndexed { i, tip ->
+                            if (i > 0) Spacer(Modifier.height(8.dp))
+                            TipBanner(tip)
+                        }
                     }
                 }
                 Spacer(Modifier.height(18.dp))

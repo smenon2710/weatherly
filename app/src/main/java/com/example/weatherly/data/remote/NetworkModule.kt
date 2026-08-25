@@ -17,6 +17,7 @@ object NetworkModule {
     private const val AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/"
     private const val OPENROUTER_URL = "https://openrouter.ai/"
     private const val NWS_URL = "https://api.weather.gov/"
+    private const val TIDE_URL = "https://api.tidesandcurrents.noaa.gov/"
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -74,4 +75,6 @@ object NetworkModule {
             .build()
             .create(NwsApi::class.java)
     }
+
+    val tideApi: TideApi by lazy { retrofit(TIDE_URL).create(TideApi::class.java) }
 }

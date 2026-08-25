@@ -63,10 +63,30 @@ data class WeatherData(
     val dewPointC: Int? = null,
     // Forecast gust series, distinct from the current-only `windGustKmh` above — same defaulting
     // reason as `alerts`.
-    val hourlyWindGust: List<Int> = emptyList()
+    val hourlyWindGust: List<Int> = emptyList(),
+    // Null for every inland location — see TideStations.nearest()'s coastal gate. Present only
+    // when a NOAA CO-OPS tide-prediction station is within range of the resolved coordinates.
+    val tides: TideInfo? = null
 ) {
     val hourLabels: List<String> get() = hourly.map { it.hourLabel }
 }
+
+/** Today's high/low tide predictions from the nearest NOAA CO-OPS station within range (see
+ * util/TideStations.kt). US coastal/tidally-influenced locations only — NOAA has no coverage
+ * elsewhere, and this app has no fallback tide source (no free non-US equivalent fits the app's
+ * no-key, no-backend constraints). */
+data class TideInfo(
+    val stationName: String,
+    val events: List<TideEvent>
+)
+
+data class TideEvent(
+    val timeLabel: String,
+    val type: TideType,
+    val heightLabel: String
+)
+
+enum class TideType { HIGH, LOW }
 
 /** Data for a metric's hourly bar chart in its detail popup. */
 data class MetricChart(
@@ -140,5 +160,10 @@ data class DayEntry(
     val snowfallSum: Double? = null,
     // Today's forecast peak gust — distinct from windMaxKmh (sustained speed). Same defaulting
     // reason as WeatherData.alerts (ForecastCache backward-compat with pre-existing cached JSON).
-    val windGustMaxKmh: Int? = null
+    val windGustMaxKmh: Int? = null,
+    // Practical, day-specific "what should I do" advice for the 7-day forecast's detail sheet —
+    // e.g. "pack an umbrella", "stay hydrated", "dangerous heat, stay indoors" — distinct from
+    // WeatherData.tips (the hero TipBanner's "right now"-phrased, night-rollover-aware advice for
+    // today/tonight only). Same defaulting reason as WeatherData.alerts.
+    val tips: List<WeatherTip> = emptyList()
 )

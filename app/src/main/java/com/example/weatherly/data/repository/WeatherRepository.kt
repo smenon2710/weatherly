@@ -12,12 +12,18 @@ import com.example.weatherly.data.model.NwsAlertProperties
 import com.example.weatherly.data.model.NwsAlertsResponse
 import com.example.weatherly.data.model.OpenMeteoResponse
 import com.example.weatherly.data.model.SavedPlace
+import com.example.weatherly.data.model.TidePredictionsResponse
+import com.example.weatherly.data.model.TideEvent
+import com.example.weatherly.data.model.TideInfo
+import com.example.weatherly.data.model.TideStation
+import com.example.weatherly.data.model.TideType
 import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.UnitSystem
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.data.remote.NetworkModule
+import com.example.weatherly.util.TideStations
 import com.example.weatherly.util.wmoText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -44,6 +50,7 @@ class WeatherRepository(private val context: Context) {
     private val geocodingApi = NetworkModule.geocodingApi
     private val airQualityApi = NetworkModule.airQualityApi
     private val nwsApi = NetworkModule.nwsApi
+    private val tideApi = NetworkModule.tideApi
 
     private data class Cached(val key: String, val data: WeatherData, val timestamp: Long)
     private var memoryCache: Cached? = null
@@ -63,7 +70,7 @@ class WeatherRepository(private val context: Context) {
             }
         }
         try {
-            val (forecast, air, alerts) = coroutineScope {
+            val fetched = coroutineScope {
                 val f = async {
                     api.getForecast(
                         latitude = lat, longitude = lon,
@@ -78,16 +85,34 @@ class WeatherRepository(private val context: Context) {
                 val n = async {
                     runCatching { nwsApi.getActiveAlerts("%.4f,%.4f".format(Locale.US, lat, lon)) }.getOrNull()
                 }
-                Triple(f.await(), a.await(), n.await())
+                // Same defensive shape as NWS above: TideStations.nearest() is the coastal gate
+                // (see its own doc comment) — nothing is fetched at all for an inland location,
+                // and a station lookup that succeeds but a NOAA fetch that fails must never fail
+                // the overall weather fetch either.
+                val t = async {
+                    TideStations.nearest(context, lat, lon)?.let { station ->
+                        runCatching { tideApi.getPredictions(station.id, units.tideApiUnit) }
+                            .getOrNull()
+                            ?.let { station to it }
+                    }
+                }
+                Fetched(f.await(), a.await(), n.await(), t.await())
             }
             val name = placeName ?: reverseGeocode(lat, lon)
-            val data = mapToWeatherData(forecast, air, alerts, name, units)
+            val data = mapToWeatherData(fetched.forecast, fetched.air, fetched.alerts, fetched.tide, name, units)
             memoryCache = Cached(cacheKey, data, now)
             Result.success(data)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
+
+    private data class Fetched(
+        val forecast: OpenMeteoResponse,
+        val air: AirQualityResponse?,
+        val alerts: NwsAlertsResponse?,
+        val tide: Pair<TideStation, TidePredictionsResponse>?
+    )
 
     suspend fun searchCity(query: String): List<SavedPlace> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
@@ -102,6 +127,7 @@ class WeatherRepository(private val context: Context) {
         r: OpenMeteoResponse,
         air: AirQualityResponse?,
         alerts: NwsAlertsResponse?,
+        tide: Pair<TideStation, TidePredictionsResponse>?,
         locationName: String,
         units: UnitSystem
     ): WeatherData {
@@ -181,22 +207,27 @@ class WeatherRepository(private val context: Context) {
         val daily = buildList {
             for (i in todayIndex until dTimes.size) {
                 val code = dCodes.getOrNull(i) ?: 0
+                val dayHigh = dHighs.getOrNull(i)?.roundToInt() ?: 0
+                val dayLow = dLows.getOrNull(i)?.roundToInt() ?: 0
+                val dayPop = dPop.getOrNull(i)
+                val dayWindMax = dWind.getOrNull(i)?.roundToInt()
                 add(
                     DayEntry(
                         dayLabel = if (i == todayIndex) "Today" else formatDay(dTimes[i]),
                         fullDateLabel = if (i == todayIndex) "Today" else formatFull(dTimes[i]),
-                        highC = dHighs.getOrNull(i)?.roundToInt() ?: 0,
-                        lowC = dLows.getOrNull(i)?.roundToInt() ?: 0,
+                        highC = dayHigh,
+                        lowC = dayLow,
                         icon = code,
                         phrase = wmoText(code),
                         sunrise = clock(dSunrise.getOrNull(i)),
                         sunset = clock(dSunset.getOrNull(i)),
                         uvMax = dUv.getOrNull(i)?.roundToInt(),
-                        precipProbMax = dPop.getOrNull(i),
-                        windMaxKmh = dWind.getOrNull(i)?.roundToInt(),
+                        precipProbMax = dayPop,
+                        windMaxKmh = dayWindMax,
                         precipSumMm = dPrecip.getOrNull(i),
                         snowfallSum = dSnowSum.getOrNull(i),
-                        windGustMaxKmh = dWindGust.getOrNull(i)?.roundToInt()
+                        windGustMaxKmh = dWindGust.getOrNull(i)?.roundToInt(),
+                        tips = buildDayOutlookTips(code, dayHigh, dayLow, dayPop, dayWindMax, units)
                     )
                 )
             }
@@ -279,8 +310,31 @@ class WeatherRepository(private val context: Context) {
             hourlyPrecipAmount = hourlyPrecipAmount,
             hourlySnowfall = hourlySnowfall,
             dewPointC = current?.dewPoint?.roundToInt(),
-            hourlyWindGust = hourlyWindGust
+            hourlyWindGust = hourlyWindGust,
+            tides = mapTide(tide, units)
         )
+    }
+
+    private fun mapTide(result: Pair<TideStation, TidePredictionsResponse>?, units: UnitSystem): TideInfo? {
+        val (station, response) = result ?: return null
+        val events = response.predictions.orEmpty().mapNotNull { p ->
+            val timeLabel = p.time?.let { parse(it, "yyyy-MM-dd HH:mm") }
+                ?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(it) }
+                ?: return@mapNotNull null
+            val type = when (p.type) {
+                "H" -> TideType.HIGH
+                "L" -> TideType.LOW
+                else -> return@mapNotNull null
+            }
+            val height = p.height?.toDoubleOrNull()
+                ?.let { "%.1f %s".format(Locale.US, it, units.tideHeightLabel) }
+                ?: return@mapNotNull null
+            TideEvent(timeLabel, type, height)
+        }
+        // An empty predictions list happens for a station id that's technically valid but
+        // doesn't actually publish tide predictions (a real, observed NOAA inconsistency, not
+        // hypothetical) — treat the same as "no coastal data" rather than showing an empty tile.
+        return if (events.isEmpty()) null else TideInfo(station.name, events)
     }
 
     private fun mapAlerts(response: NwsAlertsResponse?): List<WeatherAlert> {
@@ -497,6 +551,44 @@ class WeatherRepository(private val context: Context) {
         if (windy) add(WeatherTip("💨", "Quite windy — secure anything loose outside.", TipTone.WIND))
         if (isEmpty() && code in 0..2 && mild) add(WeatherTip("😎", "Lovely day ahead — make the most of it!", TipTone.NICE))
         if (isEmpty()) add(WeatherTip("🌤️", "No major weather to plan around today.", TipTone.NEUTRAL))
+    }.take(2)
+
+    // Per-day "how to plan around this" advice for the 7-day forecast's own detail sheet
+    // (DetailSheet.Day) — deliberately a separate function from buildTips() above, not a shared
+    // call with a parameter, even though the threshold logic overlaps: buildTips()'s wording is
+    // hardcoded "today"/"tonight"-relative for the hero TipBanner (which only ever shows for the
+    // current day, with its own night-rollover-to-tomorrow logic), and reusing it verbatim for an
+    // arbitrary future day tapped open from the 7-day list (e.g. "Wed") would read as wrong
+    // ("Rain likely today" shown while looking at Wednesday's forecast on a Monday). Kept fully
+    // independent — including its own threshold constants — so a future change to one wording set
+    // can't silently ship a mismatched change to the other.
+    private fun buildDayOutlookTips(
+        code: Int, high: Int, low: Int, pop: Int?, windMax: Int?, units: UnitSystem
+    ): List<WeatherTip> = buildList {
+        val isSnow = code in 71..77 || code in 85..86
+        val isRain = code in 51..67 || code in 80..82 || code in 95..99
+        // A second, more severe heat tier than buildTips()'s single "hot" threshold — genuine
+        // excess-heat/heatwave territory (roughly NWS Excessive Heat Warning range), warranting
+        // "stay indoors" rather than just "carry water", per user request to distinguish the two.
+        val veryHot = if (units == UnitSystem.IMPERIAL) high >= 100 else high >= 38
+        val hot = if (units == UnitSystem.IMPERIAL) high >= 86 else high >= 30
+        val cold = if (units == UnitSystem.IMPERIAL) (low <= 32 || high <= 41) else (low <= 0 || high <= 5)
+        val windy = if (units == UnitSystem.IMPERIAL) (windMax ?: 0) >= 25 else (windMax ?: 0) >= 40
+        val mild = if (units == UnitSystem.IMPERIAL) high in 61..82 else high in 16..28
+
+        when {
+            isSnow -> add(WeatherTip("❄️", "Snow expected — plan for slippery, slow-going conditions if you're headed out.", TipTone.SNOW))
+            isRain || (pop ?: 0) >= 50 ->
+                add(WeatherTip("🌂", "Rain likely — pack an umbrella or raincoat if you'll be outdoors.", TipTone.RAIN))
+        }
+        when {
+            veryHot -> add(WeatherTip("🥵", "Dangerous heat expected — stay indoors during peak hours, stay hydrated, and check on vulnerable neighbors.", TipTone.HOT))
+            hot -> add(WeatherTip("💧", "Hot conditions — stay hydrated, carry water, and take breaks in the shade.", TipTone.HOT))
+            cold -> add(WeatherTip("🧥", "Cold conditions — dress warmly in layers.", TipTone.COLD))
+        }
+        if (windy) add(WeatherTip("💨", "Windy conditions — secure loose outdoor items.", TipTone.WIND))
+        if (isEmpty() && code in 0..2 && mild) add(WeatherTip("😎", "Good conditions for outdoor plans.", TipTone.NICE))
+        if (isEmpty()) add(WeatherTip("🌤️", "No major weather concerns for this day.", TipTone.NEUTRAL))
     }.take(2)
 
     private suspend fun reverseGeocode(lat: Double, lon: Double): String {

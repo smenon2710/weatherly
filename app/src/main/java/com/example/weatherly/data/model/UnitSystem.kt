@@ -17,8 +17,12 @@ enum class UnitSystem(
     // precipLabel — showing a snow amount with the "mm" suffix would be off by 10x.
     val snowLabel: String,
     val distanceLabel: String,
-    val tempLabel: String
+    val tempLabel: String,
+    // NOAA CO-OPS's `units` query param ("english" = feet, "metric" = meters) and the matching
+    // display label for tide-height predictions.
+    val tideApiUnit: String,
+    val tideHeightLabel: String
 ) {
-    METRIC("celsius", "kmh", "mm", "km/h", "mm", "cm", "km", "°C"),
-    IMPERIAL("fahrenheit", "mph", "inch", "mph", "in", "in", "mi", "°F")
+    METRIC("celsius", "kmh", "mm", "km/h", "mm", "cm", "km", "°C", "metric", "m"),
+    IMPERIAL("fahrenheit", "mph", "inch", "mph", "in", "in", "mi", "°F", "english", "ft")
 }
