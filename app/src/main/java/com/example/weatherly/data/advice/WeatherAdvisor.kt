@@ -40,6 +40,47 @@ object WeatherAdvisor {
         }
     }
 
+    private val UMBRELLA_RE = Regex("\\bumbrella\\b")
+    private val JACKET_RE = Regex("\\b(jacket|coat)\\b")
+    private val WALKING_RE = Regex("\\b(walk|walking|jog|jogging|run|running)\\b")
+    private val DRIVING_RE = Regex("\\b(driv(e|ing)|road|commute|commuting)\\b")
+    private val HIKING_RE = Regex("\\b(hik(e|ing)|trail)\\b")
+    private val CLOTHING_RE = Regex("\\b(wear|outfit|clothes|clothing)\\b")
+
+    /**
+     * Matches free-form chat text to the same six local intents the quick-suggestion chips
+     * already answer for free — lets a *typed* "should I bring an umbrella today?" get the
+     * identical zero-latency, zero-cost local answer the chip gives, instead of always paying
+     * for an LLM call. Reserves the LLM for genuinely open-ended questions (multi-day planning,
+     * comparisons, anything combining more than one topic) per the direction logged in
+     * IMPROVEMENTS.md's "AI Chat — Keep, but Tighten LLM Usage" section.
+     *
+     * Deliberately conservative on two axes, both aimed at not misrouting a question that
+     * actually needs LLM synthesis: (1) only a short message (≤12 words) is considered at all —
+     * a longer message is far more likely to be a compound or nuanced question ("should I bring
+     * an umbrella or just reschedule the hike, and what about Thursday?") that a single-intent
+     * rule-based answer would only half-address; (2) intents are checked in a fixed priority
+     * order and the first match wins, so a message mentioning two keywords still gets exactly one
+     * (predictable, if not necessarily the "best") local answer rather than an ambiguous one.
+     * Not tuned against a large real corpus of user phrasing — a reasonable first cut, expected
+     * to need revisiting once real usage shows what gets misrouted either direction.
+     */
+    fun matchIntent(text: String): AdviceIntent? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return null
+        if (trimmed.split(Regex("\\s+")).size > 12) return null
+        val t = trimmed.lowercase()
+        return when {
+            UMBRELLA_RE.containsMatchIn(t) -> AdviceIntent.UMBRELLA
+            JACKET_RE.containsMatchIn(t) -> AdviceIntent.JACKET
+            WALKING_RE.containsMatchIn(t) -> AdviceIntent.WALKING
+            DRIVING_RE.containsMatchIn(t) -> AdviceIntent.DRIVING
+            HIKING_RE.containsMatchIn(t) -> AdviceIntent.HIKING
+            CLOTHING_RE.containsMatchIn(t) -> AdviceIntent.CLOTHING
+            else -> null
+        }
+    }
+
     private data class Ctx(
         val w: WeatherData,
         val units: UnitSystem,

@@ -67,6 +67,29 @@ class PreferencesStore(context: Context) {
     fun hasOpenRouterKey(buildDefault: String): Boolean =
         getOpenRouterKey(buildDefault).isNotBlank()
 
+    /** True only when the user has entered their own key in Settings — distinct from
+     * [hasOpenRouterKey], which also returns true for the build-time fallback. Gates the daily
+     * LLM usage cap below: the cap protects the developer's own shared build-time key from
+     * runaway cost, so it must never apply once a user is paying for their own key. */
+    fun hasOwnOpenRouterKey(): Boolean =
+        prefs.getString(KEY_OR_KEY, null)?.isNotBlank() == true
+
+    /** Count of chat messages actually routed to the LLM today (never chip taps or local-intent
+     * matches, which cost nothing) — resets automatically once the stored date is no longer
+     * today, rather than needing an explicit midnight reset job. */
+    fun getLlmUsageCountToday(): Int =
+        if (prefs.getString(KEY_LLM_USAGE_DATE, null) == todayKey()) prefs.getInt(KEY_LLM_USAGE_COUNT, 0) else 0
+
+    fun incrementLlmUsageToday() {
+        prefs.edit()
+            .putString(KEY_LLM_USAGE_DATE, todayKey())
+            .putInt(KEY_LLM_USAGE_COUNT, getLlmUsageCountToday() + 1)
+            .apply()
+    }
+
+    private fun todayKey(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
+
     fun getOpenRouterModel(buildDefault: String): String =
         prefs.getString(KEY_OR_MODEL, null)?.takeIf { it.isNotBlank() } ?: buildDefault
 
@@ -125,5 +148,7 @@ class PreferencesStore(context: Context) {
         private const val KEY_THEME = "theme_preference"
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
         private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
+        private const val KEY_LLM_USAGE_DATE = "llm_usage_date"
+        private const val KEY_LLM_USAGE_COUNT = "llm_usage_count"
     }
 }

@@ -204,4 +204,58 @@ class WeatherAdvisorTest {
         )
         assertTrue(reply.contains("jacket") || reply.contains("coat"))
     }
+
+    // -------------------------------------------------------------------------
+    // matchIntent — local-first chat routing
+    // -------------------------------------------------------------------------
+
+    @Test fun `matchIntent - umbrella question matches UMBRELLA`() {
+        assertTrue(WeatherAdvisor.matchIntent("should I bring an umbrella today?") == AdviceIntent.UMBRELLA)
+    }
+
+    @Test fun `matchIntent - jacket question matches JACKET`() {
+        assertTrue(WeatherAdvisor.matchIntent("do I need a jacket?") == AdviceIntent.JACKET)
+    }
+
+    @Test fun `matchIntent - coat also matches JACKET`() {
+        assertTrue(WeatherAdvisor.matchIntent("is a coat necessary?") == AdviceIntent.JACKET)
+    }
+
+    @Test fun `matchIntent - jog matches WALKING`() {
+        assertTrue(WeatherAdvisor.matchIntent("good weather for a jog?") == AdviceIntent.WALKING)
+    }
+
+    @Test fun `matchIntent - driving question matches DRIVING`() {
+        assertTrue(WeatherAdvisor.matchIntent("is it safe for driving right now?") == AdviceIntent.DRIVING)
+    }
+
+    @Test fun `matchIntent - hiking question matches HIKING`() {
+        assertTrue(WeatherAdvisor.matchIntent("is today good for hiking?") == AdviceIntent.HIKING)
+    }
+
+    @Test fun `matchIntent - what to wear matches CLOTHING`() {
+        assertTrue(WeatherAdvisor.matchIntent("what should I wear today?") == AdviceIntent.CLOTHING)
+    }
+
+    @Test fun `matchIntent - is case-insensitive`() {
+        assertTrue(WeatherAdvisor.matchIntent("UMBRELLA today?") == AdviceIntent.UMBRELLA)
+    }
+
+    @Test fun `matchIntent - unrelated question falls through to null (LLM)`() {
+        assertTrue(WeatherAdvisor.matchIntent("what's the capital of France?") == null)
+    }
+
+    @Test fun `matchIntent - empty text falls through to null`() {
+        assertTrue(WeatherAdvisor.matchIntent("   ") == null)
+    }
+
+    @Test fun `matchIntent - long compound question falls through to null even with a keyword`() {
+        val longQuestion = "should I bring an umbrella today or just reschedule my " +
+            "afternoon plans given how the rest of this week looks so far"
+        assertTrue(WeatherAdvisor.matchIntent(longQuestion) == null)
+    }
+
+    @Test fun `matchIntent - short umbrella question with extra words still matches`() {
+        assertTrue(WeatherAdvisor.matchIntent("hey, umbrella needed today?") == AdviceIntent.UMBRELLA)
+    }
 }

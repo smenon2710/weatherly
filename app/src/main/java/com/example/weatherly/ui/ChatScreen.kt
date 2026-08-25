@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.data.advice.AdviceIntent
-import com.example.weatherly.data.advice.WeatherAdvisor
 import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
 import com.example.weatherly.data.model.UnitSystem
@@ -135,9 +134,7 @@ fun ChatScreen(
 
     // Suggestion chips use the local rule engine; streaming simulates LLM-style output.
     fun answerLocally(s: Suggestion) {
-        val reply = weather?.let { WeatherAdvisor.advise(s.intent, it, units) }
-            ?: "Open the weather screen first so I can read your local conditions, then ask again."
-        chatViewModel.addLocalExchange(s.question, reply)
+        chatViewModel.sendLocal(s.intent, s.question, weather, units)
     }
 
     Box(
