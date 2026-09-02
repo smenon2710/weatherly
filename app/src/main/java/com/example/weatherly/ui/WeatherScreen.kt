@@ -37,6 +37,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -82,6 +83,7 @@ import com.example.weatherly.ui.components.WeatherBackground
 import com.example.weatherly.ui.components.heroBackdropIsDark
 import com.example.weatherly.ui.components.heroTextColors
 import com.example.weatherly.ui.components.heroWeight
+import com.example.weatherly.util.rememberLocalTimeText
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,6 +177,7 @@ fun WeatherScreen(
                 places = places,
                 searchResults = searchResults,
                 searching = searching,
+                currentLocationTimezone = (state as? WeatherUiState.Success)?.data?.timezone,
                 onSearch = viewModel::search,
                 onAdd = { viewModel.addPlace(it); showLocations = false },
                 onUseCurrent = { viewModel.selectCurrentLocation(); showLocations = false },
@@ -191,6 +194,11 @@ private fun LocationsSheet(
     places: List<SavedPlace>,
     searchResults: List<SavedPlace>,
     searching: Boolean,
+    // The currently-loaded weather data's own timezone, only meaningful for the "Current
+    // location" row: it's only known once that location has actually been fetched (there's no
+    // geocoding result for "wherever the device is" ahead of time), and only actually describes
+    // current location when no saved place is selected — see the call site for the guard.
+    currentLocationTimezone: String?,
     onSearch: (String) -> Unit,
     onAdd: (SavedPlace) -> Unit,
     onUseCurrent: () -> Unit,
@@ -233,6 +241,7 @@ private fun LocationsSheet(
             PlaceRow(
                 title = place.name,
                 subtitle = place.subtitle,
+                timezone = place.timezone,
                 onClick = { onAdd(place) }
             )
         }
@@ -245,6 +254,7 @@ private fun LocationsSheet(
             title = "Current location",
             subtitle = if (selected == null) "Selected" else null,
             leading = Icons.Filled.MyLocation,
+            timezone = if (selected == null) currentLocationTimezone else null,
             onClick = onUseCurrent
         )
         places.forEach { place ->
@@ -252,6 +262,7 @@ private fun LocationsSheet(
                 title = place.name,
                 subtitle = if (selected?.lat == place.lat && selected?.lon == place.lon) "Selected" else place.subtitle,
                 leading = Icons.Filled.Place,
+                timezone = place.timezone,
                 onClick = { onSelect(place) },
                 onDelete = { onRemove(place) }
             )
@@ -264,6 +275,7 @@ private fun PlaceRow(
     title: String,
     subtitle: String?,
     leading: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    timezone: String? = null,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
@@ -283,6 +295,9 @@ private fun PlaceRow(
             subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = TextSecondary, fontSize = 13.sp)
             }
+        }
+        rememberLocalTimeText(timezone)?.let {
+            Text(it, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
         }
         if (onDelete != null) {
             IconButton(onClick = onDelete) {
@@ -495,8 +510,16 @@ fun WeatherContent(
     }
 
     sheet?.let { current ->
+        // skipPartiallyExpanded: this sheet's content is always vertical-scrollable
+        // (DetailSheetContent), and the intermediate "partially expanded" stop fights with
+        // that inner scroll's own nested-scroll handling — dragging past it visibly jumps/
+        // bounces once the content is at (or near) its own scroll bounds, worst on a metric
+        // like Humidity whose content height sits right at that boundary. Going straight to
+        // fully expanded removes the stop that causes the tug-of-war.
+        val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { sheet = null },
+            sheetState = detailSheetState,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             DetailSheetContent(current, onAlertSelected = { sheet = DetailSheet.Alert(it) })

@@ -25,12 +25,16 @@ import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.data.remote.NetworkModule
 import com.example.weatherly.util.TideStations
 import com.example.weatherly.util.wmoText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import retrofit2.HttpException
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -71,13 +75,34 @@ class WeatherRepository(private val context: Context) {
         }
         try {
             val fetched = coroutineScope {
+                // Retried, unlike the other three fetches below: a failure here fails the whole
+                // screen (see the catch block), so it's worth extra attempts against a transient
+                // blip from Open-Meteo's free/keyless tier — a real 5xx, or a malformed (non-JSON)
+                // body that surfaces as a Moshi JsonEncodingException, which is an IOException
+                // under the hood, not a genuine local parsing bug. Up to 2 retries (3 attempts
+                // total) with increasing backoff (1s, 2s) — bumped from a single retry after a
+                // real user report of two consecutive failures on a network with measurable packet
+                // loss; mirrors ChatRepository's existing retry-on-429 pattern for OpenRouter,
+                // just with more attempts since this path has no server-dictated retry signal to
+                // respect.
                 val f = async {
-                    api.getForecast(
+                    suspend fun fetch() = api.getForecast(
                         latitude = lat, longitude = lon,
                         temperatureUnit = units.apiTemp,
                         windSpeedUnit = units.apiWind,
                         precipitationUnit = units.apiPrecip
                     )
+                    var attempt = 0
+                    while (true) {
+                        try {
+                            return@async fetch()
+                        } catch (e: Exception) {
+                            attempt++
+                            if (attempt > 2 || !isTransient(e)) throw e
+                            delay(1_000L * attempt)
+                        }
+                    }
+                    @Suppress("UNREACHABLE_CODE") throw IllegalStateException()
                 }
                 val a = async { runCatching { airQualityApi.get(lat, lon) }.getOrNull() }
                 // NWS is US-only and has no key of its own; a failure or an out-of-coverage
@@ -102,9 +127,39 @@ class WeatherRepository(private val context: Context) {
             val data = mapToWeatherData(fetched.forecast, fetched.air, fetched.alerts, fetched.tide, name, units)
             memoryCache = Cached(cacheKey, data, now)
             Result.success(data)
+        } catch (e: CancellationException) {
+            // Never swallow cancellation — e.g. the screen/ViewModel being torn down mid-fetch, or
+            // a newer load() superseding this one. Catching it below (as any Exception subtype)
+            // and converting it into Result.failure would surface a fake "Couldn't connect" error
+            // for what is actually just a cancelled, no-longer-relevant fetch — confirmed live via
+            // the logging added below: a real capture showed "kotlinx.coroutines.
+            // JobCancellationException: Job was cancelled" reaching this catch block and being
+            // reported to the user as a network failure. Rethrowing lets structured concurrency
+            // handle it the way ChatViewModel's own askStreaming()/addLocalExchange() already do.
+            throw e
         } catch (e: Exception) {
-            Result.failure(e)
+            // Logged (survives release builds — nothing in proguard-rules.pro strips Log calls)
+            // specifically so a real failure has a diagnosable trace in logcat: the friendly
+            // message below is deliberately generic for the user, but without this line a
+            // release-build failure leaves zero trace of the actual exception type/cause.
+            android.util.Log.w("WeatherRepository", "getWeather failed for $lat,$lon", e)
+            // WeatherViewModel shows this message verbatim (WeatherUiState.Error) — never let a
+            // raw Retrofit/Moshi exception ("HTTP 500 Internal Server Error", "Use
+            // JsonReader.setLenient(true)...") reach the screen. Same principle as
+            // ChatRepository.httpMessage().
+            Result.failure(Exception(friendlyMessage(e), e))
         }
+    }
+
+    private fun isTransient(e: Exception): Boolean =
+        (e is HttpException && e.code() in 500..599) || e is IOException
+
+    private fun friendlyMessage(e: Throwable): String = when {
+        e is HttpException && e.code() in 500..599 ->
+            "The weather service is having trouble right now. Please try again in a moment."
+        e is HttpException -> "Couldn't fetch the forecast (HTTP ${e.code()}). Please try again."
+        e is IOException -> "Couldn't connect. Check your internet connection and try again."
+        else -> "Couldn't load the forecast right now. Please try again."
     }
 
     private data class Fetched(
@@ -118,7 +173,7 @@ class WeatherRepository(private val context: Context) {
         if (query.isBlank()) return@withContext emptyList()
         runCatching {
             geocodingApi.search(query.trim()).results.orEmpty().map {
-                SavedPlace(it.name, it.admin1, it.country, it.latitude, it.longitude)
+                SavedPlace(it.name, it.admin1, it.country, it.latitude, it.longitude, it.timezone)
             }
         }.getOrDefault(emptyList())
     }
@@ -311,7 +366,8 @@ class WeatherRepository(private val context: Context) {
             hourlySnowfall = hourlySnowfall,
             dewPointC = current?.dewPoint?.roundToInt(),
             hourlyWindGust = hourlyWindGust,
-            tides = mapTide(tide, units)
+            tides = mapTide(tide, units),
+            timezone = r.timezone
         )
     }
 

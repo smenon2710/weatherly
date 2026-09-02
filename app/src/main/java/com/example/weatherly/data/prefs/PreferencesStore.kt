@@ -93,6 +93,17 @@ class PreferencesStore(context: Context) {
     fun getOpenRouterModel(buildDefault: String): String =
         prefs.getString(KEY_OR_MODEL, null)?.takeIf { it.isNotBlank() } ?: buildDefault
 
+    /** The model actually used for an LLM call — distinct from [getOpenRouterModel], which just
+     * reads back whatever is stored (used by the Settings screen to populate the input field).
+     * A stored model override only takes effect once the user has also entered their own
+     * OpenRouter key ([hasOwnOpenRouterKey]): without this gate, a user on the developer's shared
+     * build-time key could redirect calls to a paid or "auto"-routed model — the key stays
+     * invisible to them, but every call still bills against it. Same protection principle as the
+     * daily usage cap, enforced here instead so it can't be bypassed by any caller that forgets
+     * to check [hasOwnOpenRouterKey] itself. */
+    fun getEffectiveOpenRouterModel(buildDefault: String): String =
+        if (hasOwnOpenRouterKey()) getOpenRouterModel(buildDefault) else buildDefault
+
     fun setOpenRouterModel(model: String) {
         prefs.edit().apply {
             if (model.isBlank()) remove(KEY_OR_MODEL) else putString(KEY_OR_MODEL, model.trim())

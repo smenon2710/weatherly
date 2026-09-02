@@ -33,13 +33,17 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             "You've reached today's limit for AI-powered answers — it resets tomorrow. I can " +
                 "still help right now with quick questions like umbrella, jacket, driving, " +
                 "hiking, walking, or what to wear, either typed or from the suggestions below."
+        private const val OFF_TOPIC_MESSAGE =
+            "I'm SkySpeak's weather assistant, so I can't help with that — but ask me anything " +
+                "about the forecast, or try umbrella, jacket, driving, hiking, walking, or what " +
+                "to wear below."
     }
 
     private val repository = ChatRepository()
     private val prefs = PreferencesStore(app)
 
     private val apiKey: String get() = prefs.getOpenRouterKey(BuildConfig.OPENROUTER_API_KEY)
-    private val model: String get() = prefs.getOpenRouterModel(BuildConfig.OPENROUTER_MODEL)
+    private val model: String get() = prefs.getEffectiveOpenRouterModel(BuildConfig.OPENROUTER_MODEL)
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -67,6 +71,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val intent = WeatherAdvisor.matchIntent(prompt)
         if (intent != null) {
             sendLocal(intent, prompt, weather, units)
+            return
+        }
+
+        // Obviously off-topic messages (general trivia, coding help, translation, etc.) never
+        // reach the LLM at all — the system prompt's topic-scope rule would decline these anyway,
+        // but only after spending a real, billed OpenRouter call to do it. See
+        // WeatherAdvisor.isObviouslyOffTopic's doc comment for why this is a denylist, not an
+        // allowlist (a genuinely ambiguous message still reaches the LLM as before).
+        if (WeatherAdvisor.isObviouslyOffTopic(prompt)) {
+            addLocalExchange(prompt, OFF_TOPIC_MESSAGE)
             return
         }
 

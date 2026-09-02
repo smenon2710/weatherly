@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -102,6 +104,7 @@ import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.ui.theme.LocalIsDarkTheme
 import com.example.weatherly.util.MoonCalculator
+import com.example.weatherly.util.rememberLocalTimeText
 import com.example.weatherly.util.skyColor
 
 // --- Colours resolved from the active Material 3 colour scheme ---
@@ -183,13 +186,20 @@ fun conditionGradient(code: Int, isDay: Boolean): List<Color> {
  *    but [TextSecondary] (`onSurfaceVariant`, a mid-gray) measured only ~2.2:1 against it, well
  *    under WCAG's 4.5:1 floor for body text — a gray-on-gray problem, not a "too dark" one.
  *
- * On a light backdrop (the common case), [TextPrimary] is unchanged; the secondary tone borrows
- * `0xFF3F5670` — the same slate-blue "ink" [tipColors]'s RAIN tone and `drawRain`'s light-mode ink
- * already use elsewhere in this app — rather than inventing a new color, and measures ~4.3–5.6:1
- * across the light-scene range (worst case Overcast's near-gray, best case a saturated pastel like
- * Snow). On a dark backdrop, both colors borrow the dark theme's own `onBackground`/
- * `onSurfaceVariant` pair verbatim — already calibrated for exactly this contrast requirement,
- * confirmed at ~4.3–12:1 against Thunder's and Night's dark skies.
+ * On a light backdrop (the common case), [TextPrimary] is unchanged; the secondary tone is a
+ * dedicated, purpose-tuned `0xFF233A4F` — a darker slate-navy than the `0xFF3F5670` "ink" this
+ * used to borrow from [tipColors]'s RAIN tone/`drawRain`'s light-mode ink (still used there
+ * unchanged; this got its own value instead of a shared one once the reused tone turned out
+ * under-threshold here). The old value measured only ~4.3:1 against Overcast's near-gray sky —
+ * *below* WCAG's 4.5:1 floor for body text despite the doc above calling it fixed, because it was
+ * never actually re-measured against Overcast specifically, just carried over from a different
+ * context (a solid tinted pill background) where 4.3:1 happened to be the reported worst case
+ * without anyone confirming it cleared the floor. `0xFF233A4F` computes to ~6.5:1 against that
+ * same Overcast gray (RGB ~193,195,195) — real margin, not another borderline value — and higher
+ * still against every lighter/more-saturated backdrop in the light-scene range. On a dark
+ * backdrop, both colors borrow the dark theme's own `onBackground`/`onSurfaceVariant` pair
+ * verbatim — already calibrated for exactly this contrast requirement, confirmed at ~4.3–12:1
+ * against Thunder's and Night's dark skies.
  */
 @Composable
 fun heroTextColors(heroBackdropIsDark: Boolean): Pair<Color, Color> {
@@ -197,7 +207,7 @@ fun heroTextColors(heroBackdropIsDark: Boolean): Pair<Color, Color> {
     return when {
         isDark -> TextPrimary to TextSecondary
         heroBackdropIsDark -> Color(0xFFE0E6ED) to Color(0xFF8A9BAD)
-        else -> TextPrimary to Color(0xFF3F5670)
+        else -> TextPrimary to Color(0xFF233A4F)
     }
 }
 
@@ -335,6 +345,17 @@ fun CurrentHeader(
     subColor: Color,
     modifier: Modifier = Modifier
 ) {
+    // WeatherBackground is an *animated* scene (moving rain/cloud/snow particles), not a flat
+    // color, so a locally lighter patch behind a specific letter can still wash out text even
+    // when heroTextColors' flat-color contrast math looks solid — user-reported still-hard-to-
+    // read H/L and feels-like across multiple real locations/conditions even after that contrast
+    // was raised well past WCAG's floor. A subtle drop shadow gives a guarantee flat-color
+    // contrast can't: legible against literally any pixel behind it, the same technique other
+    // weather apps use for hero text over photographic/animated skies. Scoped to H/L and feels-
+    // like specifically, the two lines actually reported as hard to read, rather than applied
+    // hero-wide.
+    val heroTextShadow = Shadow(color = Color.Black.copy(alpha = 0.35f), offset = Offset(0f, 1f), blurRadius = 6f)
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -353,6 +374,18 @@ fun CurrentHeader(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
+        // Local time for the viewed place, not the device's own clock — most useful for a
+        // searched/distant city, but shown for every place with timezone data for consistency.
+        rememberLocalTimeText(data.timezone)?.let {
+            Text(
+                it,
+                color = subColor.copy(alpha = 0.8f),
+                fontSize = 12.sp,
+                fontWeight = heroWeight(FontWeight.Normal),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Spacer(Modifier.height(4.dp))
         // Condition + glyph on the same line — supporting context, not the hero
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -367,10 +400,17 @@ fun CurrentHeader(
             "H:${data.highTodayC}°  ·  L:${data.lowTodayC}°",
             color = subColor,
             fontSize = 15.sp,
-            fontWeight = heroWeight(FontWeight.Normal)
+            fontWeight = heroWeight(FontWeight.Normal),
+            style = TextStyle(shadow = heroTextShadow)
         )
         data.realFeelC?.let {
-            Text("Feels like $it°", color = subColor, fontSize = 13.sp, fontWeight = heroWeight(FontWeight.Normal))
+            Text(
+                "Feels like $it°",
+                color = subColor,
+                fontSize = 13.sp,
+                fontWeight = heroWeight(FontWeight.Normal),
+                style = TextStyle(shadow = heroTextShadow)
+            )
         }
         (data.headline ?: data.comparedToYesterday)?.let {
             Spacer(Modifier.height(10.dp))

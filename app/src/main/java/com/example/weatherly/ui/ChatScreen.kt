@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -295,6 +296,32 @@ private fun EmptyState(hasKey: Boolean, onQueryClick: (String) -> Unit) {
     }
 }
 
+/**
+ * Minimal inline-markdown renderer: bold via **text** only. The system prompt already asks the
+ * model to avoid markdown, but that's a soft instruction general-purpose models don't reliably
+ * follow — this is the actual enforcement, since the chat screen has no other formatting path and
+ * would otherwise show literal asterisks. Safe mid-stream: an unclosed ** (the closing pair
+ * hasn't streamed in yet) is left as literal text rather than swallowed, so nothing is lost while
+ * an emphasis span is still in flight.
+ */
+private fun renderChatText(raw: String): AnnotatedString = buildAnnotatedString {
+    var i = 0
+    while (i < raw.length) {
+        if (raw.startsWith("**", i)) {
+            val end = raw.indexOf("**", i + 2)
+            if (end != -1 && end > i + 2) {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append(raw.substring(i + 2, end))
+                }
+                i = end + 2
+                continue
+            }
+        }
+        append(raw[i])
+        i++
+    }
+}
+
 @Composable
 private fun MessageBubble(msg: ChatMessage) {
     val isUser = msg.role == ChatRole.USER
@@ -318,7 +345,7 @@ private fun MessageBubble(msg: ChatMessage) {
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Text(
-            text = msg.text,
+            text = renderChatText(msg.text),
             color = textColor,
             fontSize = 15.sp,
             modifier = Modifier
@@ -345,7 +372,7 @@ private fun StreamingBubble(text: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Text(
             text = buildAnnotatedString {
-                append(text)
+                append(renderChatText(text))
                 withStyle(SpanStyle(color = Cyan.copy(alpha = cursorAlpha))) { append("│") }
             },
             color = TextPrimary,

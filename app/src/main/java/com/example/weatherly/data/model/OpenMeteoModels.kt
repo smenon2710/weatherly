@@ -6,7 +6,10 @@ import com.squareup.moshi.Json
 data class OpenMeteoResponse(
     @Json(name = "current") val current: CurrentBlock?,
     @Json(name = "hourly") val hourly: HourlyBlock?,
-    @Json(name = "daily") val daily: DailyBlock?
+    @Json(name = "daily") val daily: DailyBlock?,
+    // IANA zone id (e.g. "America/New_York") the request was resolved to — already returned on
+    // every call since the request already passes timezone=auto, just not captured until now.
+    @Json(name = "timezone") val timezone: String?
 )
 
 data class CurrentBlock(

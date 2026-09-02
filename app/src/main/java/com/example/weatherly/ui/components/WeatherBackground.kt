@@ -323,9 +323,13 @@ fun heroBackdropIsDark(code: Int, isDay: Boolean, alerts: List<WeatherAlert>): B
     ) return true
     return when {
         code in 95..99 -> true
-        code in 71..86 -> false
-        code in 51..82 -> false
-        code in 45..48 -> false
+        // Mirrors skyColor()'s own !isDay branch for these three ranges (see its doc comment):
+        // snow/rain/fog now render a dark night-specific tone in light theme after dark, not the
+        // daytime pastel, so the hero text needs to flip to the light-on-dark pair to match —
+        // otherwise this would repeat the exact class of bug this function exists to prevent.
+        code in 71..86 -> !isDay
+        code in 51..82 -> !isDay
+        code in 45..48 -> !isDay
         !isDay -> true
         else -> false
     }

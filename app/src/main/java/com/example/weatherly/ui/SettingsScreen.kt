@@ -76,7 +76,7 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val hasKey by settingsViewModel.hasOpenRouterKey.collectAsStateWithLifecycle()
+    val hasOwnKey by settingsViewModel.hasOwnOpenRouterKey.collectAsStateWithLifecycle()
     val storedModel by settingsViewModel.openRouterModel.collectAsStateWithLifecycle()
     val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
 
@@ -214,7 +214,7 @@ fun SettingsScreen(
                         value = keyInput,
                         onValueChange = { keyInput = it },
                         label = { Text("New OpenRouter API key") },
-                        placeholder = { Text(if (hasKey) "•••• (saved)" else "Not set") },
+                        placeholder = { Text(if (hasOwnKey) "•••• (saved)" else "Not set") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -222,12 +222,12 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        if (hasKey) "A key is saved on this device. It can't be viewed here — enter a new one above to replace it."
-                        else "No key saved yet. Quick-suggest chips (umbrella, jacket, etc.) work without one.",
+                        if (hasOwnKey) "A key is saved on this device. It can't be viewed here — enter a new one above to replace it."
+                        else "Using the app's built-in key — AI chat works without one. Add your own above to pick a different model or use your own OpenRouter account.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
-                    if (hasKey) {
+                    if (hasOwnKey) {
                         TextButton(onClick = { settingsViewModel.removeOpenRouterKey() }) {
                             Text("Remove saved key", color = Coral, fontSize = 13.sp)
                         }
@@ -238,8 +238,17 @@ fun SettingsScreen(
                         onValueChange = { modelInput = it },
                         label = { Text("Model (optional override)") },
                         singleLine = true,
+                        enabled = hasOwnKey,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (!hasOwnKey) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Add your own key above to change the model — this stays on the shared free model until then.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = {
@@ -247,7 +256,7 @@ fun SettingsScreen(
                                 settingsViewModel.saveOpenRouterKey(keyInput)
                                 keyInput = ""
                             }
-                            settingsViewModel.saveOpenRouterModel(modelInput)
+                            if (hasOwnKey) settingsViewModel.saveOpenRouterModel(modelInput)
                             saved = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Cyan)

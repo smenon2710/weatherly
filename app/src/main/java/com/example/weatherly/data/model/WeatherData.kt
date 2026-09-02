@@ -66,7 +66,10 @@ data class WeatherData(
     val hourlyWindGust: List<Int> = emptyList(),
     // Null for every inland location — see TideStations.nearest()'s coastal gate. Present only
     // when a NOAA CO-OPS tide-prediction station is within range of the resolved coordinates.
-    val tides: TideInfo? = null
+    val tides: TideInfo? = null,
+    // IANA zone id (e.g. "America/New_York") this forecast was resolved to — drives the hero's
+    // live local-time display. Same defaulting reason as `alerts`.
+    val timezone: String? = null
 ) {
     val hourLabels: List<String> get() = hourly.map { it.hourLabel }
 }

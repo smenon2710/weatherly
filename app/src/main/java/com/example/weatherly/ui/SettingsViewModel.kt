@@ -26,6 +26,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         MutableStateFlow(prefs.hasOpenRouterKey(BuildConfig.OPENROUTER_API_KEY))
     val hasOpenRouterKey: StateFlow<Boolean> = _hasOpenRouterKey.asStateFlow()
 
+    /**
+     * True only when the user has entered their own key on this device — distinct from
+     * [hasOpenRouterKey], which is also true on the developer's build-time fallback key.
+     * Gates the model-override field in Settings: a model override must never take effect while
+     * calls are still billing against the shared key. See
+     * [PreferencesStore.getEffectiveOpenRouterModel] for the actual enforcement.
+     */
+    private val _hasOwnOpenRouterKey = MutableStateFlow(prefs.hasOwnOpenRouterKey())
+    val hasOwnOpenRouterKey: StateFlow<Boolean> = _hasOwnOpenRouterKey.asStateFlow()
+
     private val _openRouterModel =
         MutableStateFlow(prefs.getOpenRouterModel(BuildConfig.OPENROUTER_MODEL))
     val openRouterModel: StateFlow<String> = _openRouterModel.asStateFlow()
@@ -33,11 +43,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun saveOpenRouterKey(key: String) {
         prefs.setOpenRouterKey(key)
         _hasOpenRouterKey.value = prefs.hasOpenRouterKey(BuildConfig.OPENROUTER_API_KEY)
+        _hasOwnOpenRouterKey.value = prefs.hasOwnOpenRouterKey()
     }
 
     fun removeOpenRouterKey() {
         prefs.setOpenRouterKey("")
         _hasOpenRouterKey.value = prefs.hasOpenRouterKey(BuildConfig.OPENROUTER_API_KEY)
+        _hasOwnOpenRouterKey.value = prefs.hasOwnOpenRouterKey()
     }
 
     fun saveOpenRouterModel(model: String) {

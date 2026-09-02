@@ -81,6 +81,45 @@ object WeatherAdvisor {
         }
     }
 
+    private val WEATHER_WORDS = listOf(
+        "weather", "rain", "rainy", "drizzle", "snow", "snowy", "sun", "sunny", "cloud", "cloudy",
+        "storm", "thunderstorm", "lightning", "wind", "windy", "gust", "temperature", "temp",
+        "hot", "cold", "warm", "cool", "humid", "humidity", "forecast", "degree", "umbrella",
+        "jacket", "coat", "hike", "hiking", "walk", "walking", "jog", "jogging", "run", "running",
+        "drive", "driving", "outside", "outdoor", "outdoors", "pack", "packing", "trip", "travel",
+        "vacation", "weekend", "tomorrow", "tonight", "today", "this week", "uv", "aqi",
+        "air quality", "pollen", "flood", "hurricane", "tornado", "fog", "mist", "ice", "icy",
+        "frost", "sunrise", "sunset", "moon", "tide", "pressure", "visibility", "dew point",
+        "clothes", "clothing", "wear", "gear", "climate"
+    )
+
+    private val OFF_TOPIC_SIGNALS = listOf(
+        "capital of", "president of", "prime minister", "translate", "write a poem",
+        "write a story", "write code", "write a function", "python code", "javascript",
+        "html code", "css code", "sql query", "recipe for", "who is the ceo", "who won",
+        "define ", "meaning of life", "tell me a joke", "song lyrics", "movie review",
+        "stock price", "sports score", "solve this equation", "math problem", "homework help",
+        "essay about", "summarize this", "current time in"
+    )
+
+    /**
+     * A conservative denylist for messages that are almost certainly unrelated to weather at all
+     * — general trivia, coding help, translation, etc. — so they never reach the LLM in the first
+     * place. Distinct in approach from [matchIntent]'s allowlist: allowlisting risks rejecting a
+     * legitimate weather question phrased unusually, but this only blocks a message that matches
+     * a strong "definitely not weather" signal AND contains no weather-adjacent word at all — a
+     * borderline/ambiguous message still falls through to the LLM (today's existing behavior)
+     * rather than risk mishandling a real question. Exists because `ChatRepository.systemPrompt()`'s
+     * existing topic-scope rule already declines these politely, but only after spending a real,
+     * billed OpenRouter call to do it — this stops that call from ever going out.
+     */
+    fun isObviouslyOffTopic(text: String): Boolean {
+        val t = text.trim().lowercase()
+        if (t.isEmpty()) return false
+        if (WEATHER_WORDS.any { t.contains(it) }) return false
+        return OFF_TOPIC_SIGNALS.any { t.contains(it) }
+    }
+
     private data class Ctx(
         val w: WeatherData,
         val units: UnitSystem,
