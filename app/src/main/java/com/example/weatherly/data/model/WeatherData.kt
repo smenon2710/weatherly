@@ -42,6 +42,10 @@ data class WeatherData(
     // the hero's pulsing AI ring in CurrentHeader; defaults false for the usual ForecastCache/
     // persisted-JSON backward-compat reason.
     val pressureDropAlert: Boolean = false,
+    // Signed hPa delta between now and 6 hours out — negative falling, positive rising. Backs the
+    // Forecast Insight sheet's plain trend line (shown every time, not just on the pressureDropAlert
+    // threshold above), so that sheet always has something beyond the headline it also repeats.
+    val pressureTrend6h: Int? = null,
     val tips: List<WeatherTip>,
     val weekMinC: Int,
     val weekMaxC: Int,

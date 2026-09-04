@@ -368,6 +368,14 @@ class WeatherRepository(private val context: Context) {
             val futureMin = hourlyPressure.drop(1).take(6).minOrNull()
             nowP != null && futureMin != null && (nowP - futureMin) >= 3
         }
+        // Signed delta over the same 6-hour window, for the Forecast Insight sheet to show a
+        // plain trend reading ("falling"/"rising"/"steady") every time it's opened — not just on
+        // the rarer >=3 hPa alert threshold above, so the sheet always has something genuinely
+        // beyond the headline it also shows (the headline alone was user-reported as redundant
+        // with the always-visible hero pill).
+        val pressureTrend6h = hourlyPressure.getOrNull(6)?.let { future ->
+            hourlyPressure.getOrNull(0)?.let { now -> future - now }
+        }
 
         return WeatherData(
             locationName = locationName,
@@ -400,6 +408,7 @@ class WeatherRepository(private val context: Context) {
             sunset = clock(dSunset.getOrNull(todayIndex)),
             headline = headline,
             pressureDropAlert = pressureDropAlert,
+            pressureTrend6h = pressureTrend6h,
             comparedToYesterday = comparedToYesterday,
             tips = tips,
             weekMinC = weekMin,

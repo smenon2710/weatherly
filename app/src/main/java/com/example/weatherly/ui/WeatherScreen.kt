@@ -5,9 +5,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.togetherWith
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -351,6 +354,14 @@ fun WeatherContent(
         AnimatedContent(
             targetState = expandedDay,
             label = "dayDetailTransition",
+            // AnimatedContent's default behavior cross-fades the ENTIRE outgoing screen with the
+            // ENTIRE incoming screen — visible as both screens' text blended/overlapping mid-
+            // transition (confirmed as a real on-device issue, not a screenshot-timing artifact
+            // as first assumed). Disabling both here means the only thing that visibly animates
+            // is the shared-bounds element itself (the tapped row growing into the detail
+            // header); everything else in each screen appears/disappears immediately rather than
+            // fading through the other screen.
+            transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
             modifier = Modifier.fillMaxSize()
         ) { day ->
             if (day == null) {
@@ -518,8 +529,10 @@ private fun SharedTransitionScope.WeatherContentBody(
                             data, textColor = heroPrimary, subColor = heroSecondary,
                             onForecastClick = {
                                 onSheetChange(DetailSheet.Forecast(
-                                    data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
-                                    data.pressureDropAlert
+                                    headline = data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
+                                    pressureDropAlert = data.pressureDropAlert,
+                                    currentPressureHpa = data.pressureHpa,
+                                    pressureTrend6h = data.pressureTrend6h
                                 ))
                             }
                         )
@@ -626,7 +639,13 @@ private fun SharedTransitionScope.ExpandedDayDetail(
             .fillMaxSize()
             .sharedBounds(
                 rememberSharedContentState(key = "day-${day.dayLabel}"),
-                animatedVisibilityScope = animatedVisibilityScope
+                animatedVisibilityScope = animatedVisibilityScope,
+                // The row's compact Row layout and this full-screen Column have nothing in
+                // common structurally, so the default ResizeMode (RemeasureToBounds) — which
+                // relays out the child at every intermediate size during the animation — looks
+                // janky. ScaleToBounds renders each end's own layout once and scales/crossfades
+                // between them, which suits structurally-different content like this.
+                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds()
             )
             .background(AppBackground)
             .statusBarsPadding()

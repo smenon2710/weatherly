@@ -757,7 +757,12 @@ fun SharedTransitionScope.DailyCard(
                         .fillMaxWidth()
                         .sharedBounds(
                             rememberSharedContentState(key = "day-${day.dayLabel}"),
-                            animatedVisibilityScope = animatedVisibilityScope
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            // Matches ExpandedDayDetail's resizeMode — this row's compact layout
+                            // and the destination's full-screen layout share no structure, so
+                            // ScaleToBounds (scale + crossfade each end's own rendering) looks
+                            // far cleaner than the default remeasure-at-every-size behavior.
+                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds()
                         )
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onDayClick(day) }
@@ -1301,7 +1306,12 @@ sealed interface DetailSheet {
     data class AlertList(val alerts: List<WeatherAlert>) : DetailSheet
 
     // The hero's tap-to-expand AI summary — see CurrentHeader's pulsing ring doc comment.
-    data class Forecast(val headline: String, val pressureDropAlert: Boolean) : DetailSheet
+    data class Forecast(
+        val headline: String,
+        val pressureDropAlert: Boolean,
+        val currentPressureHpa: Int?,
+        val pressureTrend6h: Int?
+    ) : DetailSheet
 }
 
 @Composable
@@ -2267,6 +2277,37 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(sheet.headline, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                // Always show a plain pressure-trend reading, not only on the rarer
+                // pressureDropAlert threshold — otherwise this sheet's only content in the common
+                // case is the headline it also repeats, which is genuinely redundant with the
+                // always-visible hero pill (user-reported). This is real data not shown anywhere
+                // else in the app (the metrics grid's Pressure tile has the current value but no
+                // trend direction), so it's worth showing every time, not gated behind an anomaly.
+                if (sheet.currentPressureHpa != null) {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = TextSecondary.copy(alpha = 0.12f))
+                    Spacer(Modifier.height(16.dp))
+                    val trend = sheet.pressureTrend6h
+                    val trendWord = when {
+                        trend == null -> null
+                        trend <= -2 -> "falling"
+                        trend >= 2 -> "rising"
+                        else -> "holding steady"
+                    }
+                    Text(
+                        buildString {
+                            append("Pressure: ${sheet.currentPressureHpa} hPa")
+                            if (trendWord != null) append(", $trendWord")
+                        },
+                        color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium
+                    )
+                    if (trend != null && trendWord != "holding steady") {
+                        Text(
+                            "${if (trend < 0) "Down" else "Up"} ${kotlin.math.abs(trend)} hPa over the next 6 hours.",
+                            color = TextSecondary, fontSize = 13.sp
+                        )
+                    }
+                }
                 if (sheet.pressureDropAlert) {
                     Spacer(Modifier.height(12.dp))
                     Text(
