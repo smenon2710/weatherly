@@ -39,7 +39,10 @@ fun WeatherGlyph(
         modifier.size(size)
     Canvas(modifier = m) {
         val center = Offset(this.size.width / 2f, this.size.height / 2f)
-        drawWeather(glyphFor(code, isDay), center, this.size.minDimension)
+        drawWeather(
+            glyphFor(code, isDay), center, this.size.minDimension,
+            intensity = intensityFor(code), hasHail = hasHail(code)
+        )
     }
 }
 
@@ -65,6 +68,28 @@ internal fun glyphFor(code: Int, isDay: Boolean): Glyph = when (code) {
     95, 96, 99 -> if (isDay) Glyph.THUNDER    else Glyph.MOON_THUNDER
     else       -> Glyph.CLOUD
 }
+
+/**
+ * How many raindrops/snowflakes a RAIN/SNOW-family glyph draws, derived directly from the WMO
+ * code's own built-in intensity tier — Open-Meteo's code table already distinguishes
+ * light/moderate/heavy (or light/heavy) severity for drizzle, rain, freezing drizzle/rain, snow,
+ * and showers as genuinely distinct codes, matching the same distinction
+ * `WeatherBackground.classify()`'s animated scene already makes (`RainIntensity`/`SnowIntensity`
+ * tiers) for these exact code groups. Previously every code in a RAIN/SNOW glyph family rendered
+ * as an identical fixed-count icon regardless of real severity — this was real information the
+ * data already provided but the icon discarded, not a data gap needing new fields.
+ */
+internal fun intensityFor(code: Int): Int = when (code) {
+    51, 56, 61, 66, 71, 77, 80, 85 -> 1 // slight/light
+    53, 63, 73                     -> 2 // moderate
+    55, 57, 65, 67, 75, 82, 86     -> 3 // dense/heavy/violent
+    else                            -> 2
+}
+
+/** Whether a thunderstorm glyph should show hail accents — WMO 96/99 are specifically
+ * "thunderstorm with slight/heavy hail," distinct from plain 95, the same distinction
+ * `WeatherBackground.classify()` already makes (THUNDER vs THUNDER_HAIL scenes). */
+internal fun hasHail(code: Int): Boolean = code == 96 || code == 99
 
 /** Color set for [drawWeather] — lets a caller swap the whole palette without duplicating the
  * shape-composition logic per glyph. [MutedGlyphColors] is this app's own in-screen palette
@@ -102,7 +127,23 @@ internal val VividGlyphColors = GlyphColors(
     fog = Color(0xFFCFD8DC),
 )
 
-internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: GlyphColors = MutedGlyphColors) {
+/** Picks which of a shape's fixed drop/flake offsets to draw for a given intensity tier (1-3),
+ * preserving each glyph's own existing spacing/asymmetry rather than introducing new positions —
+ * 1 keeps just the middle position, 2 keeps the two outer ones, 3 (or anything else) keeps all. */
+private fun dropOffsetsFor(intensity: Int, full: List<Float>): List<Float> = when (intensity) {
+    1 -> listOf(full[1])
+    2 -> listOf(full[0], full[2])
+    else -> full
+}
+
+internal fun DrawScope.drawWeather(
+    glyph: Glyph,
+    c: Offset,
+    dim: Float,
+    colors: GlyphColors = MutedGlyphColors,
+    intensity: Int = 2,
+    hasHail: Boolean = false,
+) {
     when (glyph) {
         Glyph.SUN        -> drawSun(c, dim * 0.19f, colors.sun)
         Glyph.MOON       -> drawMoon(c, dim * 0.30f, colors.moon)
@@ -131,7 +172,7 @@ internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: 
         Glyph.RAIN -> {
             drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
             val sw = dim * 0.055f
-            listOf(-0.22f, 0f, 0.22f).forEach { xf ->
+            dropOffsetsFor(intensity, listOf(-0.22f, 0f, 0.22f)).forEach { xf ->
                 val x = c.x + xf * dim
                 drawLine(colors.rain, Offset(x + dim * 0.04f, c.y + dim * 0.20f),
                     Offset(x - dim * 0.02f, c.y + dim * 0.36f), strokeWidth = sw, cap = StrokeCap.Round)
@@ -139,19 +180,20 @@ internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: 
         }
         Glyph.SNOW -> {
             drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
-            listOf(-0.22f, 0f, 0.22f).forEach { xf ->
+            dropOffsetsFor(intensity, listOf(-0.22f, 0f, 0.22f)).forEach { xf ->
                 drawCircle(colors.snow, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.28f))
             }
         }
         Glyph.THUNDER -> {
             drawCloud(Offset(c.x, c.y - dim * 0.12f), dim * 0.78f, colors.cloud)
             drawBolt(c, dim, colors.bolt)
+            if (hasHail) drawHail(c, dim, colors.snow)
         }
         Glyph.MOON_RAIN -> {
             drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
             drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
             val sw = dim * 0.055f
-            listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
+            dropOffsetsFor(intensity, listOf(-0.17f, 0.05f, 0.26f)).forEach { xf ->
                 val x = c.x + xf * dim
                 drawLine(colors.rain, Offset(x + dim * 0.04f, c.y + dim * 0.16f),
                     Offset(x - dim * 0.02f, c.y + dim * 0.32f), strokeWidth = sw, cap = StrokeCap.Round)
@@ -160,7 +202,7 @@ internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: 
         Glyph.MOON_SNOW -> {
             drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
             drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
-            listOf(-0.17f, 0.05f, 0.26f).forEach { xf ->
+            dropOffsetsFor(intensity, listOf(-0.17f, 0.05f, 0.26f)).forEach { xf ->
                 drawCircle(colors.snow, dim * 0.045f, Offset(c.x + xf * dim, c.y + dim * 0.22f))
             }
         }
@@ -168,6 +210,7 @@ internal fun DrawScope.drawWeather(glyph: Glyph, c: Offset, dim: Float, colors: 
             drawMoon(Offset(c.x - dim * 0.22f, c.y - dim * 0.24f), dim * 0.13f, colors.moon)
             drawCloud(Offset(c.x + dim * 0.04f, c.y - dim * 0.02f), dim * 0.70f, colors.cloud)
             drawBolt(c, dim, colors.bolt)
+            if (hasHail) drawHail(c, dim, colors.snow)
         }
     }
 }
@@ -214,6 +257,15 @@ private fun DrawScope.drawBolt(c: Offset, dim: Float, color: Color) {
         close()
     }
     drawPath(bolt, color)
+}
+
+/** Small ice-toned dots flanking the bolt — the visual accent for WMO 96/99's "with hail",
+ * distinct from a plain thunderstorm (95). Reuses [GlyphColors.snow] (already a light icy tone)
+ * rather than adding a dedicated hail color field. */
+private fun DrawScope.drawHail(c: Offset, dim: Float, color: Color) {
+    listOf(-0.20f to 0.32f, 0.22f to 0.36f).forEach { (xf, yf) ->
+        drawCircle(color, dim * 0.035f, Offset(c.x + xf * dim, c.y + dim * yf))
+    }
 }
 
 private fun DrawScope.drawCloud(c: Offset, w: Float, color: Color) {

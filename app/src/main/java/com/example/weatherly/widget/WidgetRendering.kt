@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.example.weatherly.ui.components.VividGlyphColors
 import com.example.weatherly.ui.components.drawWeather
 import com.example.weatherly.ui.components.glyphFor
+import com.example.weatherly.ui.components.hasHail
+import com.example.weatherly.ui.components.intensityFor
 import android.graphics.Canvas as AndroidCanvas
 
 /**
@@ -38,7 +40,10 @@ fun renderGlyphBitmap(code: Int, isDay: Boolean, sizePx: Int): Bitmap {
         val center = Offset(sizePx / 2f, sizePx / 2f)
         // VividGlyphColors, not the in-app muted palette — a deliberate widget-only choice
         // (user-requested, referencing another weather app's more saturated widget icons).
-        drawWeather(glyphFor(code, isDay), center, sizePx.toFloat(), VividGlyphColors)
+        drawWeather(
+            glyphFor(code, isDay), center, sizePx.toFloat(), VividGlyphColors,
+            intensity = intensityFor(code), hasHail = hasHail(code)
+        )
     }
     return bitmap
 }
