@@ -24,9 +24,9 @@ These three don't need new engineering so much as a decision about scope, becaus
 
 **What's already there:** `WeatherWidget` (Jetpack Glance) already ships all of this — six responsive breakpoints (`SMALL`/`MEDIUM`/`TALL`/`WIDE`/`LARGE`/`XLARGE`), chrono-dynamic content (morning/daytime/night focus), Material You dynamic colors via `resolveWidgetColors()`, an `AlertIndicator` for active NWS alerts, real vector glyph icons, stale-while-revalidate rendering, and a manual refresh button. This is one of the most mature subsystems in the app (see `CLAUDE.md`'s "Widget" section — multiple full release cycles of real-device bug fixes already went into it). There's genuinely very little left to add here beyond a "launch the AI chat" quick-action tap target, which is a small, bounded addition to an existing, working system.
 
-### Lock-screen widgets (the other half of proposal #10)
+### Lock-screen widgets (the other half of proposal #10) — dropped, 2026-09-04
 
-**Reality check:** Android phones don't have a general public "lock-screen widget" surface — that capability was removed after Android 4.x and never returned (Wear OS has lock-screen-style complications; phones don't). This isn't a build-it-later item, it's a platform gap. The closest phone-side equivalent is a persistent/ongoing `Notification` showing current conditions, which is a different feature with its own permission (`POST_NOTIFICATIONS` on API 33+) and UX implications (an always-there notification is a much more invasive ask than a widget the user chose to place). Worth clarifying what's actually wanted before scoping anything under this name.
+**Decided: out of scope entirely, not pursued.** Android phones don't have a general public "lock-screen widget" surface — that capability was removed after Android 4.x and never returned (Wear OS has lock-screen-style complications; phones don't). The closest phone-side equivalent would be a persistent/ongoing `Notification`, which is a different, more invasive feature (its own permission, always-there UX) — and moot anyway, since the OS's own lock screen already surfaces weather (Android's at-a-glance/AOD clock-and-weather treatment) without this app needing to build anything. No further work here.
 
 ### Multi-source data — the NWS/NOAA half (part of proposal #9)
 
