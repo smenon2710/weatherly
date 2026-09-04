@@ -1336,10 +1336,13 @@ fun MetricsGrid(
         }
 
         // ── Atmosphere: AQI + Pressure ────────────────────────────────────────
+        // Air Quality carries an `advisory` line (see MetricTileData.advisory) that Pressure
+        // never does, so without matching them to the row's tallest child, Pressure's card wraps
+        // shorter than AQI's — same fix as the Sunrise+Visibility row below.
         SectionLabel(Icons.Filled.Air, "Atmosphere", Teal)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            m["Air Quality"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
-            m["Pressure"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f)) }
+        Row(modifier = Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            m["Air Quality"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
+            m["Pressure"]?.let { t -> ArcGaugeTile(t, { click(t) }, Modifier.weight(1f).fillMaxHeight()) }
         }
 
         // ── Sky: Sunrise + Visibility + Moon Phase ────────────────────────────
