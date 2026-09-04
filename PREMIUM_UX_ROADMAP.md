@@ -60,13 +60,7 @@ Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for
 
 ---
 
-## Medium — real, scoped feature work
-
-### 3. Gyroscope-Responsive Particles (the new half of proposal #2)
-
-**What's proposed:** rain/snow particles that drift based on how the user tilts the phone.
-
-**What's already there:** the live particle simulation itself is not new — `WeatherBackground.kt` already runs a full per-condition particle system (`drawRain`, `drawSnow`, `drawSleet`, `drawHail`, `drawWindStreaks`, and more, 26 `Scene` values in total) driven by real wind/precipitation data on a shared `timeMs` clock (`CLAUDE.md`'s `WeatherBackground` section covers this in detail). The genuinely new piece is a `SensorManager` listener (accelerometer or gyroscope) feeding a tilt value into the existing per-particle position math, lifecycle-scoped so the listener registers/unregisters correctly with the composable. This is a scoped addition on top of a mature system, not a rebuild — the risk is mostly in getting sensor lifecycle and battery impact right, not in the visual effect itself.
+## Medium — in scope, real, scoped feature work
 
 ### 4. Glanceable AI Ring + Proactive Summary (proposal #5)
 
@@ -82,7 +76,19 @@ Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for
 
 **Current state:** tapping a `DailyCard` row today opens `DetailSheet.Day` as a `ModalBottomSheet` (see `CLAUDE.md`'s "Detail sheet system" section) — not a shared-element expansion. Compose's `SharedTransitionLayout` is a real, usable API in current Compose releases and would let that specific row expand in place rather than a sheet sliding up. This is a genuine, bounded redesign of one interaction (the day-row → detail-day path), not an app-wide navigation overhaul — the other detail sheets (metrics, alerts) aren't in scope for this unless a decision is made to extend the same treatment everywhere.
 
-### 6. Conversational Voice Interface (proposal #6)
+---
+
+## Medium — shelved for now (2026-09-04)
+
+Deprioritized, not rejected on the merits — the two items above (AI ring, fluid transitions) are the active Medium-tier scope for now. These two can come back into scope later without anything below being wrong or reconsidered.
+
+### Gyroscope-Responsive Particles (the new half of proposal #2)
+
+**What's proposed:** rain/snow particles that drift based on how the user tilts the phone.
+
+**What's already there:** the live particle simulation itself is not new — `WeatherBackground.kt` already runs a full per-condition particle system (`drawRain`, `drawSnow`, `drawSleet`, `drawHail`, `drawWindStreaks`, and more, 26 `Scene` values in total) driven by real wind/precipitation data on a shared `timeMs` clock (`CLAUDE.md`'s `WeatherBackground` section covers this in detail). The genuinely new piece is a `SensorManager` listener (accelerometer or gyroscope) feeding a tilt value into the existing per-particle position math, lifecycle-scoped so the listener registers/unregisters correctly with the composable. This is a scoped addition on top of a mature system, not a rebuild — the risk is mostly in getting sensor lifecycle and battery impact right, not in the visual effect itself.
+
+### Conversational Voice Interface (proposal #6)
 
 **What's proposed:** hands-free voice queries, leaning into the "Speak" half of the SkySpeak name.
 
@@ -115,15 +121,15 @@ Separately, #8 also needs infrastructure the app doesn't have at all today: **no
 ## Suggested sequencing (not a commitment)
 
 1. ~~**Easy tier first** (#4 haptics)~~ — done, see above.
-2. **Medium tier next**, roughly in this order: #3 gyroscope tilt (smallest, extends a system that already works) → #4 (this doc's) AI ring (visible, builds on existing headline logic) → #5 fluid transitions (bounded UI redesign) → #6 voice (most design decisions to resolve first).
+2. **Medium tier next, active scope**: #4 AI ring (visible, builds on existing headline logic) → #5 fluid transitions (bounded UI redesign). Gyroscope tilt and voice are shelved for now (2026-09-04) — deprioritized, not rejected — see "Medium — shelved for now."
 3. **Complex tier — spike before committing**: a short on-device experiment with real `RenderEffect` blur (not alpha-blending) for glassmorphism, and a short AGSL shader prototype gated to API 33+, before deciding whether #1 is worth the fallback-path investment. For #8/#9, the open question is the licensing/monetization decision, not a technical spike — that conversation should happen before any code.
 
 ---
 
 ## Open questions for the next conversation
 
-1. For the lock-screen half of #10 — is a persistent/ongoing notification actually what's wanted, given phones don't have a real lock-screen-widget surface? Worth confirming before it's scoped as anything.
+1. ~~For the lock-screen half of #10~~ — resolved 2026-09-04: dropped entirely, no scope. See "Already covered" above.
 2. For #1's glassmorphism half — worth a quick real-device spike with `RenderEffect` blur specifically, or is this shelved given the prior documented failure?
 3. For #8/#9 — is moving off Open-Meteo's free non-commercial tier (to get real minute-level nowcasting or a second provider) actually on the table? This is the same monetization conversation `premium_widget_strategy.md` and `AI_ROADMAP_NEXT_VERSION.md` both already opened and left unresolved — worth deciding once rather than three separate times across three docs.
-4. Does #6 (voice) still make sense to prioritize alongside `AI_ROADMAP_NEXT_VERSION.md`'s open question about whether free-form AI chat should be *scaled back* rather than expanded? Building a voice interface for a chat feature whose future is itself undecided is worth sequencing deliberately.
-5. Any of the Medium-tier items you'd want scoped into an actual implementation plan first, or do you want to sit with this grouping for a bit before picking?
+4. Voice (shelved) still shares an open question with `AI_ROADMAP_NEXT_VERSION.md`: whether free-form AI chat should be *scaled back* rather than expanded. Worth resolving that before voice comes back into scope, whenever it does.
+5. Ready to scope the AI ring (#4) or fluid transitions (#5) into an actual implementation plan next?
