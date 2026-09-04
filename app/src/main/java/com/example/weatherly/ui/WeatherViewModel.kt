@@ -13,6 +13,7 @@ import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
+import com.example.weatherly.util.playConditionHaptic
 import com.example.weatherly.widget.WeatherWidget
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.delay
@@ -117,6 +118,12 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     trackAlertChanges(it.alerts)
                     // Keep home-screen widget in sync whenever the app fetches fresh data.
                     viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
+                    // Only a foreground load the user is actually looking at (cold start, retry,
+                    // a location/unit change) — never a silent periodic or pull-to-refresh
+                    // background reload, which the user may not even be looking at the phone for.
+                    if (!background && prefs.getHapticFeedbackEnabled()) {
+                        playConditionHaptic(getApplication(), it)
+                    }
                 }
                     .onFailure {
                         if (!background || _state.value !is WeatherUiState.Success) {

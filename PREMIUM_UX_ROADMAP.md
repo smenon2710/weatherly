@@ -50,7 +50,11 @@ This doesn't affect the **Glanceable AI ring (#5 below)** — it stands on its o
 
 ## Easy — small, self-contained, low risk
 
-### 1. Adaptive Haptic Feedback (proposal #4)
+### 1. Adaptive Haptic Feedback (proposal #4) — ✅ IMPLEMENTED (2026-09-04)
+
+**Shipped.** See `IMPROVEMENTS.md`'s "Completed — Adaptive Haptic Feedback (2026-09-04)" entry and `CLAUDE.md`'s "Haptic feedback" section for full detail. Summary: `util/WeatherHaptics.kt` fires one restrained pulse on a foreground forecast load for a severe alert, thunderstorm, or heavy rain/snow (reusing `wmoText()`'s existing WMO categorization) — never on a silent background/periodic refresh. Toggleable in Settings → Haptic Feedback, default on. `assembleDebug`/`test` (38/38)/`lint` all pass; **not yet verified on a real device** — pattern timings are a first pass, worth a real on-device feel-check before calling this fully done.
+
+Left below as the original plan/rationale.
 
 Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for an irregular "rumble" pattern mapped to alert severity, or a light repeating click pattern mapped to precipitation intensity. No new dependency; only needs the existing `VIBRATE` permission (normal, no runtime prompt). Should respect the system's haptic-feedback toggle rather than always firing. Genuinely small and self-contained — a good first pick if the goal is a quick, low-risk win before the bigger items.
 
@@ -110,7 +114,7 @@ Separately, #8 also needs infrastructure the app doesn't have at all today: **no
 
 ## Suggested sequencing (not a commitment)
 
-1. **Easy tier first** (#4 haptics) — low risk, no new infrastructure, ships fast.
+1. ~~**Easy tier first** (#4 haptics)~~ — done, see above.
 2. **Medium tier next**, roughly in this order: #3 gyroscope tilt (smallest, extends a system that already works) → #4 (this doc's) AI ring (visible, builds on existing headline logic) → #5 fluid transitions (bounded UI redesign) → #6 voice (most design decisions to resolve first).
 3. **Complex tier — spike before committing**: a short on-device experiment with real `RenderEffect` blur (not alpha-blending) for glassmorphism, and a short AGSL shader prototype gated to API 33+, before deciding whether #1 is worth the fallback-path investment. For #8/#9, the open question is the licensing/monetization decision, not a technical spike — that conversation should happen before any code.
 

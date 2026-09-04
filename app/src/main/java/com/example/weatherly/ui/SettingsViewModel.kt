@@ -67,4 +67,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         // system-scheduled widget update.
         viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
     }
+
+    private val _hapticsEnabled = MutableStateFlow(prefs.getHapticFeedbackEnabled())
+    val hapticsEnabled: StateFlow<Boolean> = _hapticsEnabled.asStateFlow()
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        prefs.setHapticFeedbackEnabled(enabled)
+        _hapticsEnabled.value = enabled
+    }
 }

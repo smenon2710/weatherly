@@ -150,6 +150,17 @@ class PreferencesStore(context: Context) {
         prefs.edit().putBoolean(KEY_WIDGET_TRANSPARENT, transparent).apply()
     }
 
+    // --- Haptics --------------------------------------------------------------
+    /** Whether a single restrained haptic pulse fires when a fresh forecast loads for a notable
+     * condition (active severe alert, thunderstorm, or heavy rain/snow) — see
+     * util/WeatherHaptics.kt. Defaults to on; toggleable since any unsolicited vibration is
+     * undesirable for some users (accessibility, quiet environments). */
+    fun getHapticFeedbackEnabled(): Boolean = prefs.getBoolean(KEY_HAPTICS_ENABLED, true)
+
+    fun setHapticFeedbackEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HAPTICS_ENABLED, enabled).apply()
+    }
+
     companion object {
         private const val KEY_UNITS = "units"
         private const val KEY_PLACES = "places"
@@ -159,6 +170,7 @@ class PreferencesStore(context: Context) {
         private const val KEY_THEME = "theme_preference"
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
         private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
+        private const val KEY_HAPTICS_ENABLED = "haptics_enabled"
         private const val KEY_LLM_USAGE_DATE = "llm_usage_date"
         private const val KEY_LLM_USAGE_COUNT = "llm_usage_count"
     }

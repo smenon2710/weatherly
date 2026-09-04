@@ -79,6 +79,7 @@ fun SettingsScreen(
     val hasOwnKey by settingsViewModel.hasOwnOpenRouterKey.collectAsStateWithLifecycle()
     val storedModel by settingsViewModel.openRouterModel.collectAsStateWithLifecycle()
     val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
+    val hapticsEnabled by settingsViewModel.hapticsEnabled.collectAsStateWithLifecycle()
 
     // The key field never holds the stored secret — only whatever new value the
     // user is about to save. See SettingsViewModel for why.
@@ -200,6 +201,37 @@ fun SettingsScreen(
                     Text(
                         "Transparent lets your wallpaper show through the widget. Text may be " +
                             "harder to read against busy wallpapers.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Haptic Feedback")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OptionPill(
+                            label = "On",
+                            icon = null,
+                            selected = hapticsEnabled,
+                            onClick = { settingsViewModel.setHapticsEnabled(true) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OptionPill(
+                            label = "Off",
+                            icon = null,
+                            selected = !hapticsEnabled,
+                            onClick = { settingsViewModel.setHapticsEnabled(false) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "A brief vibration when the forecast loads for a notable condition — an " +
+                            "active severe alert, a thunderstorm, or heavy rain/snow. Ordinary " +
+                            "weather stays silent.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )

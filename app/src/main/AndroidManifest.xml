@@ -6,6 +6,9 @@
     <!-- Location: COARSE is enough for city-level weather. FINE is optional. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Normal permission, no runtime prompt: a single restrained haptic pulse for notable
+         conditions (severe alert, thunderstorm, heavy rain/snow). See util/WeatherHaptics.kt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
