@@ -1,5 +1,8 @@
 package com.example.weatherly.ui.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -728,10 +731,12 @@ private fun MetricBarChart(chart: MetricChart, accent: Color) {
     )
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun DailyCard(
+fun SharedTransitionScope.DailyCard(
     data: WeatherData,
     onDayClick: (DayEntry) -> Unit,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier
 ) {
     // Derived rather than added as a new WeatherData field: windUnit is already set from
@@ -744,8 +749,16 @@ fun DailyCard(
             Spacer(Modifier.height(8.dp))
             data.daily.forEachIndexed { index, day ->
                 Row(
+                    // Tagged with the day's own label as the shared-element key — unique within
+                    // one 7-day fetch (Today/Sat/Sun/.../Thu never repeat) — so tapping this row
+                    // grows it into ExpandedDayDetail's matching container instead of a sheet
+                    // sliding up. See WeatherScreen.kt's WeatherContent for the other end of this.
                     modifier = Modifier
                         .fillMaxWidth()
+                        .sharedBounds(
+                            rememberSharedContentState(key = "day-${day.dayLabel}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onDayClick(day) }
                         .padding(vertical = 8.dp),
@@ -1282,8 +1295,6 @@ sealed interface DetailSheet {
         // Today's full high/low tide predictions — only ever non-null for the "Tides" tile.
         val tideEvents: List<TideEvent>? = null,
     ) : DetailSheet
-
-    data class Day(val day: DayEntry, val windUnit: String, val precipUnit: String) : DetailSheet
 
     data class Alert(val alert: WeatherAlert) : DetailSheet
 
@@ -2165,6 +2176,46 @@ private fun TideDetailContent(sheet: DetailSheet.Metric) {
     )
 }
 
+/**
+ * A single day's full detail content — date, glyph + phrase + H/L, day-outlook tips, then the raw
+ * `DetailRow`s. Extracted so it can be reused by both the day-row's shared-element expansion
+ * (`WeatherScreen.kt`'s `ExpandedDayDetail`, the current entry point) and, historically, the
+ * `DetailSheet.Day` bottom-sheet path it replaced — kept as a standalone composable rather than
+ * inlined into either caller so a future second entry point doesn't need to duplicate it again.
+ */
+@Composable
+fun DayDetailBody(day: DayEntry, windUnit: String, precipUnit: String) {
+    Text(day.fullDateLabel, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(12.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        WeatherGlyph(code = day.icon, isDay = true, size = 44.dp)
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(day.phrase ?: "", color = TextPrimary, fontSize = 18.sp)
+            Text("H:${day.highC}°   L:${day.lowC}°", color = TextSecondary, fontSize = 16.sp)
+        }
+    }
+    // Practical "how to plan around this day" advice — conclusion first, before the raw numbers
+    // below. Same TipBanner visual language as the hero's tip (editorial left-accent-bar style,
+    // not a full card), reused rather than a new treatment.
+    if (day.tips.isNotEmpty()) {
+        Spacer(Modifier.height(16.dp))
+        Column {
+            day.tips.forEachIndexed { i, tip ->
+                if (i > 0) Spacer(Modifier.height(8.dp))
+                TipBanner(tip)
+            }
+        }
+    }
+    Spacer(Modifier.height(18.dp))
+    DetailRow("Sunrise", day.sunrise ?: "--")
+    DetailRow("Sunset", day.sunset ?: "--")
+    DetailRow("Max UV index", day.uvMax?.toString() ?: "--")
+    DetailRow("Chance of rain", day.precipProbMax?.let { "$it%" } ?: "--")
+    DetailRow("Precipitation", day.precipSumMm?.let { "$it $precipUnit" } ?: "0 $precipUnit")
+    DetailRow("Max wind", day.windMaxKmh?.let { "$it $windUnit" } ?: "--")
+}
+
 @Composable
 fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Unit = {}) {
     // verticalScroll is a general safety net, not just for AlertList: ModalBottomSheet does not
@@ -2187,38 +2238,6 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 "Moon Phase"    -> MoonDetailContent(sheet)
                 "Tides"         -> TideDetailContent(sheet)
                 else            -> DefaultMetricContent(sheet)
-            }
-            is DetailSheet.Day -> {
-                val day = sheet.day
-                Text(day.fullDateLabel, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    WeatherGlyph(code = day.icon, isDay = true, size = 44.dp)
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(day.phrase ?: "", color = TextPrimary, fontSize = 18.sp)
-                        Text("H:${day.highC}°   L:${day.lowC}°", color = TextSecondary, fontSize = 16.sp)
-                    }
-                }
-                // Practical "how to plan around this day" advice — conclusion first, before the
-                // raw numbers below. Same TipBanner visual language as the hero's tip (editorial
-                // left-accent-bar style, not a full card), reused rather than a new treatment.
-                if (day.tips.isNotEmpty()) {
-                    Spacer(Modifier.height(16.dp))
-                    Column {
-                        day.tips.forEachIndexed { i, tip ->
-                            if (i > 0) Spacer(Modifier.height(8.dp))
-                            TipBanner(tip)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(18.dp))
-                DetailRow("Sunrise", day.sunrise ?: "--")
-                DetailRow("Sunset", day.sunset ?: "--")
-                DetailRow("Max UV index", day.uvMax?.toString() ?: "--")
-                DetailRow("Chance of rain", day.precipProbMax?.let { "$it%" } ?: "--")
-                DetailRow("Precipitation", day.precipSumMm?.let { "$it ${sheet.precipUnit}" } ?: "0 ${sheet.precipUnit}")
-                DetailRow("Max wind", day.windMaxKmh?.let { "$it ${sheet.windUnit}" } ?: "--")
             }
             is DetailSheet.Alert -> AlertDetailContent(sheet.alert)
             // A tappable summary list, not every alert's full write-up stacked at full height —

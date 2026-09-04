@@ -74,7 +74,11 @@ Left below as the original plan/rationale.
 
 **Scope note:** this stands alone without any per-activity personalization — see "Considered and dropped" above for why lifestyle-context thresholds specifically were ruled out. Keep this to generic, data-backed observations ("wind picking up after 3 PM," "rain holding off until this evening") rather than any suitability/safety-flavored phrasing, consistent with the same guardrail principle.
 
-### 5. Fluid Layout Transitions (proposal #3)
+### 5. Fluid Layout Transitions (proposal #3) — ✅ IMPLEMENTED (2026-09-04)
+
+**Shipped.** See `CLAUDE.md`'s "Fluid day-detail transition" section and `IMPROVEMENTS.md` for full detail. Summary: tapping a day in the 7-day forecast now grows that row into a full-screen detail view via Compose's `SharedTransitionLayout`/`AnimatedContent`, replacing the old `DetailSheet.Day` bottom sheet (removed entirely, not left as dead code). Verified live on-device across two different days, plus back-navigation returning to the list at its prior scroll position.
+
+Left below as the original plan/rationale.
 
 **What's proposed:** tapping a day in the 7-day forecast expands that row into a full detail view via a physically continuous transition, instead of a sheet snapping open.
 
@@ -125,7 +129,7 @@ Separately, #8 also needs infrastructure the app doesn't have at all today: **no
 ## Suggested sequencing (not a commitment)
 
 1. ~~**Easy tier first** (#4 haptics)~~ — done, see above.
-2. **Medium tier next, active scope**: #4 AI ring (visible, builds on existing headline logic) → #5 fluid transitions (bounded UI redesign). Gyroscope tilt and voice are shelved for now (2026-09-04) — deprioritized, not rejected — see "Medium — shelved for now."
+2. ~~**Medium tier, active scope** (#4 AI ring, #5 fluid transitions)~~ — both done, see above. Gyroscope tilt and voice remain shelved (2026-09-04) — deprioritized, not rejected — see "Medium — shelved for now."
 3. **Complex tier — spike before committing**: a short on-device experiment with real `RenderEffect` blur (not alpha-blending) for glassmorphism, and a short AGSL shader prototype gated to API 33+, before deciding whether #1 is worth the fallback-path investment. For #8/#9, the open question is the licensing/monetization decision, not a technical spike — that conversation should happen before any code.
 
 ---
@@ -136,4 +140,4 @@ Separately, #8 also needs infrastructure the app doesn't have at all today: **no
 2. For #1's glassmorphism half — worth a quick real-device spike with `RenderEffect` blur specifically, or is this shelved given the prior documented failure?
 3. For #8/#9 — is moving off Open-Meteo's free non-commercial tier (to get real minute-level nowcasting or a second provider) actually on the table? This is the same monetization conversation `premium_widget_strategy.md` and `AI_ROADMAP_NEXT_VERSION.md` both already opened and left unresolved — worth deciding once rather than three separate times across three docs.
 4. Voice (shelved) still shares an open question with `AI_ROADMAP_NEXT_VERSION.md`: whether free-form AI chat should be *scaled back* rather than expanded. Worth resolving that before voice comes back into scope, whenever it does.
-5. Ready to scope the AI ring (#4) or fluid transitions (#5) into an actual implementation plan next?
+5. ~~Ready to scope the AI ring (#4) or fluid transitions (#5) into an actual implementation plan next?~~ — resolved: both implemented 2026-09-04. Next candidates, if any: the shelved Medium items (gyroscope tilt, voice), or a Complex-tier spike (see above).

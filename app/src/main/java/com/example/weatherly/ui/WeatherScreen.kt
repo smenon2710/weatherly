@@ -1,11 +1,18 @@
 package com.example.weatherly.ui
 
 import android.Manifest
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -63,6 +71,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherData
@@ -71,6 +80,7 @@ import com.example.weatherly.ui.components.ResolvedAlertCard
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.AttributionFooter
 import com.example.weatherly.ui.components.CurrentHeader
+import com.example.weatherly.ui.components.DayDetailBody
 import com.example.weatherly.ui.components.Cyan
 import com.example.weatherly.ui.components.DailyCard
 import com.example.weatherly.ui.components.DetailSheet
@@ -308,7 +318,7 @@ private fun PlaceRow(
 }
 
 /** Stateless content — used by the screen and by @Preview. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun WeatherContent(
     data: WeatherData,
@@ -322,6 +332,11 @@ fun WeatherContent(
     onDismissResolved: (String) -> Unit = {}
 ) {
     var sheet by remember { mutableStateOf<DetailSheet?>(null) }
+    // Tapping a day in the 7-day forecast expands that row into a full detail view via a shared-
+    // element transition, instead of opening DetailSheet.Day as a ModalBottomSheet the way every
+    // other detail view still does — see DailyCard/ExpandedDayDetail below.
+    var expandedDay by remember { mutableStateOf<DayEntry?>(null) }
+    BackHandler(enabled = expandedDay != null) { expandedDay = null }
 
     // Hero text sits directly on WeatherBackground's animated scene with no card/scrim behind it,
     // so its color has to be calibrated against that scene rather than the fixed app-wide
@@ -332,6 +347,60 @@ fun WeatherContent(
     }
     val (heroPrimary, heroSecondary) = heroTextColors(heroIsDark)
 
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = expandedDay,
+            label = "dayDetailTransition",
+            modifier = Modifier.fillMaxSize()
+        ) { day ->
+            if (day == null) {
+                with(this@SharedTransitionLayout) {
+                    WeatherContentBody(
+                        data = data, cachedAt = cachedAt, isRefreshing = isRefreshing,
+                        onRefresh = onRefresh, resolvedAlerts = resolvedAlerts,
+                        onDismissResolved = onDismissResolved,
+                        onOpenLocations = onOpenLocations, onOpenChat = onOpenChat,
+                        onOpenSettings = onOpenSettings,
+                        heroPrimary = heroPrimary, heroSecondary = heroSecondary,
+                        sheet = sheet, onSheetChange = { sheet = it },
+                        onDayClick = { expandedDay = it },
+                        animatedVisibilityScope = this@AnimatedContent
+                    )
+                }
+            } else {
+                with(this@SharedTransitionLayout) {
+                    ExpandedDayDetail(
+                        day = day,
+                        windUnit = data.windUnit,
+                        precipUnit = data.precipUnit,
+                        animatedVisibilityScope = this@AnimatedContent,
+                        onBack = { expandedDay = null }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@Composable
+private fun SharedTransitionScope.WeatherContentBody(
+    data: WeatherData,
+    cachedAt: Long?,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    resolvedAlerts: List<TrackedAlert>,
+    onDismissResolved: (String) -> Unit,
+    onOpenLocations: () -> Unit,
+    onOpenChat: () -> Unit,
+    onOpenSettings: () -> Unit,
+    heroPrimary: Color,
+    heroSecondary: Color,
+    sheet: DetailSheet?,
+    onSheetChange: (DetailSheet?) -> Unit,
+    onDayClick: (DayEntry) -> Unit,
+    animatedVisibilityScope: AnimatedVisibilityScope
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Full-screen animated scene (rain/snow/fog/clouds/etc., condition + time-of-day driven) —
         // sits behind the entire scrolling content, not just the hero. Cards below are fully
@@ -448,10 +517,10 @@ fun WeatherContent(
                         CurrentHeader(
                             data, textColor = heroPrimary, subColor = heroSecondary,
                             onForecastClick = {
-                                sheet = DetailSheet.Forecast(
+                                onSheetChange(DetailSheet.Forecast(
                                     data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
                                     data.pressureDropAlert
-                                )
+                                ))
                             }
                         )
                         Spacer(Modifier.height(20.dp))
@@ -481,8 +550,8 @@ fun WeatherContent(
                         Spacer(Modifier.height(12.dp))
                         AlertBannerList(
                             alerts = data.alerts,
-                            onAlertClick = { sheet = DetailSheet.Alert(it) },
-                            onMoreClick = { sheet = DetailSheet.AlertList(it) }
+                            onAlertClick = { onSheetChange(DetailSheet.Alert(it)) },
+                            onMoreClick = { onSheetChange(DetailSheet.AlertList(it)) }
                         )
                     }
                     resolvedAlerts.forEach { resolved ->
@@ -494,10 +563,11 @@ fun WeatherContent(
                     Spacer(Modifier.height(12.dp))
                     DailyCard(
                         data,
-                        onDayClick = { sheet = DetailSheet.Day(it, data.windUnit, data.precipUnit) }
+                        onDayClick = onDayClick,
+                        animatedVisibilityScope = animatedVisibilityScope
                     )
                     Spacer(Modifier.height(12.dp))
-                    MetricsGrid(data, onMetricClick = { sheet = it })
+                    MetricsGrid(data, onMetricClick = { onSheetChange(it) })
                     if (cachedAt != null) {
                         val agoText = remember(cachedAt) {
                             val agoMin = (System.currentTimeMillis() - cachedAt) / 60_000
@@ -526,12 +596,49 @@ fun WeatherContent(
         // fully expanded removes the stop that causes the tug-of-war.
         val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
-            onDismissRequest = { sheet = null },
+            onDismissRequest = { onSheetChange(null) },
             sheetState = detailSheetState,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
-            DetailSheetContent(current, onAlertSelected = { sheet = DetailSheet.Alert(it) })
+            DetailSheetContent(current, onAlertSelected = { onSheetChange(DetailSheet.Alert(it)) })
         }
+    }
+}
+
+/**
+ * The shared-element destination for tapping a day in the 7-day forecast — grows from that row
+ * (see DailyCard's matching `Modifier.sharedBounds` with the same "day-${day.dayLabel}" key)
+ * into this full-screen view rather than a sheet sliding up. Content itself is `DayDetailBody`,
+ * the same body `DetailSheet.Day`'s bottom sheet used to render before this feature replaced it.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun SharedTransitionScope.ExpandedDayDetail(
+    day: DayEntry,
+    windUnit: String,
+    precipUnit: String,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .sharedBounds(
+                rememberSharedContentState(key = "day-${day.dayLabel}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+            .background(AppBackground)
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.padding(top = 8.dp)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+        }
+        Spacer(Modifier.height(8.dp))
+        DayDetailBody(day, windUnit, precipUnit)
+        Spacer(Modifier.height(28.dp))
     }
 }
 
