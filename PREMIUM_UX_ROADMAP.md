@@ -10,6 +10,7 @@
 - **One proposal (glassmorphism/frosted cards) was already tried and reverted, for a documented reason.** `CLAUDE.md`'s `GlassCard` section explains a translucent card fill over the animated background produced visibly patchy, seamed cards — confirmed via a real device screenshot, worse in light mode. What wasn't tried is *true* `RenderEffect` blur (API 31+) rather than plain alpha-blending — that's a real, open, unverified alternative, not a repeat of the same failure, but it needs its own spike before assuming it'll fare better.
 - **Two proposals (hyper-local proactive alerts, multi-source data) hit the same underlying wall:** genuine minute-level nowcasting and a second forecast provider both need a paid/non-Open-Meteo data source, which reopens the exact licensing conversation already logged in `premium_widget_strategy.md` — "if the app becomes paid, Open-Meteo's free non-commercial tier no longer applies." These aren't just engineering tickets; they're data-sourcing and monetization decisions first.
 - **`minSdk = 26` is a recurring constraint**, not a one-off: AGSL runtime shaders need API 33+, `RenderEffect` blur needs API 31+, and on-device speech recognition needs API 31+. Every item that touches these needs an explicit fallback story for API 26–30/32, not just a "does it compile" check.
+- **Semantic Lifestyle Context (proposal #7) was considered and dropped** — see "Considered and dropped" below. Not a technical concern; a liability one, consistent with a guardrail the app already enforces elsewhere.
 
 ---
 
@@ -35,19 +36,23 @@ These three don't need new engineering so much as a decision about scope, becaus
 
 ---
 
+## Considered and dropped
+
+### Semantic Lifestyle Context (proposal #7) — dropped, 2026-09-04
+
+**What was proposed:** the AI learns personal routines — "perfect running weather," "good gardening conditions" — and proactively tells the user their custom conditions are met.
+
+**Why dropped:** a liability call, not a technical one. This app already has an explicit guardrail against exactly this kind of confident, unsolicited safety/suitability claim — `ChatRepository.systemPrompt()`'s safety/liability rule instructs the model to avoid definitive-sounding statements for driving/hiking-type questions, framing things as "no active advisories, but conditions can change" rather than an outright "it's safe" (see `CLAUDE.md`'s "AI chat: local-first routing, guardrails, and usage cap" section). A proactive "good running weather right now" notification is a *more* confident, *more* prominent version of the exact claim that rule exists to soften — surfaced without being asked, not tucked into a chat reply the user requested. If a user relies on it and gets caught in conditions the app's coarse per-activity thresholds didn't anticipate (a storm cell it didn't model, an individual health sensitivity it can't know about), that's a real trust and liability exposure this app has deliberately avoided taking on elsewhere. Not worth reopening that principle for one feature.
+
+This doesn't affect the **Glanceable AI ring (#5 below)** — it stands on its own using only the existing generic anomaly/headline logic (`buildUpcomingHeadline()`), with no per-activity personalization or endorsement language involved.
+
+---
+
 ## Easy — small, self-contained, low risk
 
 ### 1. Adaptive Haptic Feedback (proposal #4)
 
 Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for an irregular "rumble" pattern mapped to alert severity, or a light repeating click pattern mapped to precipitation intensity. No new dependency; only needs the existing `VIBRATE` permission (normal, no runtime prompt). Should respect the system's haptic-feedback toggle rather than always firing. Genuinely small and self-contained — a good first pick if the goal is a quick, low-risk win before the bigger items.
-
-### 2. Semantic Lifestyle Context (proposal #7)
-
-**What's proposed:** the AI understands personal routines — "perfect running weather," "good gardening conditions" — specific to that user, not generic thresholds.
-
-**Why this is Easy, not Medium/Complex:** it's an extension of two patterns that already exist rather than new architecture. `WeatherAdvisor`'s six intents already do threshold-based reasoning over live `WeatherData` (see `CLAUDE.md`'s advice-intent write-up); `ChatRepository.systemPrompt()`'s `weatherBrief()` already assembles a structured context block fed to the LLM. Adding a small `PreferencesStore`-backed set of user-defined thresholds (e.g. "ideal running temp range," "hikes only if UV < 6") and either (a) checking them in `WeatherAdvisor` for a seventh local intent, or (b) appending a "USER PREFERENCES" block to the existing system prompt, is straightforward within both existing systems. The real work here is UX/product design (how many activities, how much configuration to expose in Settings) more than technical difficulty.
-
-**Pairs with:** the Medium-tier "Glanceable AI ring" (#5, below) — once personal thresholds exist, the ambient ring's proactive summary can reference them ("good running weather in the next 2 hours") instead of only generic anomaly detection.
 
 ---
 
@@ -64,6 +69,8 @@ Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for
 **What's proposed:** an ambient, pulsing AI indicator around the current temperature that expands into a one-sentence proactive summary when it detects something worth flagging.
 
 **What's already there:** the text-generation half of this already exists. `WeatherRepository.buildUpcomingHeadline()` already scans the next 12 hours of real hourly data for significant condition changes and produces exactly this style of sentence (e.g. the existing lookahead pill under the hero — see `CLAUDE.md`'s "Lookahead pill" section). The genuinely new work is UI: a pulsing ring affordance around the temperature, and an expand-to-bottom-sheet interaction on tap. This is real, visible feature work — new animation, a new interaction pattern — but it's UI/animation work layered on an existing data pipeline, not a new intelligence system. "Forecast anomaly" detection (e.g. a sudden pressure drop) would need a small addition to that pipeline (pressure-delta check), which is a bounded, well-scoped addition given `WeatherData.pressure` and the day/hour blocks already exist.
+
+**Scope note:** this stands alone without any per-activity personalization — see "Considered and dropped" above for why lifestyle-context thresholds specifically were ruled out. Keep this to generic, data-backed observations ("wind picking up after 3 PM," "rain holding off until this evening") rather than any suitability/safety-flavored phrasing, consistent with the same guardrail principle.
 
 ### 5. Fluid Layout Transitions (proposal #3)
 
@@ -103,7 +110,7 @@ Separately, #8 also needs infrastructure the app doesn't have at all today: **no
 
 ## Suggested sequencing (not a commitment)
 
-1. **Easy tier first** (#4 haptics, #7 lifestyle context) — low risk, no new infrastructure, ships fast.
+1. **Easy tier first** (#4 haptics) — low risk, no new infrastructure, ships fast.
 2. **Medium tier next**, roughly in this order: #3 gyroscope tilt (smallest, extends a system that already works) → #4 (this doc's) AI ring (visible, builds on existing headline logic) → #5 fluid transitions (bounded UI redesign) → #6 voice (most design decisions to resolve first).
 3. **Complex tier — spike before committing**: a short on-device experiment with real `RenderEffect` blur (not alpha-blending) for glassmorphism, and a short AGSL shader prototype gated to API 33+, before deciding whether #1 is worth the fallback-path investment. For #8/#9, the open question is the licensing/monetization decision, not a technical spike — that conversation should happen before any code.
 
