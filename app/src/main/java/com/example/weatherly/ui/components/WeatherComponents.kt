@@ -736,7 +736,15 @@ fun DailyCard(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         WeatherGlyph(code = day.icon, size = 24.dp)
-                        day.precipProbMax?.takeIf { it > 0 && day.icon in 45..99 }?.let {
+                        // Gated on the probability itself (the "balanced" 40% threshold where
+                        // meteorologists treat rain as a real "chance of," not just a slight one
+                        // — see IMPROVEMENTS.md), not on `day.icon` — a day's dominant WMO code
+                        // is a poor proxy for "is this day's rain chance worth a glance," since a
+                        // real 6-10% chance on an Overcast day and a real 40%+ chance on the same
+                        // day are otherwise indistinguishable by code alone (confirmed as a real,
+                        // user-reported inconsistency: the unconditional detail-sheet "Chance of
+                        // rain" row showed real percentages the icon-gated badge here hid).
+                        day.precipProbMax?.takeIf { it >= 40 }?.let {
                             Text(
                                 "$it%",
                                 color = Indigo,
