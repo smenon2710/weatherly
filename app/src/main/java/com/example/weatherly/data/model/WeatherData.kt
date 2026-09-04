@@ -37,6 +37,11 @@ data class WeatherData(
     val sunset: String?,
     val headline: String?,
     val comparedToYesterday: String?,
+    // A real, recognized signal that weather may be changing soon (a sustained pressure drop
+    // over the next few hours) — not safety-flavored, just an objective data observation. Backs
+    // the hero's pulsing AI ring in CurrentHeader; defaults false for the usual ForecastCache/
+    // persisted-JSON backward-compat reason.
+    val pressureDropAlert: Boolean = false,
     val tips: List<WeatherTip>,
     val weekMinC: Int,
     val weekMaxC: Int,

@@ -360,6 +360,14 @@ class WeatherRepository(private val context: Context) {
         }
         val tips = buildTips(tipsCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
         val headline = r.hourly?.let { buildUpcomingHeadline(it, nowIndex, units.windLabel, currentCode, units) }
+        // A sustained drop of >= 3 hPa within the next 6 hours — a real, widely-recognized signal
+        // that unsettled weather may be approaching, independent of what the WMO code currently
+        // says. Backs the hero's pulsing AI ring rather than a hero-wide indicator.
+        val pressureDropAlert = run {
+            val nowP = hourlyPressure.getOrNull(0)
+            val futureMin = hourlyPressure.drop(1).take(6).minOrNull()
+            nowP != null && futureMin != null && (nowP - futureMin) >= 3
+        }
 
         return WeatherData(
             locationName = locationName,
@@ -391,6 +399,7 @@ class WeatherRepository(private val context: Context) {
             sunrise = clock(dSunrise.getOrNull(todayIndex)),
             sunset = clock(dSunset.getOrNull(todayIndex)),
             headline = headline,
+            pressureDropAlert = pressureDropAlert,
             comparedToYesterday = comparedToYesterday,
             tips = tips,
             weekMinC = weekMin,

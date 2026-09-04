@@ -445,7 +445,15 @@ fun WeatherContent(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        CurrentHeader(data, textColor = heroPrimary, subColor = heroSecondary)
+                        CurrentHeader(
+                            data, textColor = heroPrimary, subColor = heroSecondary,
+                            onForecastClick = {
+                                sheet = DetailSheet.Forecast(
+                                    data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
+                                    data.pressureDropAlert
+                                )
+                            }
+                        )
                         Spacer(Modifier.height(20.dp))
                     }
                 }

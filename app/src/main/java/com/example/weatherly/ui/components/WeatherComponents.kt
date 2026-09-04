@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Air
@@ -343,7 +344,8 @@ fun CurrentHeader(
     data: WeatherData,
     textColor: Color,
     subColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onForecastClick: () -> Unit = {}
 ) {
     // WeatherBackground is an *animated* scene (moving rain/cloud/snow particles), not a flat
     // color, so a locally lighter patch behind a specific letter can still wash out text even
@@ -393,8 +395,31 @@ fun CurrentHeader(
             Spacer(Modifier.width(6.dp))
             Text(data.condition, color = subColor, fontSize = 15.sp, fontWeight = heroWeight(FontWeight.Normal))
         }
-        // Temperature — the undisputed hero
-        Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
+        // Temperature — the undisputed hero. A subtle pulsing ring appears only when
+        // pressureDropAlert is set (a real, data-backed "something may be changing" signal, not
+        // decorative) — the ambient half of the glanceable-AI treatment; tapping the pill below
+        // is the tap-to-expand half. Drawn conditionally so the common (no-anomaly) case renders
+        // byte-identical to before this feature existed.
+        if (data.pressureDropAlert) {
+            val ringPulse = rememberInfiniteTransition(label = "aiRingPulse")
+            val ringAlpha by ringPulse.animateFloat(
+                initialValue = 0.15f, targetValue = 0.45f,
+                animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "aiRingAlpha"
+            )
+            Box(contentAlignment = Alignment.Center) {
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    drawCircle(
+                        color = Cyan.copy(alpha = ringAlpha),
+                        radius = size.width / 2f + 18.dp.toPx(),
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                }
+                Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
+            }
+        } else {
+            Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
+        }
         // H/L and feels-like as compact secondary info
         Text(
             "H:${data.highTodayC}°  ·  L:${data.lowTodayC}°",
@@ -414,9 +439,13 @@ fun CurrentHeader(
         }
         (data.headline ?: data.comparedToYesterday)?.let {
             Spacer(Modifier.height(10.dp))
+            // Tappable — the tap-to-expand half of the glanceable-AI treatment (see the
+            // temperature ring above for the ambient half). Opens the same summary in a larger,
+            // dedicated sheet via DetailSheet.Forecast rather than only this compact pill.
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
+                    .clickable { onForecastClick() }
                     .background(textColor.copy(alpha = 0.10f))
                     .padding(horizontal = 12.dp, vertical = 5.dp)
             ) {
@@ -1259,6 +1288,9 @@ sealed interface DetailSheet {
     data class Alert(val alert: WeatherAlert) : DetailSheet
 
     data class AlertList(val alerts: List<WeatherAlert>) : DetailSheet
+
+    // The hero's tap-to-expand AI summary — see CurrentHeader's pulsing ring doc comment.
+    data class Forecast(val headline: String, val pressureDropAlert: Boolean) : DetailSheet
 }
 
 @Composable
@@ -2206,6 +2238,23 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 sheet.alerts.forEachIndexed { i, a ->
                     if (i > 0) HorizontalDivider(color = TextSecondary.copy(alpha = 0.12f))
                     AlertSummaryRow(a, onClick = { onAlertSelected(a) })
+                }
+            }
+            is DetailSheet.Forecast -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Cyan, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Forecast Insight", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(sheet.headline, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                if (sheet.pressureDropAlert) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Pressure is dropping over the next few hours — often an early sign that " +
+                            "conditions are about to change.",
+                        color = TextSecondary, fontSize = 14.sp
+                    )
                 }
             }
         }

@@ -62,7 +62,11 @@ Native `Vibrator`/`VibratorManager` APIs, `VibrationEffect.createWaveform()` for
 
 ## Medium — in scope, real, scoped feature work
 
-### 4. Glanceable AI Ring + Proactive Summary (proposal #5)
+### 4. Glanceable AI Ring + Proactive Summary (proposal #5) — ✅ IMPLEMENTED (2026-09-04)
+
+**Shipped.** See `CLAUDE.md`'s "Glanceable AI ring + tap-to-expand summary" section and `IMPROVEMENTS.md` for full detail. Summary: `WeatherData.pressureDropAlert` (a real ≥3 hPa/6h drop signal) drives a pulsing ring behind the hero temperature, and the existing headline pill is now tappable, opening a new `DetailSheet.Forecast` sheet with a larger presentation of the same summary. Verified live on-device: the tap-to-expand sheet works correctly; the ring itself wasn't visually confirmed since no genuine pressure-drop anomaly occurred during testing.
+
+Left below as the original plan/rationale.
 
 **What's proposed:** an ambient, pulsing AI indicator around the current temperature that expands into a one-sentence proactive summary when it detects something worth flagging.
 
