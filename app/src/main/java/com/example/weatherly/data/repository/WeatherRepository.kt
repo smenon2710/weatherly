@@ -259,13 +259,40 @@ class WeatherRepository(private val context: Context) {
         }
         val yesterdayHigh = (todayIndex - 1).takeIf { it >= 0 }?.let { dHighs.getOrNull(it)?.roundToInt() }
 
+        // How many of `hourly` (which already starts at "now") still fall within today — reuses
+        // the same "first 12 AM label" boundary MetricChart.dayChangeIndex relies on elsewhere.
+        // Used below to correct today's own precipProbMax; every other day's own full-day
+        // aggregate stays untouched since those days haven't started yet.
+        val todayRemainingCount = hourly.indexOfFirst { it.hourLabel == "12 AM" }
+            .let { if (it < 0) hourly.size else it }
+
         val daily = buildList {
             for (i in todayIndex until dTimes.size) {
                 val code = dCodes.getOrNull(i) ?: 0
                 val dayHigh = dHighs.getOrNull(i)?.roundToInt() ?: 0
                 val dayLow = dLows.getOrNull(i)?.roundToInt() ?: 0
-                val dayPop = dPop.getOrNull(i)
+                // Open-Meteo's precipitation_probability_max describes the FULL calendar day
+                // (00:00–23:59). For today specifically, once part of the day has already
+                // elapsed, that full-day max can describe a window that's already passed —
+                // confirmed live (real cached data: a 40% daily max and a "Light drizzle" day
+                // code from an already-elapsed morning still read as "Rain likely today" in the
+                // 7-day list, the detail sheet, and the hero tip, hours after the actual forward
+                // forecast had dropped to single digits with zero real rain left). Trust only
+                // what's still ahead of "now" for today's own entry; every other day hasn't
+                // started yet, so its full-day aggregate is exactly right and stays untouched.
+                val dayPop = if (i == todayIndex) {
+                    hourly.take(todayRemainingCount).mapNotNull { it.precipChance }.maxOrNull()
+                } else {
+                    dPop.getOrNull(i)
+                }
                 val dayWindMax = dWind.getOrNull(i)?.roundToInt()
+                // buildDayOutlookTips()'s isSnow/isRain check keys off the code passed in,
+                // independent of pop — so today's own dominant code (still the historical
+                // full-day value, deliberately left as-is for the displayed icon/phrase above)
+                // would keep firing "Rain likely" regardless of how low the corrected dayPop
+                // now reads. Use the live current condition for today's tip text specifically,
+                // same reasoning as tipsCode below for the hero tip.
+                val tipsCodeForDay = if (i == todayIndex) currentCode else code
                 add(
                     DayEntry(
                         dayLabel = if (i == todayIndex) "Today" else formatDay(dTimes[i]),
@@ -282,7 +309,7 @@ class WeatherRepository(private val context: Context) {
                         precipSumMm = dPrecip.getOrNull(i),
                         snowfallSum = dSnowSum.getOrNull(i),
                         windGustMaxKmh = dWindGust.getOrNull(i)?.roundToInt(),
-                        tips = buildDayOutlookTips(code, dayHigh, dayLow, dayPop, dayWindMax, units)
+                        tips = buildDayOutlookTips(tipsCodeForDay, dayHigh, dayLow, dayPop, dayWindMax, units)
                     )
                 )
             }
@@ -311,10 +338,27 @@ class WeatherRepository(private val context: Context) {
         val isCurrentDay = (current?.isDay ?: 1) == 1
         val nextDay = daily.getOrNull(1)
         val tipDay = if (isCurrentDay || nextDay == null) today else nextDay
-        // Merge the tip day's daily pop with the max precip chance in the next 12 hourly slots.
-        val nextHoursMaxPop = hourly.drop(1).take(12).mapNotNull { it.precipChance }.maxOrNull() ?: 0
-        val tipsPop = maxOf(tipDay?.precipProbMax ?: 0, nextHoursMaxPop)
-        val tips = buildTips(tipDay?.icon ?: currentCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
+        val tipsCode: Int
+        val tipsPop: Int
+        if (isCurrentDay) {
+            // today.precipProbMax is already corrected above to reflect only what's left of
+            // today, so this just needs to prefer the live current condition over today's own
+            // summary icon — a direct "is it raining right now" read is more reliable than a
+            // whole-day code even after the probability fix, since a single "dominant" icon for
+            // a mix of remaining-hour conditions isn't attempted here (deliberately out of scope
+            // — see IMPROVEMENTS.md).
+            tipsCode = currentCode
+            tipsPop = tipDay?.precipProbMax ?: 0
+        } else {
+            // tipDay is tomorrow (the night-rollover case) — it hasn't started yet, so its own
+            // full-day aggregate legitimately describes what's ahead; no elapsed-time correction
+            // is needed here. Merge with the next 12 hourly slots' max in case a short-range spike
+            // (tonight, before tomorrow's own block starts) isn't reflected in tomorrow's daily pop yet.
+            val nextHoursMaxPop = hourly.drop(1).take(12).mapNotNull { it.precipChance }.maxOrNull() ?: 0
+            tipsCode = tipDay?.icon ?: currentCode
+            tipsPop = maxOf(tipDay?.precipProbMax ?: 0, nextHoursMaxPop)
+        }
+        val tips = buildTips(tipsCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
         val headline = r.hourly?.let { buildUpcomingHeadline(it, nowIndex, units.windLabel, currentCode, units) }
 
         return WeatherData(
