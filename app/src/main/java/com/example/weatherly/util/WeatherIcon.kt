@@ -1,25 +1,10 @@
 package com.example.weatherly.util
 
 /**
- * WMO weather codes -> emoji glyph + plain-English phrase, so no image assets
- * are needed. Clear/partly conditions switch to moon glyphs at night.
+ * WMO weather codes -> plain-English phrase. Real icons are `WeatherGlyph`'s hand-drawn Canvas
+ * vector shapes (`ui/components/WeatherGlyph.kt`), not emoji — raw emoji rendered inconsistently
+ * across OEM launchers, which is why the widget also rasterizes these same vector shapes instead.
  */
-fun weatherEmoji(code: Int, isDay: Boolean = true): String = when (code) {
-    0 -> if (isDay) "☀️" else "🌙"
-    1 -> if (isDay) "🌤️" else "🌙"
-    2 -> if (isDay) "⛅" else "☁️"
-    3 -> "☁️"
-    45, 48 -> "🌫️"
-    51, 53, 55, 56, 57 -> "🌦️"
-    61, 63, 65, 66, 67 -> "🌧️"
-    71, 73, 75, 77 -> "❄️"
-    80, 81, 82 -> "🌦️"
-    85, 86 -> "🌨️"
-    95 -> "⛈️"
-    96, 99 -> "⛈️"
-    else -> "🌡️"
-}
-
 fun wmoText(code: Int): String = when (code) {
     0 -> "Clear sky"
     1 -> "Mainly clear"
