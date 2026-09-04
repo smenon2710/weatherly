@@ -98,6 +98,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
+import com.example.weatherly.data.model.HourEntry
 import com.example.weatherly.data.model.MetricChart
 import com.example.weatherly.data.model.TideEvent
 import com.example.weatherly.data.model.TideType
@@ -621,6 +622,82 @@ private fun tipIcon(tone: TipTone): ImageVector = when (tone) {
     TipTone.NEUTRAL -> Icons.Filled.Info
 }
 
+/** One hour's glyph/temp/precip column — shared by `HourlyCard` (the main screen's "next 24
+ * hours" strip) and `DayHourlyStrip` (a specific day's own full-day breakdown, in
+ * `DayDetailBody`), so both render identical `HourEntry` values identically, not just compute
+ * them identically. */
+@Composable
+private fun HourColumn(h: HourEntry) {
+    val isNow = h.hourLabel == "Now"
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            h.hourLabel,
+            color = if (isNow) TextPrimary else TextSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
+        )
+        Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier.height(40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
+            h.precipChance?.takeIf { it > 0 }?.let {
+                Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "${h.tempC}°",
+            color = if (isNow) TextPrimary else TextSecondary,
+            fontSize = 16.sp,
+            fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+/**
+ * A specific day's own full 00:00-23:00 hourly breakdown — shown in `DayDetailBody`. Distinct
+ * from `HourlyCard` (the main screen's "next 24 hours from now" strip) but built from `HourEntry`
+ * values computed by the exact same `WeatherRepository.hourEntryAt()` function, so any hour that
+ * appears in both (e.g. this evening's hours, for Today's own entry) always reads identically in
+ * both places — no independent recomputation that could quietly drift.
+ */
+@Composable
+fun DayHourlyStrip(hours: List<HourEntry>, modifier: Modifier = Modifier) {
+    if (hours.size < 2) return
+    Column(modifier) {
+        SectionLabel(Icons.Filled.Schedule, "Hourly", Amber)
+        Spacer(Modifier.height(12.dp))
+        val listState = rememberLazyListState()
+        // Wrapped in its own Box (mirroring HourlyCard's) for the same right/left scroll-fade
+        // affordance — this strip can genuinely run to 24 items, longer than the main screen's.
+        // Fades into AppBackground specifically, not colorScheme.surface — this strip sits
+        // directly on ExpandedDayDetail's flat page background, not inside a GlassCard.
+        Box(modifier = Modifier.fillMaxWidth()) {
+            LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                items(hours) { h -> HourColumn(h) }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(28.dp)
+                    .fillMaxHeight()
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, AppBackground)))
+            )
+            if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(20.dp)
+                        .fillMaxHeight()
+                        .background(Brush.horizontalGradient(listOf(AppBackground, Color.Transparent)))
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
     val hourlyTemps = data.hourly.map { it.tempC }
@@ -637,34 +714,7 @@ fun HourlyCard(data: WeatherData, modifier: Modifier = Modifier) {
             val cardSurface = MaterialTheme.colorScheme.surface
             Box(modifier = Modifier.fillMaxWidth()) {
                 LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    items(data.hourly) { h ->
-                        val isNow = h.hourLabel == "Now"
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                h.hourLabel,
-                                color = if (isNow) TextPrimary else TextSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Column(
-                                modifier = Modifier.height(40.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                WeatherGlyph(code = h.icon, isDay = h.isDay, size = 26.dp)
-                                h.precipChance?.takeIf { it > 0 }?.let {
-                                    Text("$it%", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "${h.tempC}°",
-                                color = if (isNow) TextPrimary else TextSecondary,
-                                fontSize = 16.sp,
-                                fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
+                    items(data.hourly) { h -> HourColumn(h) }
                 }
                 // Right fade — always shown as scroll affordance
                 Box(
@@ -2216,6 +2266,14 @@ fun DayDetailBody(day: DayEntry, windUnit: String, precipUnit: String) {
                 TipBanner(tip)
             }
         }
+    }
+    // This day's own hour-by-hour breakdown — real Open-Meteo data that was already being
+    // fetched (all 7 days' worth) but discarded past the main screen's first 24 hours. Placed
+    // before the summary DetailRows, since "what does the day actually look like hour to hour"
+    // is the more useful lead than the aggregate numbers below it.
+    if (day.dayHourly.size >= 2) {
+        Spacer(Modifier.height(20.dp))
+        DayHourlyStrip(day.dayHourly)
     }
     Spacer(Modifier.height(18.dp))
     DetailRow("Sunrise", day.sunrise ?: "--")

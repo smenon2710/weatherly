@@ -177,5 +177,11 @@ data class DayEntry(
     // e.g. "pack an umbrella", "stay hydrated", "dangerous heat, stay indoors" — distinct from
     // WeatherData.tips (the hero TipBanner's "right now"-phrased, night-rollover-aware advice for
     // today/tonight only). Same defaulting reason as WeatherData.alerts.
-    val tips: List<WeatherTip> = emptyList()
+    val tips: List<WeatherTip> = emptyList(),
+    // This day's own full 00:00-23:00 local hourly breakdown — separate from WeatherData.hourly
+    // (the "next 24 hours from now" window shown on the main screen), computed via the exact same
+    // per-hour extraction so any hour appearing in both lists (e.g. this evening's hours, for
+    // Today's own entry) always shows identical values — see WeatherRepository.hourEntryAt().
+    // Same defaulting reason as WeatherData.alerts.
+    val dayHourly: List<HourEntry> = emptyList()
 )

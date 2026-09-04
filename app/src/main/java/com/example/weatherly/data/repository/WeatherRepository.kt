@@ -214,7 +214,14 @@ class WeatherRepository(private val context: Context) {
         val dPrecip = r.daily?.precipitationSum ?: emptyList()
         val dSnowSum = r.daily?.snowfallSum ?: emptyList()
 
-        val hourly = window.map { i ->
+        // Single source of truth for turning a raw hourly index into a HourEntry — used both for
+        // the "next 24 hours" window below and for each DayEntry's own dayHourly slice further
+        // down. Reusing this exact function (rather than two separately-written but supposedly-
+        // equivalent computations) is what guarantees an hour that appears in both places (e.g.
+        // this evening's hours, which are both "later today" and part of today's own full-day
+        // breakdown) always shows byte-identical values in both — no drift, no rounding mismatch,
+        // by construction rather than by coincidence.
+        fun hourEntryAt(i: Int): HourEntry {
             val hourTime = hourTimes.getOrNull(i) ?: ""
             val hourDate = if (hourTime.length >= 10) hourTime.substring(0, 10) else ""
             val dayIdx = dTimes.indexOf(hourDate).takeIf { it >= 0 }
@@ -225,7 +232,7 @@ class WeatherRepository(private val context: Context) {
             } else {
                 (current?.isDay ?: 1) == 1
             }
-            HourEntry(
+            return HourEntry(
                 hourLabel = if (i == nowIndex) "Now" else formatHour(hourTime),
                 tempC = r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0,
                 icon = r.hourly?.weatherCode?.getOrNull(i) ?: 0,
@@ -235,6 +242,7 @@ class WeatherRepository(private val context: Context) {
                     ?: (r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0)
             )
         }
+        val hourly = window.map { hourEntryAt(it) }
         val hourlyUv = window.map { (r.hourly?.uvIndex?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyWind = window.map { (r.hourly?.windSpeed?.getOrNull(it) ?: 0.0).roundToInt() }
         val hourlyWindGust = window.map { (r.hourly?.windGusts?.getOrNull(it) ?: 0.0).roundToInt() }
@@ -293,6 +301,15 @@ class WeatherRepository(private val context: Context) {
                 // now reads. Use the live current condition for today's tip text specifically,
                 // same reasoning as tipsCode below for the hero tip.
                 val tipsCodeForDay = if (i == todayIndex) currentCode else code
+                // This day's own full-day hourly slice, via the same hourEntryAt() the "next 24
+                // hours" window uses above — guarantees identical values for any hour that
+                // appears in both (e.g. Today's remaining hours, or Sat's early hours if the
+                // 24-hour window reaches that far), rather than two independently-computed lists
+                // that could quietly drift apart in rounding or field mapping.
+                val dayDate = dTimes.getOrNull(i)
+                val dayHourly = if (dayDate != null) {
+                    hourTimes.indices.filter { hourTimes[it].startsWith(dayDate) }.map { hourEntryAt(it) }
+                } else emptyList()
                 add(
                     DayEntry(
                         dayLabel = if (i == todayIndex) "Today" else formatDay(dTimes[i]),
@@ -309,7 +326,8 @@ class WeatherRepository(private val context: Context) {
                         precipSumMm = dPrecip.getOrNull(i),
                         snowfallSum = dSnowSum.getOrNull(i),
                         windGustMaxKmh = dWindGust.getOrNull(i)?.roundToInt(),
-                        tips = buildDayOutlookTips(tipsCodeForDay, dayHigh, dayLow, dayPop, dayWindMax, units)
+                        tips = buildDayOutlookTips(tipsCodeForDay, dayHigh, dayLow, dayPop, dayWindMax, units),
+                        dayHourly = dayHourly
                     )
                 )
             }
