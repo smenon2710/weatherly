@@ -1,6 +1,8 @@
 package com.example.weatherly.ui
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,6 +83,7 @@ import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.ui.components.AlertBannerList
 import com.example.weatherly.ui.components.ResolvedAlertCard
 import com.example.weatherly.ui.components.AppBackground
@@ -136,6 +142,54 @@ fun WeatherScreen(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (state is WeatherUiState.Success) viewModel.load(background = true)
+    }
+
+    // Catches a real silent-failure gap: WeatherAlertWorker's two Settings notification toggles
+    // now require ACCESS_BACKGROUND_LOCATION (it always resolves live current location, no
+    // saved-place fallback) — a user can flip a toggle on, skip the separate "Allow background
+    // location" step in Settings (or later revoke it via system Settings), and the feature just
+    // goes quiet with zero visible sign anything is wrong; Settings itself only explains this to
+    // someone who happens to scroll back there. Checked here, on the main screen, so it reaches a
+    // user who never revisits Settings after the first setup. Not a legacy-migration concern —
+    // this app has never shipped notifications before, so there's no previously-published install
+    // base with a toggle already on — just a general "enabled but not actually working" catch.
+    // Re-checked on every resume (not gated to once-per-session) since permission state can change
+    // outside the app too (the user revoking it from system Settings), and dismissing only
+    // suppresses it until the next resume rather than forever, so a still-broken state keeps
+    // surfacing rather than being silenced by one dismissal.
+    val context = LocalContext.current
+    var showNotificationPermissionPrompt by remember { mutableStateOf(false) }
+    val backgroundLocationPromptLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { showNotificationPermissionPrompt = false }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val prefs = PreferencesStore(context)
+        showNotificationPermissionPrompt =
+            (prefs.getAlertNotificationsEnabled() || prefs.getPersistentWeatherEnabled()) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=
+                    PackageManager.PERMISSION_GRANTED
+    }
+    if (showNotificationPermissionPrompt) {
+        AlertDialog(
+            onDismissRequest = { showNotificationPermissionPrompt = false },
+            title = { Text("Notifications need one more permission") },
+            text = {
+                Text(
+                    "You've turned on a weather notification in Settings, but it needs " +
+                        "Background Location access to actually check conditions — without it, " +
+                        "it's on but won't do anything. Grant it now, or head to Settings later."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    backgroundLocationPromptLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }) { Text("Grant Access") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNotificationPermissionPrompt = false }) { Text("Not Now") }
+            }
+        )
     }
 
     when (val s = state) {
@@ -530,9 +584,7 @@ private fun SharedTransitionScope.WeatherContentBody(
                             onForecastClick = {
                                 onSheetChange(DetailSheet.Forecast(
                                     headline = data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
-                                    pressureDropAlert = data.pressureDropAlert,
-                                    currentPressureHpa = data.pressureHpa,
-                                    pressureTrend6h = data.pressureTrend6h
+                                    otherInsights = data.dayInsights.drop(1)
                                 ))
                             }
                         )

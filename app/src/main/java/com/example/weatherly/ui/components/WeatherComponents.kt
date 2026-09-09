@@ -399,31 +399,12 @@ fun CurrentHeader(
             Spacer(Modifier.width(6.dp))
             Text(data.condition, color = subColor, fontSize = 15.sp, fontWeight = heroWeight(FontWeight.Normal))
         }
-        // Temperature — the undisputed hero. A subtle pulsing ring appears only when
-        // pressureDropAlert is set (a real, data-backed "something may be changing" signal, not
-        // decorative) — the ambient half of the glanceable-AI treatment; tapping the pill below
-        // is the tap-to-expand half. Drawn conditionally so the common (no-anomaly) case renders
-        // byte-identical to before this feature existed.
-        if (data.pressureDropAlert) {
-            val ringPulse = rememberInfiniteTransition(label = "aiRingPulse")
-            val ringAlpha by ringPulse.animateFloat(
-                initialValue = 0.15f, targetValue = 0.45f,
-                animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                label = "aiRingAlpha"
-            )
-            Box(contentAlignment = Alignment.Center) {
-                Canvas(modifier = Modifier.matchParentSize()) {
-                    drawCircle(
-                        color = Cyan.copy(alpha = ringAlpha),
-                        radius = size.width / 2f + 18.dp.toPx(),
-                        style = Stroke(width = 3.dp.toPx())
-                    )
-                }
-                Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
-            }
-        } else {
-            Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
-        }
+        // Temperature — the undisputed hero. Used to grow a pulsing ring when pressureDropAlert
+        // was set, but that made the same "pressure falling" signal appear twice — once as this
+        // ring, once as a plain sentence in the insight list below — and the ring itself was
+        // user-reported as unreadable visual noise rather than useful. Removed; the text insight
+        // alone now carries this signal.
+        Text("${data.currentTempC}°", color = textColor, fontSize = 96.sp, fontWeight = heroWeight(FontWeight.Thin))
         // H/L and feels-like as compact secondary info
         Text(
             "H:${data.highTodayC}°  ·  L:${data.lowTodayC}°",
@@ -446,13 +427,25 @@ fun CurrentHeader(
             // Tappable — the tap-to-expand half of the glanceable-AI treatment (see the
             // temperature ring above for the ambient half). Opens the same summary in a larger,
             // dedicated sheet via DetailSheet.Forecast rather than only this compact pill.
-            Box(
+            // The leading sparkle is a deliberate tap affordance (user-reported: the pill read as
+            // static text, not something to tap) — same AutoAwesome icon used for "this is an
+            // AI-synthesized insight" elsewhere (chat FAB, this same sheet's own header icon), so
+            // it signals both "there's more" and "this was generated for you" at once.
+            Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
                     .clickable { onForecastClick() }
                     .background(textColor.copy(alpha = 0.10f))
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(Modifier.width(5.dp))
                 Text(it, color = textColor, fontSize = 12.sp, fontWeight = heroWeight(FontWeight.Normal))
             }
         }
@@ -1355,12 +1348,15 @@ sealed interface DetailSheet {
 
     data class AlertList(val alerts: List<WeatherAlert>) : DetailSheet
 
-    // The hero's tap-to-expand AI summary — see CurrentHeader's pulsing ring doc comment.
+    // The hero's tap-to-expand AI summary — see CurrentHeader's pulsing ring doc comment. The
+    // pill shows only `headline` (the single most notable thing); `otherInsights` is everything
+    // ELSE currently true — see WeatherRepository.buildDayInsights' doc comment. Deliberately
+    // plain sentences ("UV is very high right now"), not raw metric numbers — those already live
+    // in the metrics grid and the 7-day day-detail sheet, and duplicating them here was
+    // user-reported as not what a "day summary" should be.
     data class Forecast(
         val headline: String,
-        val pressureDropAlert: Boolean,
-        val currentPressureHpa: Int?,
-        val pressureTrend6h: Int?
+        val otherInsights: List<String>
     ) : DetailSheet
 }
 
@@ -2335,44 +2331,33 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(sheet.headline, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                // Always show a plain pressure-trend reading, not only on the rarer
-                // pressureDropAlert threshold — otherwise this sheet's only content in the common
-                // case is the headline it also repeats, which is genuinely redundant with the
-                // always-visible hero pill (user-reported). This is real data not shown anywhere
-                // else in the app (the metrics grid's Pressure tile has the current value but no
-                // trend direction), so it's worth showing every time, not gated behind an anomaly.
-                if (sheet.currentPressureHpa != null) {
+                // Everything ELSE currently worth knowing about today — plain sentences, not a
+                // metrics readout (see DetailSheet.Forecast's doc comment for why: those numbers
+                // already live in the metrics grid and the 7-day day-detail sheet).
+                if (sheet.otherInsights.isNotEmpty()) {
                     Spacer(Modifier.height(16.dp))
                     HorizontalDivider(color = TextSecondary.copy(alpha = 0.12f))
                     Spacer(Modifier.height(16.dp))
-                    val trend = sheet.pressureTrend6h
-                    val trendWord = when {
-                        trend == null -> null
-                        trend <= -2 -> "falling"
-                        trend >= 2 -> "rising"
-                        else -> "holding steady"
-                    }
                     Text(
-                        buildString {
-                            append("Pressure: ${sheet.currentPressureHpa} hPa")
-                            if (trendWord != null) append(", $trendWord")
-                        },
-                        color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium
+                        "ALSO WORTH KNOWING",
+                        color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp
                     )
-                    if (trend != null && trendWord != "holding steady") {
-                        Text(
-                            "${if (trend < 0) "Down" else "Up"} ${kotlin.math.abs(trend)} hPa over the next 6 hours.",
-                            color = TextSecondary, fontSize = 13.sp
-                        )
+                    Spacer(Modifier.height(10.dp))
+                    sheet.otherInsights.forEachIndexed { index, insight ->
+                        if (index > 0) Spacer(Modifier.height(10.dp))
+                        Row {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 7.dp)
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Cyan)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(insight, color = TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        }
                     }
-                }
-                if (sheet.pressureDropAlert) {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Pressure is dropping over the next few hours — often an early sign that " +
-                            "conditions are about to change.",
-                        color = TextSecondary, fontSize = 14.sp
-                    )
                 }
             }
         }

@@ -377,23 +377,29 @@ class WeatherRepository(private val context: Context) {
             tipsPop = maxOf(tipDay?.precipProbMax ?: 0, nextHoursMaxPop)
         }
         val tips = buildTips(tipsCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
-        val headline = r.hourly?.let { buildUpcomingHeadline(it, nowIndex, units.windLabel, currentCode, units) }
         // A sustained drop of >= 3 hPa within the next 6 hours — a real, widely-recognized signal
         // that unsettled weather may be approaching, independent of what the WMO code currently
-        // says. Backs the hero's pulsing AI ring rather than a hero-wide indicator.
+        // says. Backs the hero's pulsing AI ring, and (below) folds into the insight list as a
+        // plain sentence rather than a raw hPa reading.
         val pressureDropAlert = run {
             val nowP = hourlyPressure.getOrNull(0)
             val futureMin = hourlyPressure.drop(1).take(6).minOrNull()
             nowP != null && futureMin != null && (nowP - futureMin) >= 3
         }
-        // Signed delta over the same 6-hour window, for the Forecast Insight sheet to show a
-        // plain trend reading ("falling"/"rising"/"steady") every time it's opened — not just on
-        // the rarer >=3 hPa alert threshold above, so the sheet always has something genuinely
-        // beyond the headline it also shows (the headline alone was user-reported as redundant
-        // with the always-visible hero pill).
-        val pressureTrend6h = hourlyPressure.getOrNull(6)?.let { future ->
-            hourlyPressure.getOrNull(0)?.let { now -> future - now }
-        }
+        // Every currently-true "worth knowing about today" signal, most-important first — not
+        // just the single top one. index 0 backs the hero pill (WeatherData.headline); the full
+        // list backs DetailSheet.Forecast's breakdown, so tapping the pill surfaces whatever ELSE
+        // is notable today rather than raw metric numbers already shown elsewhere (the 7-day
+        // detail sheet, the metrics grid) — user-reported that a numbers readout here didn't add
+        // anything a "day summary" ask actually wanted.
+        val dayInsights = r.hourly?.let {
+            buildDayInsights(
+                rawHourly = it, nowIndex = nowIndex, windUnit = units.windLabel, currentIcon = currentCode,
+                units = units, hourly = hourly, currentTempC = current?.temperature?.roundToInt() ?: 0,
+                uvNow = uvNow?.roundToInt(), aqiNow = aqiNow, pressureDropAlert = pressureDropAlert
+            )
+        } ?: emptyList()
+        val headline = dayInsights.firstOrNull()
 
         return WeatherData(
             locationName = locationName,
@@ -426,7 +432,7 @@ class WeatherRepository(private val context: Context) {
             sunset = clock(dSunset.getOrNull(todayIndex)),
             headline = headline,
             pressureDropAlert = pressureDropAlert,
-            pressureTrend6h = pressureTrend6h,
+            dayInsights = dayInsights,
             comparedToYesterday = comparedToYesterday,
             tips = tips,
             weekMinC = weekMin,
@@ -591,13 +597,30 @@ class WeatherRepository(private val context: Context) {
         }
     }
 
-    private fun buildUpcomingHeadline(
+    /**
+     * Every currently-true "worth knowing about today" signal, most-important first — not a
+     * metrics readout. Each entry is a plain sentence about an actual condition to be aware of
+     * (precip/thunder/fog arriving, high wind, live UV, live air quality, a real temperature
+     * swing a few hours out, a falling-pressure heads-up), never a bare number restated from a
+     * tile that already shows it elsewhere (metrics grid, the 7-day day-detail sheet) — user-
+     * reported that a numbers readout here didn't serve the "day summary" ask at all. index 0
+     * backs the hero pill; the rest back DetailSheet.Forecast's list beneath it. Safety-relevant
+     * near-term changes (storm/precip/fog arriving, high wind) always come before softer whole-day
+     * context (UV, air quality, a temperature swing, pressure), which in turn beats the generic
+     * "what's the sky like right now" fallback — only ever added when nothing else qualified.
+     */
+    private fun buildDayInsights(
         rawHourly: HourlyBlock,
         nowIndex: Int,
         windUnit: String,
         currentIcon: Int,
-        units: UnitSystem
-    ): String {
+        units: UnitSystem,
+        hourly: List<HourEntry>,
+        currentTempC: Int,
+        uvNow: Int?,
+        aqiNow: Int?,
+        pressureDropAlert: Boolean
+    ): List<String> = buildList {
         val totalHours = rawHourly.time?.size ?: 0
         val end = minOf(nowIndex + 13, totalHours) // scan nowIndex+1 .. nowIndex+12
         val alreadyRain = currentIcon in 61..82
@@ -626,33 +649,56 @@ class WeatherRepository(private val context: Context) {
                 break
             }
         }
+        eventDesc?.let { add("$it expected around $eventTime.") }
 
         val maxWind = ((nowIndex + 1) until end)
             .mapNotNull { rawHourly.windSpeed?.getOrNull(it) }
             .maxOrNull()?.roundToInt() ?: 0
         val windThreshold = if (units == UnitSystem.IMPERIAL) 25 else 40
+        if (maxWind >= windThreshold) add("Winds up to $maxWind $windUnit expected in the next few hours.")
 
-        return when {
-            eventDesc != null && maxWind >= windThreshold ->
-                "$eventDesc expected around $eventTime. Winds up to $maxWind $windUnit."
-            eventDesc != null -> "$eventDesc expected around $eventTime."
-            maxWind >= windThreshold -> "Winds up to $maxWind $windUnit in the next few hours."
-            else -> {
-                // Summarise the dominant condition over the next 6 hours, but only when one
-                // condition actually has a real majority (>=60%) — a bare plurality (e.g. 3 of 6
-                // hours, tied with something else) isn't a confident enough basis to assert a
-                // specific condition, and previously produced misleading headlines like "Clear
-                // skies" during genuinely mixed stretches.
-                val nextCodes = (nowIndex until minOf(nowIndex + 6, totalHours))
-                    .mapNotNull { rawHourly.weatherCode?.getOrNull(it) }
-                val counts = nextCodes.groupingBy { it }.eachCount()
-                val topEntry = counts.maxByOrNull { it.value }
-                val hasClearMajority = nextCodes.isNotEmpty() &&
-                    topEntry != null &&
-                    topEntry.value.toDouble() / nextCodes.size >= 0.6
-                if (!hasClearMajority) {
-                    "Mixed conditions over the next few hours."
-                } else when (topEntry!!.key) {
+        // Live readings (not a whole-day max/average) for UV/AQI specifically, so this never
+        // claims "UV is very high" hours after the actual peak already passed — a live reading is
+        // accurate regardless of time of day.
+        if (uvNow != null && uvNow >= 8) add("UV is very high right now — wear sunscreen if you're headed out.")
+        // >150, not the softer >100 "unhealthy for sensitive groups" band — matches
+        // WeatherAdvisor.walking()'s existing "poor air quality" threshold, so this and the
+        // local-chat advice never disagree about what counts as worth mentioning.
+        if (aqiNow != null && aqiNow > 150) add("Air quality is unhealthy right now — consider limiting time outdoors.")
+
+        // "A few hours from now" reference point, reused rather than a second independently-
+        // chosen window, so this always means the same thing regardless of which other signals
+        // also fired.
+        val laterHour = hourly.getOrNull(6)
+        val tempSwingThreshold = if (units == UnitSystem.IMPERIAL) 12 else 7
+        if (laterHour != null) {
+            if (laterHour.tempC - currentTempC >= tempSwingThreshold) {
+                add("Warming up to ${laterHour.tempC}° by ${laterHour.hourLabel}.")
+            } else if (currentTempC - laterHour.tempC >= tempSwingThreshold) {
+                add("Cooling down to ${laterHour.tempC}° by ${laterHour.hourLabel}.")
+            }
+        }
+
+        if (pressureDropAlert) {
+            add("Pressure is falling — often an early sign that conditions are about to change.")
+        }
+
+        if (isEmpty()) {
+            // Summarise the dominant condition over the next 6 hours, but only when one condition
+            // actually has a real majority (>=60%) — a bare plurality (e.g. 3 of 6 hours, tied
+            // with something else) isn't a confident enough basis to assert a specific condition,
+            // and previously produced misleading headlines like "Clear skies" during genuinely
+            // mixed stretches.
+            val nextCodes = (nowIndex until minOf(nowIndex + 6, totalHours))
+                .mapNotNull { rawHourly.weatherCode?.getOrNull(it) }
+            val counts = nextCodes.groupingBy { it }.eachCount()
+            val topEntry = counts.maxByOrNull { it.value }
+            val hasClearMajority = nextCodes.isNotEmpty() &&
+                topEntry != null &&
+                topEntry.value.toDouble() / nextCodes.size >= 0.6
+            add(
+                if (!hasClearMajority) "Mixed conditions over the next few hours."
+                else when (topEntry!!.key) {
                     0, 1 -> "Clear skies for the next few hours."
                     2 -> "Partly cloudy for the next few hours."
                     3 -> "Overcast for the next few hours."
@@ -663,7 +709,7 @@ class WeatherRepository(private val context: Context) {
                     in 95..99 -> "Thunderstorm conditions in the next few hours."
                     else -> "No significant changes in the next few hours."
                 }
-            }
+            )
         }
     }
 

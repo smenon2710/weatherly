@@ -38,14 +38,18 @@ data class WeatherData(
     val headline: String?,
     val comparedToYesterday: String?,
     // A real, recognized signal that weather may be changing soon (a sustained pressure drop
-    // over the next few hours) — not safety-flavored, just an objective data observation. Backs
-    // the hero's pulsing AI ring in CurrentHeader; defaults false for the usual ForecastCache/
-    // persisted-JSON backward-compat reason.
+    // over the next few hours) — not safety-flavored, just an objective data observation. Folds
+    // into dayInsights below as a plain sentence. Previously also drew a pulsing ring around the
+    // hero temperature (CurrentHeader) — removed after it was user-reported as unreadable visual
+    // noise duplicating the same signal the text insight already states more clearly. Defaults
+    // false for the usual ForecastCache/persisted-JSON backward-compat reason.
     val pressureDropAlert: Boolean = false,
-    // Signed hPa delta between now and 6 hours out — negative falling, positive rising. Backs the
-    // Forecast Insight sheet's plain trend line (shown every time, not just on the pressureDropAlert
-    // threshold above), so that sheet always has something beyond the headline it also repeats.
-    val pressureTrend6h: Int? = null,
+    // Every currently-true "worth knowing about today" signal, most-important first — plain
+    // sentences (precip/wind/UV/air-quality/temperature-swing/pressure), never raw numbers
+    // already shown elsewhere. headline (below) is dayInsights.firstOrNull(); the rest backs
+    // DetailSheet.Forecast's list. See WeatherRepository.buildDayInsights' doc comment. Defaults
+    // empty for the usual ForecastCache/persisted-JSON backward-compat reason.
+    val dayInsights: List<String> = emptyList(),
     val tips: List<WeatherTip>,
     val weekMinC: Int,
     val weekMaxC: Int,

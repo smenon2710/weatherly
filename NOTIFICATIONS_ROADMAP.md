@@ -333,3 +333,29 @@ different, harder project — not a v1 candidate.
    min and just log actual fire times over a day or two on a real phone under normal use — to
    get real numbers instead of reasoning from Android's documented (but not always representative)
    Doze/Standby-Bucket behavior?
+
+## v1.5 — toggle race fix + proactive missing-permission prompt
+
+Two more real-device-reported issues, same day:
+
+- **Toggle race condition.** Both Settings toggles gated `setXEnabled(true)` behind the async
+  `POST_NOTIFICATIONS` permission launcher's callback (via a shared `pendingNotificationEnable`
+  closure) — user-reported that enabling "Weather Status Notification" sometimes silently did
+  nothing on the first tap, only working after an off/on retry. Fixed by decoupling entirely:
+  tapping "On" now calls `setXEnabled(true)` immediately and unconditionally, and independently
+  fires the permission request only if not already granted — the toggle's visible state no longer
+  depends on that request's result. `WeatherNotifier` already no-ops posting until permission is
+  actually granted, so "enabled but not yet permitted" is an honest, harmless intermediate state
+  rather than something to prevent.
+- **Silent "enabled but broken" gap.** Since v1.4 dropped the saved-place fallback, both
+  notification features now hard-require `ACCESS_BACKGROUND_LOCATION`. A user can flip a toggle
+  on in Settings, skip (or later revoke) that separate permission grant, and the feature just goes
+  quiet — no crash, no error, nothing, since Settings' own explanatory copy only reaches someone
+  who happens to scroll back there. Not a legacy-migration concern (this app has never shipped
+  notifications in a published release, so there's no existing install base with a toggle already
+  on) — just a general "enabled but not actually working" catch. Fixed with a dialog on
+  `WeatherScreen` (the main/landing screen, reachable without ever revisiting Settings),
+  re-evaluated on every resume rather than shown once: detects "a notification toggle is on AND
+  Background Location isn't granted" and offers a direct "Grant Access" button. Re-checking every
+  resume (not just once per session) also catches a user who revokes the permission later via
+  system Settings, not just first-time setup.

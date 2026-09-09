@@ -92,19 +92,18 @@ fun SettingsScreen(
     val persistentWeatherEnabled by settingsViewModel.persistentWeatherEnabled.collectAsStateWithLifecycle()
 
     // Two independent toggles (Alert Notifications, Weather Status Notification) share this one
-    // POST_NOTIFICATIONS request — whichever one was tapped stashes what to do once permission is
-    // actually granted, since the launcher callback itself has no way to know which toggle fired it.
-    var pendingNotificationEnable by remember { mutableStateOf<(() -> Unit)?>(null) }
-    // API 33+ only: posting to a channel needs no runtime grant below that, so the permission
-    // request is skipped entirely pre-33 (see each toggle's onClick below).
+    // POST_NOTIFICATIONS request. Deliberately NOT gating the toggle's enabled state behind this
+    // launcher's callback — an earlier version called settingsViewModel.setXEnabled(true) only
+    // from inside the callback, which user-reported as sometimes silently doing nothing on the
+    // first tap (needing an off/on retry to actually take): the callback is an async system
+    // round-trip, and if anything about that composition/lifecycle timing hiccups, the toggle
+    // just never flips with no visible error. Instead, each toggle's onClick enables itself
+    // immediately (see below) and independently fires this request only if not yet granted —
+    // WeatherNotifier already no-ops posting until permission is actually granted, so "enabled but
+    // not yet permitted" is a real, honestly-represented state rather than something to prevent.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        // A denial just leaves the toggle off — Android won't re-prompt from here once denied;
-        // the user would need to grant it from system Settings, same as any other permission.
-        if (granted) pendingNotificationEnable?.invoke()
-        pendingNotificationEnable = null
-    }
+    ) { /* no-op: the toggle already reflects "on"; this only affects whether it can post */ }
 
     // ACCESS_BACKGROUND_LOCATION (API 29+ only) lets WeatherAlertWorker fall back to the device's
     // live location when no place is explicitly selected — see that class's doc comment. Requires
@@ -330,11 +329,11 @@ fun SettingsScreen(
                             icon = null,
                             selected = alertNotificationsEnabled,
                             onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    pendingNotificationEnable = { settingsViewModel.setAlertNotificationsEnabled(true) }
+                                settingsViewModel.setAlertNotificationsEnabled(true)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                ) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    settingsViewModel.setAlertNotificationsEnabled(true)
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -369,11 +368,11 @@ fun SettingsScreen(
                             icon = null,
                             selected = persistentWeatherEnabled,
                             onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    pendingNotificationEnable = { settingsViewModel.setPersistentWeatherEnabled(true) }
+                                settingsViewModel.setPersistentWeatherEnabled(true)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                ) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    settingsViewModel.setPersistentWeatherEnabled(true)
                                 }
                             },
                             modifier = Modifier.weight(1f)
