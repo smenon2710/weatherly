@@ -504,16 +504,130 @@ Android, independent of anything this app does correctly. Before Production:
    execution) than most prior releases, which is exactly the kind of change staged rollout exists
    for.
 
-### Open questions
+### Decision, 2026-09-09: Production is the goal, target 10–15 days
 
-1. Is Production for this feature actually the goal right now, or is continued sideload/personal
-   use the actual near-term plan, with Production revisited later? Worth deciding explicitly
-   before investing in the Play Console policy process, which has real overhead.
-2. Should the daily digest (still unbuilt) ship in the same release as alert/status notifications,
-   or is it worth going through the Background Location review once for what's already built,
-   rather than delaying on a feature that isn't there yet?
-3. Given the background-location review's own uncertainty (timeline, whether the justification is
-   accepted as-is), is there value in a fallback plan — e.g., if the review pushes back hard, is
-   dropping the ongoing "Weather Status Notification" (arguably the harder case to justify, since
-   it's ambient rather than event-driven) and keeping only alert notifications an acceptable
-   fallback scope?
+Question 1 above is resolved. This reshapes the plan materially: the Background Location
+declaration is the one item with external turnaround time neither of us controls (historically
+anywhere from a few days to 2+ weeks, sometimes needing a resubmission round if the
+justification/video isn't accepted the first time) — that has to go in **immediately**, with
+everything else below running in parallel while it's under review, not sequentially after it.
+Everything else in this doc's own history (Internal → Closed → Production promotion for a build
+already technically ready) has been fast for this app specifically — see versionCode 13's
+same-day Internal→Closed→Production, versionCode 15's ~3-day version — so the declaration review
+is genuinely the risk to the 10–15 day window, not the rest of the process.
+
+**Immediate next action: draft and submit the Background Location declaration this week.**
+Needs, per Google's own form: a clear written justification (this app's is straightforward — the
+whole point of the feature is checking weather while the app is closed) and typically a short
+screencast demonstrating the feature actually depending on background access. Worth drafting the
+justification text and a recording plan now rather than waiting for the rest of the checklist to
+be "done."
+
+**Given the timeline, two follow-up decisions worth making now rather than mid-crunch:**
+
+2. **Daily digest stays out of this release.** It's unbuilt, and building + testing it would eat
+   directly into the 10–15 day window for no benefit to the review itself (the declaration is
+   about the *permission*, not which specific features use it — alert + status notifications
+   already justify it on their own). Ship what's built; the digest can follow in a later release
+   once this one is live and stable.
+3. **Fallback scope if the review pushes back:** if Google's review specifically challenges the
+   justification, drop the ongoing "Weather Status Notification" (ambient, harder to justify as
+   *requiring* background access specifically) and resubmit with just the alert notifications
+   (event-driven, more straightforward case) rather than losing the whole timeline to a
+   back-and-forth on both features at once. Not expected to be needed — noted now so it's a fast
+   decision instead of a scramble if it comes up.
+
+### Background Location Declaration — Draft Justification (2026-09-09)
+
+> Google's exact form fields and wording shift between Console versions — same caveat as every
+> other draft in this doc. This is written to cover the substance Google's policy consistently
+> asks for (core feature, user benefit, why foreground access isn't sufficient, scope/frequency of
+> use, data handling), organized so it can be mapped onto whichever specific fields the live form
+> presents, not copy-pasted verbatim without checking against the actual form first.
+
+**Core feature requiring background location access**
+
+SkySpeak includes two related, user-enabled, opt-in notification features (both off by default):
+1. **Severe Weather Alert notifications** — notifies the user when a new severe or extreme
+   National Weather Service advisory is issued for their location, or when a previously active
+   one clears.
+2. **Weather Status notification** — an ongoing, low-priority notification showing current
+   conditions at the user's location, refreshed periodically.
+
+Both run on a periodic background check (roughly every 30 minutes, subject to standard Android
+system throttling) that resolves the device's current location to fetch weather/alert data for
+that location.
+
+**Why this cannot work with foreground-only location access**
+
+The entire value of both features is reaching the user *without* them having the app open. A
+weather-alert notification that could only check conditions while the user is already looking at
+the app provides no value over the user just looking at the weather screen directly — there would
+be nothing left for the notification to add. SkySpeak has no backend server and no push
+infrastructure (no FCM channel); it is a purely client-side app that talks directly to free,
+public weather and government-alert APIs (Open-Meteo, api.weather.gov). The only way to check for
+new conditions while the app is closed is a background job that can resolve the device's location
+at that time — there is no server-side alternative to fall back to.
+
+**How this benefits the user**
+
+- Real, official government severe-weather-advisory awareness (NWS warnings — flood, severe
+  thunderstorm, extreme heat, etc.) delivered proactively, without the user needing to remember to
+  open the app during a hazardous-weather event.
+- Ambient convenience: current conditions visible directly from the notification shade.
+
+**Explicit, narrow opt-in — not automatic or default**
+
+- Both features are off by default. The user must explicitly enable each one, individually, in
+  Settings.
+- Enabling either one triggers the standard Android system "Allow all the time" location dialog —
+  the app never requests background location eagerly on launch or as a side effect of any other
+  flow. It is requested only at the exact moment the user takes the specific action of turning on
+  one of these two toggles.
+- Settings shows the current grant status at all times, and the user can revoke access (via
+  system Settings) or simply turn the toggles back off at any time, with no other loss of app
+  functionality — every other part of the app works fully without this permission.
+
+**Scope and frequency of use**
+
+- A periodic check roughly every 30 minutes (subject to Android's own Doze/App Standby
+  throttling) — not a continuous location stream, and not `requestLocationUpdates`-style tracking.
+- Each check resolves a single current/last-known location fix, used only to make weather-data API
+  calls for that coordinate.
+
+**Data handling**
+
+- No backend server of any kind — coordinates go directly from the device to Open-Meteo and the
+  National Weather Service over HTTPS, the same third parties (and the same transport) already
+  disclosed for this app's existing, already-approved foreground location use.
+- Location is not logged, stored beyond the immediate API call, sold, or shared for advertising or
+  analytics — the app has no analytics or crash-reporting SDK of any kind.
+
+---
+
+### Video demonstration — shot list (2026-09-09 draft)
+
+Google's review typically expects a short screen recording showing the feature genuinely
+depending on background access, not just the permission being requested. Suggested sequence:
+
+1. **Show the toggle is off by default.** Open Settings, show "Alert Notifications" and "Weather
+   Status Notification" both Off, and "Background Location" showing as not yet granted.
+2. **Turn a toggle on.** Tap "Alert Notifications" → On. Show the `POST_NOTIFICATIONS` system
+   prompt appearing and being granted.
+3. **Show the Background Location card/prompt.** Either scroll to the Settings card and tap
+   "Allow background location," or close the app to the home screen and reopen it to show the
+   proactive missing-permission dialog firing, then tap through it.
+4. **Grant "Allow all the time"** on the real system location-permission page — show this
+   specific screen, since it's the crux of what's being justified.
+5. **Close the app entirely** (swipe it away from Recents, not just background it) to make clear
+   no foreground process is running.
+6. **Wait for (or force) a background check**, then show a real notification arriving in the
+   shade while the app was fully closed — this is the single most important shot, since it's the
+   direct demonstration that the feature requires background access to do what it claims.
+7. **Tap the notification** to show it opens back into the app, closing the loop.
+
+Recording this needs a moment with either a live severe weather alert somewhere, or (more
+practically) the Weather Status Notification toggle, since that one doesn't depend on a real
+severe-weather event happening to exist during recording — showing step 6 with the ongoing status
+notification updating after the app was fully closed is likely the cleaner, more reliably
+reproducible demonstration for the video.
