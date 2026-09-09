@@ -151,6 +151,19 @@ background-location review trap" section above, which this directly reopens):
   15 shipped versionCodes. That's a separate decision from "does the feature work," deliberately
   not made here.
 
+## v1.4 — dropped the selected-place fallback entirely, always current location
+
+Same-day follow-up: user found the "selected place wins if set" priority unnecessary —
+background notifications should reflect wherever the user actually is, not whichever city was
+last browsed in-app. `WeatherAlertWorker` no longer reads `PreferencesStore.getSelected()` at
+all; it always resolves live current location via `LocationProvider`, gated only on
+`ACCESS_BACKGROUND_LOCATION`. This is a real behavior change, not just a simplification:
+**Background Location is now a hard requirement**, not an enhancement — without it, both
+notification features are enabled-but-inert, since there's no fallback left. Settings reordered
+to put the Background Location card first, with copy updated to say "required" rather than
+"optional," and both notification cards' descriptions now say "Needs Background Location above"
+directly.
+
 ---
 
 ## What's already built, and what's genuinely missing

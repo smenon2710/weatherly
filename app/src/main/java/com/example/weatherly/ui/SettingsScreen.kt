@@ -291,6 +291,37 @@ fun SettingsScreen(
 
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column {
+                    SettingsSectionLabel("Background Location")
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (hasBackgroundLocation)
+                            "Granted — the two notification features below check your live " +
+                                "current location, wherever you are."
+                        else
+                            "Required for the two notification features below — they always " +
+                                "check your live current location (not a saved place), which " +
+                                "needs this separate \"Allow all the time\" permission beyond " +
+                                "ordinary location access. Without it, those features are " +
+                                "enabled but silently do nothing.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    if (!hasBackgroundLocation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Cyan)
+                        ) {
+                            Text("Allow background location")
+                        }
+                    }
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
                     SettingsSectionLabel("Alert Notifications")
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -319,10 +350,9 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Get notified in the background when a severe weather alert is issued " +
-                            "for — or clears from — your location, even with the app closed and " +
-                            "no widget placed. Checks periodically, not instantly. Uses a saved, " +
-                            "explicitly selected place if you have one; otherwise your live " +
-                            "current location, if you've granted Background Location below.",
+                            "for — or clears from — your current location, even with the app " +
+                            "closed and no widget placed. Checks periodically, not instantly. " +
+                            "Needs Background Location above.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
@@ -358,46 +388,13 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "An ongoing notification showing current conditions, updated roughly " +
-                            "every 30 minutes. It stays in your notification shade until you " +
-                            "turn this off — it can't be swiped away on its own. Same location " +
-                            "source as Alert Notifications above.",
+                        "An ongoing notification showing conditions at your current location, " +
+                            "updated roughly every 30 minutes. It stays in your notification " +
+                            "shade until you turn this off — it can't be swiped away on its " +
+                            "own. Needs Background Location above.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
-                }
-            }
-
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    SettingsSectionLabel("Background Location")
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        if (hasBackgroundLocation)
-                            "Granted — the two notification features above will use your live " +
-                                "current location when no place is explicitly selected, instead " +
-                                "of only working for a saved place."
-                        else
-                            "Optional. Without this, the notifications above only work for a " +
-                                "saved place (Locations → search and select a city). Granting " +
-                                "it lets them use your live current location instead when " +
-                                "nothing is explicitly selected. Requires a separate \"Allow " +
-                                "all the time\" system permission beyond ordinary location " +
-                                "access.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                    if (!hasBackgroundLocation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Cyan)
-                        ) {
-                            Text("Allow background location")
-                        }
-                    }
                 }
             }
 

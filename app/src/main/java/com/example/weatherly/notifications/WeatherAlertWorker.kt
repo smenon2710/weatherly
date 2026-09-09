@@ -18,16 +18,16 @@ import com.example.weatherly.location.LocationProvider
  * alerts and alerts that have since resolved, surfaced as system notifications — for the users
  * `NOTIFICATIONS_ROADMAP.md` is aimed at, who never open the app or place a widget.
  *
- * Location resolution mirrors [com.example.weatherly.ui.WeatherViewModel.load]'s exact
- * foreground pattern: a saved/selected place ([PreferencesStore.getSelected]) wins if set —
- * someone explicitly watching a specific city should always get that city, not wherever the
- * device happens to be — otherwise falls back to the device's live location via
- * [LocationProvider], **only if** `ACCESS_BACKGROUND_LOCATION` is granted (Settings → Background
- * Location). Without that grant, "current location" mode simply gets no background checks,
- * same as before this was added. User-requested (over the original saved-place-only v1 scope)
- * with an explicit trade-off called out: this permission needs its own "Allow all the time"
- * system flow and, if this ever ships to Production, a Play Console background-location policy
- * declaration this app has never needed before — sideload-testing only for now.
+ * Location: **always** the device's live current location via [LocationProvider], regardless of
+ * whatever place is selected/saved in-app — deliberately diverging from
+ * [com.example.weatherly.ui.WeatherViewModel.load]'s foreground pattern (which does prefer a
+ * selected place) per explicit user request: background notifications should reflect wherever
+ * the user actually is, not whatever city happened to be last browsed in the app. Requires
+ * `ACCESS_BACKGROUND_LOCATION` (Settings → Background Location) — without it, this worker simply
+ * has no location to check and both notification features silently do nothing, since there's no
+ * selected-place fallback anymore. This permission needs its own "Allow all the time" system flow
+ * and, if this ever ships to Production, a Play Console background-location policy declaration
+ * this app has never needed before — sideload-testing only for now.
  *
  * Uses its own [PreferencesStore.getBackgroundTrackedAlerts] slot rather than the foreground's
  * [PreferencesStore.getTrackedAlerts] — see that method's doc comment for why sharing one would
@@ -47,21 +47,12 @@ class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
         val statusEnabled = prefs.getPersistentWeatherEnabled()
         if (!alertsEnabled && !statusEnabled) return Result.success()
 
-        val selected = prefs.getSelected()
-        val lat: Double
-        val lon: Double
-        val placeName: String?
-        if (selected != null) {
-            lat = selected.lat; lon = selected.lon; placeName = selected.name
-        } else {
-            if (!hasBackgroundLocationPermission(applicationContext)) return Result.success()
-            val ll = LocationProvider(applicationContext).currentLatLon() ?: return Result.success()
-            lat = ll.first; lon = ll.second; placeName = null
-        }
+        if (!hasBackgroundLocationPermission(applicationContext)) return Result.success()
+        val (lat, lon) = LocationProvider(applicationContext).currentLatLon() ?: return Result.success()
 
         val repository = WeatherRepository(applicationContext)
         val fetched = repository.getWeather(
-            lat = lat, lon = lon, units = prefs.getUnitSystem(), placeName = placeName
+            lat = lat, lon = lon, units = prefs.getUnitSystem()
         )
         val data = fetched.getOrNull() ?: return Result.retry()
 
