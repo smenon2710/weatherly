@@ -15,6 +15,7 @@ import com.example.weatherly.MainActivity
 import com.example.weatherly.R
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherAlert
+import com.example.weatherly.data.model.WeatherData
 
 /**
  * Notification channels for the background weather-alert feature (see [WeatherAlertWorker]) —
@@ -26,6 +27,7 @@ import com.example.weatherly.data.model.WeatherAlert
 object WeatherNotificationChannels {
     const val SEVERE_ALERTS = "severe_alerts"
     const val ALERTS_RESOLVED = "alerts_resolved"
+    const val WEATHER_STATUS = "weather_status"
 
     fun ensureCreated(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -37,6 +39,15 @@ object WeatherNotificationChannels {
         manager.createNotificationChannel(
             NotificationChannel(ALERTS_RESOLVED, "Alert resolved", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Lets you know when a previously active weather alert has ended."
+            }
+        )
+        // LOW, not DEFAULT/HIGH: this one updates itself silently on every periodic check
+        // (WeatherNotifier.notifyWeatherStatus) — anything above LOW would heads-up/alert the
+        // user roughly every 30 minutes, which is the opposite of "ambient".
+        manager.createNotificationChannel(
+            NotificationChannel(WEATHER_STATUS, "Weather status", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "An ongoing notification showing current conditions for your saved location, updated periodically."
+                setShowBadge(false)
             }
         )
     }
@@ -77,6 +88,38 @@ object WeatherNotifier {
             .setContentIntent(contentIntent(context))
             .build()
         NotificationManagerCompat.from(context).notify(resolved.id.hashCode(), notification)
+    }
+
+    // Fixed, arbitrary id — every call re-posts to this same id so the notification updates in
+    // place each periodic check instead of stacking a new one every ~30 minutes.
+    private const val WEATHER_STATUS_NOTIFICATION_ID = 778821
+
+    /** Posts (or updates) the ongoing "current conditions" notification. `setOngoing(true)`
+     * makes it non-swipeable — a deliberate choice (see NOTIFICATIONS_ROADMAP.md) over a normal
+     * dismissible notification that would just silently reappear at the next check anyway;
+     * turning the Settings toggle off is what actually removes it, via [cancelWeatherStatus].
+     * `setOnlyAlertOnce(true)` is a second belt-and-suspenders guard (alongside the LOW-importance
+     * channel) against any sound/vibration/heads-up on the periodic updates. */
+    fun notifyWeatherStatus(context: Context, data: WeatherData) {
+        if (!hasPermission(context)) return
+        val notification = NotificationCompat.Builder(context, WeatherNotificationChannels.WEATHER_STATUS)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("${data.currentTempC}° · ${data.condition}")
+            .setContentText("${data.locationName} · H:${data.highTodayC}° L:${data.lowTodayC}°")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(false)
+            .setContentIntent(contentIntent(context))
+            .build()
+        NotificationManagerCompat.from(context).notify(WEATHER_STATUS_NOTIFICATION_ID, notification)
+    }
+
+    /** Removes the ongoing weather-status notification — called when the Settings toggle turns
+     * it off, since [notifyWeatherStatus]'s `setOngoing(true)` means the user can't swipe it away
+     * themselves. */
+    fun cancelWeatherStatus(context: Context) {
+        NotificationManagerCompat.from(context).cancel(WEATHER_STATUS_NOTIFICATION_ID)
     }
 
     private fun hasPermission(context: Context): Boolean {

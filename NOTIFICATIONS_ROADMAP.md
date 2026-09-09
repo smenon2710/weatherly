@@ -74,6 +74,31 @@ built or installed anywhere** — source changes only, unverified by an actual c
 location" background support (which would reopen the background-location question this
 implementation was designed to avoid).
 
+## What shipped (v1.1) — ongoing "current conditions" status notification
+
+User-requested follow-up, same day: an ambient, silently-updating notification showing current
+temp/condition (the "weather bubble" pattern other weather apps use), distinct from the
+alert-only types above. Reuses `WeatherAlertWorker`'s existing periodic job rather than adding a
+second one — no new scheduling infra.
+
+- A third notification channel, `weather_status` (`IMPORTANCE_LOW` — no heads-up/sound on its
+  ~30-minute updates, unlike the alert channels).
+- `WeatherNotifier.notifyWeatherStatus()`/`cancelWeatherStatus()` — posts to a fixed notification
+  ID so each periodic check updates the same notification in place instead of stacking. Built
+  **persistent** (`setOngoing(true)`) per explicit user preference over a dismissible one that
+  would just silently reappear anyway — turning the Settings toggle off is the only way to
+  remove it, since `setOngoing` means it can't be swiped away.
+- A **separate** Settings toggle ("Weather Status Notification") from "Alert Notifications" —
+  someone might want the ambient status without alert pings, or vice versa — even though both
+  toggles now drive the same underlying `WeatherAlertWorker`/`WeatherNotificationScheduler` job
+  (`SettingsViewModel.syncScheduler()` schedules whenever either is on, cancels only when both
+  are off). Same saved-place-only scoping as alert notifications, for the same
+  background-location reason.
+- Built (`assembleDebug` succeeds) and installed to a real device for testing; **not yet
+  functionally verified** — unlike the alert-notification path above (confirmed end-to-end on
+  the emulator with a real live NWS alert), this one hasn't actually been triggered and observed
+  yet.
+
 ---
 
 ## What's already built, and what's genuinely missing

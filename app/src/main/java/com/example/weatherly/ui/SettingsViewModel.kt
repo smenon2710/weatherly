@@ -6,8 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weatherly.BuildConfig
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.notifications.WeatherAlertWorker
 import com.example.weatherly.notifications.WeatherNotificationChannels
 import com.example.weatherly.notifications.WeatherNotificationScheduler
+import com.example.weatherly.notifications.WeatherNotifier
 import com.example.weatherly.widget.WeatherWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,9 +92,37 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAlertNotificationsEnabled(enabled: Boolean) {
         prefs.setAlertNotificationsEnabled(enabled)
         _alertNotificationsEnabled.value = enabled
+        if (enabled) WeatherNotificationChannels.ensureCreated(getApplication())
+        syncScheduler()
+    }
+
+    /**
+     * Ongoing "current conditions" status notification (see NOTIFICATIONS_ROADMAP.md) — a
+     * separate opt-in from [alertNotificationsEnabled] even though both are driven by the same
+     * background job (see [syncScheduler]), since a user might want one without the other.
+     */
+    private val _persistentWeatherEnabled = MutableStateFlow(prefs.getPersistentWeatherEnabled())
+    val persistentWeatherEnabled: StateFlow<Boolean> = _persistentWeatherEnabled.asStateFlow()
+
+    fun setPersistentWeatherEnabled(enabled: Boolean) {
+        prefs.setPersistentWeatherEnabled(enabled)
+        _persistentWeatherEnabled.value = enabled
         val context = getApplication<Application>()
         if (enabled) {
             WeatherNotificationChannels.ensureCreated(context)
+        } else {
+            // Ongoing (setOngoing(true)) means the user can't swipe it away themselves — turning
+            // the toggle off is the only way it actually disappears.
+            WeatherNotifier.cancelWeatherStatus(context)
+        }
+        syncScheduler()
+    }
+
+    /** [WeatherAlertWorker] serves both notification features off one periodic job — only cancel
+     * it once neither feature needs it, and (re)schedule whenever at least one does. */
+    private fun syncScheduler() {
+        val context = getApplication<Application>()
+        if (_alertNotificationsEnabled.value || _persistentWeatherEnabled.value) {
             WeatherNotificationScheduler.schedule(context)
         } else {
             WeatherNotificationScheduler.cancel(context)

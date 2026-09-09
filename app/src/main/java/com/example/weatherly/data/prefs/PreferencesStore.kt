@@ -160,6 +160,18 @@ class PreferencesStore(context: Context) {
         prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply()
     }
 
+    /** Opt-in for an ongoing, silently-updating "current conditions" notification (temp +
+     * condition), refreshed on WeatherAlertWorker's same periodic check — see
+     * notifications/WeatherNotifications.kt. Deliberately a separate toggle from
+     * [getAlertNotificationsEnabled]: someone might want ambient status without alert pings, or
+     * vice versa, even though both share the same underlying background job. Defaults to off,
+     * same opt-in reasoning as alert notifications. */
+    fun getPersistentWeatherEnabled(): Boolean = prefs.getBoolean(KEY_PERSISTENT_WEATHER_ENABLED, false)
+
+    fun setPersistentWeatherEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PERSISTENT_WEATHER_ENABLED, enabled).apply()
+    }
+
     // --- Appearance ---------------------------------------------------------
     fun getThemePreference(): ThemePreference =
         prefs.getString(KEY_THEME, null)?.let {
@@ -202,6 +214,7 @@ class PreferencesStore(context: Context) {
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
         private const val KEY_TRACKED_ALERTS_BG = "tracked_alerts_bg"
         private const val KEY_NOTIFICATIONS_ENABLED = "alert_notifications_enabled"
+        private const val KEY_PERSISTENT_WEATHER_ENABLED = "persistent_weather_enabled"
         private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
         private const val KEY_HAPTICS_ENABLED = "haptics_enabled"
         private const val KEY_LLM_USAGE_DATE = "llm_usage_date"

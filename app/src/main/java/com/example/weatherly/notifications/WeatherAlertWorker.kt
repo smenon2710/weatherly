@@ -24,13 +24,20 @@ import com.example.weatherly.data.repository.WeatherRepository
  * Uses its own [PreferencesStore.getBackgroundTrackedAlerts] slot rather than the foreground's
  * [PreferencesStore.getTrackedAlerts] — see that method's doc comment for why sharing one would
  * corrupt the diff when the in-app view and the background-tracked place differ.
+ *
+ * Also drives the ongoing "current conditions" status notification
+ * ([PreferencesStore.getPersistentWeatherEnabled]) on the same fetch/interval — a separate opt-in
+ * from the alert notifications above, but sharing this one job rather than scheduling a second
+ * periodic worker, since both need the identical data for the identical place.
  */
 class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         val prefs = PreferencesStore(applicationContext)
-        if (!prefs.getAlertNotificationsEnabled()) return Result.success()
+        val alertsEnabled = prefs.getAlertNotificationsEnabled()
+        val statusEnabled = prefs.getPersistentWeatherEnabled()
+        if (!alertsEnabled && !statusEnabled) return Result.success()
 
         val place = prefs.getSelected() ?: return Result.success()
 
@@ -40,14 +47,20 @@ class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
         )
         val data = fetched.getOrNull() ?: return Result.retry()
 
-        val tracker = AlertTracker(prefs::getBackgroundTrackedAlerts, prefs::setBackgroundTrackedAlerts)
-        val diff = tracker.diffAndUpdate(data.alerts)
-
         WeatherNotificationChannels.ensureCreated(applicationContext)
-        diff.newlyAppeared
-            .filter { it.severity == AlertSeverity.EXTREME || it.severity == AlertSeverity.SEVERE }
-            .forEach { WeatherNotifier.notifySevereAlert(applicationContext, it) }
-        diff.newlyResolved.forEach { WeatherNotifier.notifyAlertResolved(applicationContext, it) }
+
+        if (alertsEnabled) {
+            val tracker = AlertTracker(prefs::getBackgroundTrackedAlerts, prefs::setBackgroundTrackedAlerts)
+            val diff = tracker.diffAndUpdate(data.alerts)
+            diff.newlyAppeared
+                .filter { it.severity == AlertSeverity.EXTREME || it.severity == AlertSeverity.SEVERE }
+                .forEach { WeatherNotifier.notifySevereAlert(applicationContext, it) }
+            diff.newlyResolved.forEach { WeatherNotifier.notifyAlertResolved(applicationContext, it) }
+        }
+
+        if (statusEnabled) {
+            WeatherNotifier.notifyWeatherStatus(applicationContext, data)
+        }
 
         return Result.success()
     }

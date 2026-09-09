@@ -85,15 +85,21 @@ fun SettingsScreen(
     val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
     val hapticsEnabled by settingsViewModel.hapticsEnabled.collectAsStateWithLifecycle()
     val alertNotificationsEnabled by settingsViewModel.alertNotificationsEnabled.collectAsStateWithLifecycle()
+    val persistentWeatherEnabled by settingsViewModel.persistentWeatherEnabled.collectAsStateWithLifecycle()
 
+    // Two independent toggles (Alert Notifications, Weather Status Notification) share this one
+    // POST_NOTIFICATIONS request — whichever one was tapped stashes what to do once permission is
+    // actually granted, since the launcher callback itself has no way to know which toggle fired it.
+    var pendingNotificationEnable by remember { mutableStateOf<(() -> Unit)?>(null) }
     // API 33+ only: posting to a channel needs no runtime grant below that, so the permission
-    // request is skipped entirely pre-33 (see the toggle's onClick below).
+    // request is skipped entirely pre-33 (see each toggle's onClick below).
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         // A denial just leaves the toggle off — Android won't re-prompt from here once denied;
         // the user would need to grant it from system Settings, same as any other permission.
-        if (granted) settingsViewModel.setAlertNotificationsEnabled(true)
+        if (granted) pendingNotificationEnable?.invoke()
+        pendingNotificationEnable = null
     }
 
     // The key field never holds the stored secret — only whatever new value the
@@ -264,6 +270,7 @@ fun SettingsScreen(
                             selected = alertNotificationsEnabled,
                             onClick = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    pendingNotificationEnable = { settingsViewModel.setAlertNotificationsEnabled(true) }
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 } else {
                                     settingsViewModel.setAlertNotificationsEnabled(true)
@@ -286,6 +293,46 @@ fun SettingsScreen(
                             "and no widget placed. Checks periodically, not instantly. Currently " +
                             "only works for a saved place (add one from the locations sheet on " +
                             "the Weather screen) — not \"current location\" mode.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Weather Status Notification")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OptionPill(
+                            label = "On",
+                            icon = null,
+                            selected = persistentWeatherEnabled,
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    pendingNotificationEnable = { settingsViewModel.setPersistentWeatherEnabled(true) }
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    settingsViewModel.setPersistentWeatherEnabled(true)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OptionPill(
+                            label = "Off",
+                            icon = null,
+                            selected = !persistentWeatherEnabled,
+                            onClick = { settingsViewModel.setPersistentWeatherEnabled(false) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "An ongoing notification showing current conditions for a saved " +
+                            "location, updated roughly every 30 minutes. It stays in your " +
+                            "notification shade until you turn this off — it can't be swiped " +
+                            "away on its own. Same saved-place requirement as Alert " +
+                            "Notifications above.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
