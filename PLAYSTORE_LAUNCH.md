@@ -426,7 +426,14 @@ justify).
   class name) and a real posted notification via `dumpsys notification`, matching every prior
   debug-build test exactly. The one genuine unknown this pre-flight item existed to catch is
   closed.
-- [ ] `versionCode`/`versionName` bump (currently 15/1.0.14 → 16/1.0.15 or similar).
+- [x] `versionCode`/`versionName` bumped 15/1.0.14 → 16/1.0.15, 2026-09-09 — fully re-verified at
+  the new numbering (not just `assembleDebug`): fresh `assembleRelease`, `apksigner verify` (same
+  keystore), `aapt2 dump badging` confirming `versionCode='16' versionName='1.0.15'` embedded
+  correctly, installed as an in-place update on the real device (same signing key as the prior
+  test build, no uninstall needed this time — app data/prefs persisted through the update
+  correctly), Settings → About confirmed "Version 1.0.15" in the running app, and the
+  WeatherAlertWorker → SUCCESS → posted-notification chain reconfirmed end to end on this exact
+  build via `dumpsys`.
 - [ ] Full standard release verification, same bar as every prior release in this doc:
   `assembleDebug`/`lint`/`test` all `BUILD SUCCESSFUL`, `jarsigner -verify` on the AAB,
   `apksigner verify` on the APK, `aapt2 dump badging` confirming the version strings landed.
