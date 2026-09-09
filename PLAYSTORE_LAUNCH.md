@@ -90,17 +90,33 @@ KEY_PASSWORD=your_key_password
 
 ### 4. Data Safety Form (Play Console)
 
-**✅ Re-submitted in Console (2026-07-16):** the live Data Safety form was updated and verified against the Store Listing preview — Location (Approximate + Precise) shows Shared/App functionality and Collected/Optional/App functionality, matching the table below. Note that Play Console's form has no field to name individual third-party recipients (Open-Meteo, NWS) — it only captures data type/shared/purpose, so checking "Shared: Yes, App functionality" for Location is the complete disclosure Console requires; the specific recipient names live in `docs/privacy.html` instead.
+**✅ Last submitted 2026-07-16** (Location Approximate + Precise, shared/App functionality;
+User queries, optional/App functionality). **Needs updating before this release** — background
+location collection (the two new optional notification features) isn't reflected yet, and should
+say the same story as the Background Location declaration above rather than a narrower one, so a
+reviewer cross-referencing both doesn't see a contradiction. Play Console's form has no field to
+name individual third-party recipients (Open-Meteo, NWS) — it only captures data type/shared/
+purpose, so checking "Shared: Yes, App functionality" for Location is the complete disclosure
+Console requires; the specific recipient names live in `docs/privacy.html` instead.
 
-Fill out in Play Console → Store listing → Data safety. Summary (see the detailed draft answers below for the full form flow):
+**On whether the Data Safety form itself has a distinct "background" checkbox:** not confirmed —
+unlike everything else in this section (checked against the live form as of the last
+submission), this specific point hasn't been verified against the *current* Play Console UI,
+which changes over time. Check for it directly when the form is open; if no such field exists,
+the practical fix is making sure the **purpose/description text** for Location explicitly
+mentions the two background features below, so the form and the separate Background Location
+declaration tell a consistent story either way.
+
+Fill out in Play Console → Store listing → Data safety. Summary (see the detailed draft answers
+below for the full form flow):
 
 | Data type | Collected | Shared with third parties | Purpose |
 |---|---|---|---|
-| Approximate location | Yes | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
-| Precise location | Yes | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
+| Approximate location | Yes, including in the background if the user opts into either notification feature below | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
+| Precise location | Yes, including in the background if the user opts into either notification feature below | Yes (Open-Meteo, to fetch the forecast; National Weather Service, to check for active weather alerts — U.S. locations only) | App functionality |
 | User queries (chat) | Optional | Yes (OpenRouter), only when a key is configured | App functionality |
 
-*(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`. Updated again 2026-07-16 to add the National Weather Service as a third recipient of location data, added when the weather-alerts feature shipped.)*
+*(Corrected from an earlier draft: location **is** shared with Open-Meteo — the app has no backend, so coordinates go directly from device to Open-Meteo's API. This matches `docs/privacy.html`. Updated 2026-07-16 to add the National Weather Service as a third recipient of location data. Updated again 2026-09-09 to reflect background collection for the new opt-in notification features — see `NOTIFICATIONS_ROADMAP.md`.)*
 
 <details>
 <summary>Detailed draft answers, matching Play Console's actual form flow (expand)</summary>
@@ -116,13 +132,20 @@ Fill out in Play Console → Store listing → Data safety. Summary (see the det
 
 | Data type | Collected? | Shared? | Purpose | Optional? | Ephemeral? |
 |---|---|---|---|---|---|
-| Approximate location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Yes — a manual city search works without ever granting location permission | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's/NWS's own retention policy |
-| Precise location | Yes | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Yes — same as above | Same as above |
+| Approximate location | Yes — including in the background, but only if the user has separately opted into "Alert Notifications" or "Weather Status Notification" in Settings (both off by default) and granted the additional "Allow all the time" location permission those require | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Yes — a manual city search works without ever granting location permission at all, and the two background features require two further explicit opt-ins beyond the base permission | Not claimed — don't check "ephemeral" unless you've confirmed Open-Meteo's/NWS's own retention policy |
+| Precise location | Same as above | Yes — Open-Meteo, and National Weather Service (U.S. locations only, for active weather alerts) | App functionality | Same as above | Same as above |
 | Other user-generated content *(free-form chat text)* | Yes, only if the user opens AI chat and a key is configured | Yes — OpenRouter (and whichever model OpenRouter routes to) | App functionality | Yes — the quick-suggest chips work without any chat text ever being sent | No |
 
 **Data types with no data to declare (leave unchecked):** Personal info (name/email/etc. — never collected), Financial info (the donation link opens an external Razorpay page in the browser; the app itself never collects or processes payment details), Health & fitness, Photos/videos, Audio, Contacts, Calendar, Messages (SMS/email), Web browsing history, Device/other IDs, App info & performance (no analytics or crash-reporting SDK in the codebase).
 
 </details>
+
+**Consistency check before submitting:** the wording above should tell the same story as the
+Background Location declaration's justification text (see "Background Location Declaration —
+Draft Justification" further down this doc) — both should describe the same two opt-in features,
+the same "off by default, two separate explicit grants required" scope, and the same third
+parties (Open-Meteo, NWS). If either gets edited independently before submission, re-check the
+other for drift.
 
 ---
 
@@ -162,7 +185,7 @@ Character counts verified — safe to paste directly into Play Console.
 Ad-free forecasts, a live weather view, and an AI assistant. No account needed.
 ```
 
-**Full description** (4000 char limit, ~2227 used):
+**Full description** (4000 char limit, updated 2026-09-09 to cover the new notification features — see draft below):
 ```
 SkySpeak is a clean, ad-free weather app built for people who just want accurate forecasts without the clutter — plus an AI assistant for the planning questions a forecast alone can't answer.
 
@@ -172,6 +195,7 @@ WHAT YOU GET
 • Rain and snow shown as what they actually are: real, separate amounts — not one vague "precipitation" figure that could quietly mean either
 • Air quality, pressure, visibility, wind, humidity, sunrise/sunset, and moon phase — all in one screen
 • Official National Weather Service advisories — severe warnings, watches, and air quality alerts — shown clearly at a glance (U.S. locations)
+• Optional notifications: get alerted when a severe weather advisory starts or ends near you, or keep an ongoing conditions notification up to date in the background — both entirely opt-in, off by default
 • A home-screen widget that adapts its layout to size and time of day
 • Works offline: your last forecast is cached, so the app never opens to a blank screen
 
@@ -182,7 +206,7 @@ PRIVACY BY DESIGN
 • No account or sign-up required
 • No ads, no ad SDK, no tracking for advertising purposes
 • No analytics or crash-reporting SDKs
-• Your location is used only to fetch your forecast — never sold or shared for marketing
+• Your location is used only to fetch your forecast, plus — only if you turn on the optional notification features above — periodically in the background to keep them up to date. Never sold or shared for marketing, either way
 • Full privacy policy available in-app and on our website
 
 ABOUT THE DATA
@@ -192,6 +216,8 @@ SkySpeak is free to use with no paywalled features. If you find it useful, an op
 
 Whether you're deciding what to wear this morning or planning a weekend outdoors, SkySpeak gives you the forecast and the judgment to go with it.
 ```
+
+*(Character count re-verified 2026-09-09: 2569/4000 — safe to paste directly into Play Console.)*
 
 **Category:** Weather
 
@@ -472,17 +498,26 @@ Android, independent of anything this app does correctly. Before Production:
 
 ### Data Safety form + Privacy Policy updates
 
-- [ ] **Data Safety form** (Play Console → Store listing → Data safety): the existing Location
-  entries are declared as collected/shared for "App functionality," but the form has separate
-  context for background collection — this needs updating to reflect that location can now be
-  accessed while the app isn't in active use, not just during a foreground fetch.
-- [ ] **`docs/privacy.html`**: needs an explicit new disclosure that background location access is
-  used for the optional notification features, distinct from the existing "used only to fetch
-  your forecast" framing, which currently implies foreground-only use.
-- [ ] **Store listing full description**: the existing "PRIVACY BY DESIGN" section says "Your
-  location is used only to fetch your forecast — never sold or shared for marketing" — true, but
-  written before background access existed; worth revisiting the wording so it doesn't read as
-  contradicting the new Data Safety disclosure once both are live side by side.
+- [x] **Data Safety form draft updated, 2026-09-09** (see section 4 above): both Location rows now
+  call out background collection, scoped to the two opt-in notification features, third-party
+  recipients unchanged (Open-Meteo, NWS). Still needs the actual live-Console submission — this is
+  a doc draft, not yet pasted into Play Console — and one open question flagged there: whether the
+  current Console UI has a distinct background-collection checkbox or just a purpose/description
+  field; check live before submitting.
+- [x] **`docs/privacy.html` updated, 2026-09-09**: added a dedicated "Background location access"
+  section explaining the two opt-in features, the separate "Allow all the time" permission prompt
+  each requires, and the ~30-minute periodic check via WorkManager; the per-data-type table and
+  third-party-services list both now distinguish foreground vs. background collection. Also
+  removed stale RainViewer/OpenStreetMap radar references left over from `RadarScreen`'s removal
+  (see CLAUDE.md) — those services haven't received any data since, so leaving them listed as
+  recipients was itself a latent accuracy gap, found while doing this pass. Live at
+  `https://smenon2710.github.io/weatherly/privacy.html` once pushed — GitHub Pages serves straight
+  from this repo, so no separate publish step beyond the normal commit/push.
+- [x] **Store listing full description updated, 2026-09-09** (see the Store Listing Content
+  section above): added a "WHAT YOU GET" bullet for the two opt-in notification features and
+  reworded the "PRIVACY BY DESIGN" location line so it no longer reads as foreground-only.
+  Re-verified at 2569/4000 characters — safe to paste as-is. Not yet re-pasted into the live Play
+  Console listing itself — that's the one remaining user-side action here.
 
 ### Sequencing (not a commitment)
 

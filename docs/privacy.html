@@ -30,7 +30,7 @@
 <body>
 
 <h1>Privacy Policy — SkySpeak</h1>
-<p class="updated">Last updated: July 16, 2026</p>
+<p class="updated">Last updated: September 9, 2026</p>
 
 <p>
   SkySpeak: Premium Weather Chat ("SkySpeak", "the app") is a weather application
@@ -44,9 +44,14 @@
 <table>
   <tr><th>Data</th><th>Why</th><th>Leaves your device?</th></tr>
   <tr>
-    <td>Precise / approximate location</td>
-    <td>To fetch weather, air quality, radar, and official weather-advisory data for where you are</td>
-    <td>Yes — sent to Open-Meteo, RainViewer, and the U.S. National Weather Service as coordinates (see below)</td>
+    <td>Precise / approximate location (while using the app)</td>
+    <td>To fetch weather, air quality, and official weather-advisory data for where you are</td>
+    <td>Yes — sent to Open-Meteo and the U.S. National Weather Service as coordinates (see below)</td>
+  </tr>
+  <tr>
+    <td>Precise / approximate location (in the background)</td>
+    <td>Only if you turn on <strong>Alert Notifications</strong> or the <strong>Weather Status Notification</strong> in Settings — both are off by default, and each requires you to separately grant "Allow all the time" location access beyond the ordinary while-using-the-app permission. When on, the app periodically checks your current location in the background (roughly every 30 minutes) so it can notify you of severe weather alerts near you, or keep an ongoing conditions notification up to date, without you having to keep the app open</td>
+    <td>Yes — same destinations as above (Open-Meteo, and the National Weather Service for U.S. locations), only while either feature is enabled</td>
   </tr>
   <tr>
     <td>City search text</td>
@@ -70,22 +75,50 @@
   SDKs, and does not contain advertising of any kind.
 </p>
 
+<h2>Background location access</h2>
+<p>
+  By default, SkySpeak only accesses your location while you have the app open, to
+  show you the forecast for where you are. Two optional features, both off by
+  default and found in Settings, use your location in the background as well:
+</p>
+<ul>
+  <li>
+    <strong>Alert Notifications</strong> — notifies you when a severe or extreme
+    National Weather Service advisory becomes active for your current location,
+    and again when it ends.
+  </li>
+  <li>
+    <strong>Weather Status Notification</strong> — keeps an ongoing notification
+    in your notification shade showing current conditions for your location,
+    updated periodically.
+  </li>
+</ul>
+<p>
+  Turning on either feature triggers a separate Android system permission
+  prompt for "Allow all the time" location access — granting your regular
+  while-using-the-app location permission alone is not enough, and the app
+  will never request background access unless you first opt into one of these
+  two features. When enabled, the app checks your current location roughly
+  every 30 minutes, in the background, using Android's WorkManager (so it can
+  run periodically without keeping the app itself active). Both features can
+  be turned off at any time in Settings, which stops the background location
+  checks entirely; nothing about this is required for the rest of the app to
+  work.
+</p>
+
 <h2>Third-party services</h2>
 <p>Because SkySpeak has no backend of its own, the data above is sent directly from your device to these services:</p>
 <ul>
   <li>
     <strong><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></strong>
-    — receives your location coordinates to return forecast, air quality, and
-    location-search results. See <a href="https://open-meteo.com/en/terms" target="_blank" rel="noopener">Open-Meteo's terms</a>.
-  </li>
-  <li>
-    <strong><a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a></strong> and
-    <strong><a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a></strong>
-    — receive approximate map-tile coordinates to display the precipitation radar map.
+    — receives your location coordinates (including in the background, if you've
+    enabled one of the notification features above) to return forecast, air
+    quality, and location-search results. See <a href="https://open-meteo.com/en/terms" target="_blank" rel="noopener">Open-Meteo's terms</a>.
   </li>
   <li>
     <strong><a href="https://www.weather.gov" target="_blank" rel="noopener">U.S. National Weather Service</a></strong>
-    (<code>api.weather.gov</code>) — receives your location coordinates to check for active
+    (<code>api.weather.gov</code>) — receives your location coordinates (including in the
+    background, if you've enabled Alert Notifications) to check for active
     official weather advisories (e.g. severe weather warnings, air quality alerts) in your area.
     This is a free, public U.S. government service; only U.S. locations receive advisory data,
     since the Service does not cover other countries. See the
