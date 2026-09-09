@@ -321,18 +321,28 @@ different, harder project — not a v1 candidate.
 
 ## Open questions for the next conversation
 
-1. Is the degraded background-execution timing for rarely-opened apps (the core tension of the
-   whole polling approach) an acceptable trade for a v1, or does it undermine the feature enough
-   that FCM/backend investment should be reconsidered sooner rather than later?
-2. Should the daily digest ship alongside severe alerts, or later as its own decision — they
-   have genuinely different goals (safety vs. engagement) and maybe different opt-in defaults?
-3. What's the actual default polling interval worth targeting — the existing 30-minute forecast
-   cache TTL is a natural anchor, but is that too coarse for a "severe alert" use case even
-   before Doze throttling makes it worse?
-4. Worth a lightweight real-device experiment first — schedule a `PeriodicWorkRequest` at 15–30
-   min and just log actual fire times over a day or two on a real phone under normal use — to
-   get real numbers instead of reasoning from Android's documented (but not always representative)
-   Doze/Standby-Bucket behavior?
+**Resolved, 2026-09-09 — see `PLAYSTORE_LAUNCH.md`'s "Decision, 2026-09-09: Production is the
+goal, target 10–15 days" section for the full reasoning:**
+
+1. ~~Is the degraded background-execution timing... an acceptable trade for a v1?~~ **Resolved:
+   ship polling as-is for v1, with the battery-optimization-exemption nudge (built, see
+   `notifications/WeatherNotifications.kt`'s `isIgnoringBatteryOptimizations`) as the real-world
+   mitigation for OEM background-execution throttling, rather than delaying for an FCM/backend
+   rewrite.** Real non-Pixel device testing is still the one genuinely open item here — the nudge
+   is a mitigation, not a substitute for confirming actual delivery on non-Pixel hardware.
+2. ~~Should the daily digest ship alongside severe alerts, or later?~~ **Resolved: daily digest
+   stays out of this release entirely**, deferred as a separate future decision — this release is
+   scoped to severe/extreme alerts + the ongoing status notification only.
+3. ~~What's the actual default polling interval worth targeting?~~ **Resolved by implementation,
+   not a live open question anymore: 30 minutes**, matching the existing forecast-cache TTL — see
+   `WeatherNotificationScheduler`'s `PeriodicWorkRequestBuilder` interval.
+4. The "log real fire times on a real phone" experiment described below was never run as its own
+   isolated test — instead, the feature was built and tested live end-to-end (severe alerts,
+   resolved alerts, ongoing status) against real external data across multiple real-world
+   locations, on both an emulator and a real Pixel 9 Pro (see "What shipped" sections above and
+   `PLAYSTORE_LAUNCH.md`'s testing-gap notes) — a coarser signal than isolated fire-time logging,
+   but real-device-confirmed rather than theoretical. Non-Pixel real-device confirmation remains
+   the one genuinely unresolved piece of this list.
 
 ## v1.5 — toggle race fix + proactive missing-permission prompt
 
