@@ -381,3 +381,112 @@ Verified before committing, same bar as every prior release:
 - [ ] **Android Vitals findings investigated 2026-09-01, both tagged to release 14 (1.0.13), neither release-blocking:**
   - *"Edge-to-edge may not display for all users" / "app uses deprecated APIs" (`Window.setStatusBarColor`/`setNavigationBarColor`/`LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`)* — deobfuscated via the release build's own R8 mapping file: the flagged calls originate entirely from `androidx.activity`'s own `EdgeToEdgeApi26`/`EdgeToEdgeApi29`/`EdgeToEdgeApi35` internal classes (`enableEdgeToEdge()`'s own backward-compatibility shim for API 26–34, where the modern edge-to-edge API doesn't exist), not from this app's code. Confirmed `androidx.activity:activity-compose:1.13.0` (the current pin) is already the latest stable release — no newer version to bump to. Effectively unactionable without dropping `minSdk` below 35 entirely, which isn't worth it. Likely affects most apps using `enableEdgeToEdge()` for pre-Android-15 support.
   - *"Optimised resource shrinking isn't enabled"* — `app/build.gradle.kts`'s `optimization { enable = true }` (added for versionCode 13) is, per AGP's own DSL source (`com.android.build.api.dsl.Optimization`), documented to enable both code shrinking and resource optimization together, matching the existing code comment. Why Play Console still flags it for release 14 is unresolved — possibly the legacy `isShrinkResources = true` line (kept alongside the new DSL for a lower-risk, additive change) is taking precedence over the newer AAPT2-based "optimized" resource shrinker specifically. Not investigated further this session (non-blocking, would need a real upload/re-scan cycle to test any change) — worth a dedicated experiment in a future release: try removing the legacy line and confirming the optimized shrinker's build output artifacts change before re-checking Vitals.
+
+---
+
+## Planning: Shipping the Notifications Feature to Production (2026-09-09, not started)
+
+> Not a decision, not started — a plan to work from. Covers the background-alert/weather-status
+> notifications built this session (`WeatherAlertWorker`, `ACCESS_BACKGROUND_LOCATION`, the two
+> Settings toggles, the missing-permission prompt), currently sideload-only. See
+> `NOTIFICATIONS_ROADMAP.md` for the feature's own design history — this section is specifically
+> about the path to Production, which that doc deliberately deferred.
+
+### The core gate: Google Play's Background Location Policy
+
+This is the one item that can single-handedly block the whole release, so it comes first.
+`ACCESS_BACKGROUND_LOCATION` is one of Google Play's "restricted permissions" — shipping an app
+that requests it requires completing a **separate declaration in Play Console** (Policy → App
+content → Permissions), on top of the ordinary app review:
+- Must justify why the feature genuinely needs *background* access, not just foreground —
+  straightforward here, since the entire point is checking weather while the app is closed.
+- Historically requires a short screencast demonstrating the feature in actual use, showing the
+  background-location-dependent behavior.
+- This review is separate from, and can take longer than, ordinary release review — budget real
+  calendar time, not just a build-and-upload cycle.
+- A rejection blocks *this* release specifically until resolved and resubmitted, not necessarily
+  the whole app, but plan for the possibility of a round-trip.
+
+**Do this first, before investing further polish time** — if this comes back with pushback on the
+justification, it reshapes everything below it (e.g., might argue for scoping v1 to alert
+notifications only, dropping the ongoing status notification, if that reads as the harder case to
+justify).
+
+### Technical pre-flight (must happen before any Play Console work)
+
+- [ ] **R8/WorkManager risk (flagged above).** Add an explicit keep rule for the notification
+  package (`-keep class com.example.weatherly.notifications.** { *; }` in `proguard-rules.pro`,
+  matching the existing pattern already there for `data.model.**`), then actually build and
+  verify: `bundleRelease`/`assembleRelease`, install the **signed release APK** (not debug) on a
+  real device, enable a notification toggle, and confirm via `dumpsys jobscheduler`/`dumpsys
+  notification` that it still works exactly like every debug-build test this session did. Every
+  single verification so far has been on debug builds — this is genuinely unverified territory.
+- [ ] `versionCode`/`versionName` bump (currently 15/1.0.14 → 16/1.0.15 or similar).
+- [ ] Full standard release verification, same bar as every prior release in this doc:
+  `assembleDebug`/`lint`/`test` all `BUILD SUCCESSFUL`, `jarsigner -verify` on the AAB,
+  `apksigner verify` on the APK, `aapt2 dump badging` confirming the version strings landed.
+- [ ] Confirm the manifest's `POST_NOTIFICATIONS` and `ACCESS_BACKGROUND_LOCATION` entries are
+  correctly scoped (they are, per this session's build — but worth a final read before shipping).
+
+### Testing gap: this has only ever run on one Pixel
+
+Every test this session — the emulator work and the real-device work — happened on a Pixel
+(stock Android, relatively lenient background-execution policy) or a Pixel-class emulator. OEM
+skins with aggressive battery/background management (Samsung, Xiaomi, OnePlus, and others) are
+well known to kill or throttle background `WorkManager` jobs far more aggressively than stock
+Android, independent of anything this app does correctly. Before Production:
+- [ ] Recruit at least a few Closed Testing testers specifically to exercise the notification
+  toggles on non-Pixel hardware, and report back whether checks actually fire on their normal
+  daily-use schedule (not just immediately after toggling, which this session's testing already
+  covers well).
+- [ ] Consider whether Settings copy should set expectations about this ("delivery timing varies
+  by device, especially with aggressive battery optimization enabled") rather than implying a
+  precise 30-minute guarantee.
+
+### Data Safety form + Privacy Policy updates
+
+- [ ] **Data Safety form** (Play Console → Store listing → Data safety): the existing Location
+  entries are declared as collected/shared for "App functionality," but the form has separate
+  context for background collection — this needs updating to reflect that location can now be
+  accessed while the app isn't in active use, not just during a foreground fetch.
+- [ ] **`docs/privacy.html`**: needs an explicit new disclosure that background location access is
+  used for the optional notification features, distinct from the existing "used only to fetch
+  your forecast" framing, which currently implies foreground-only use.
+- [ ] **Store listing full description**: the existing "PRIVACY BY DESIGN" section says "Your
+  location is used only to fetch your forecast — never sold or shared for marketing" — true, but
+  written before background access existed; worth revisiting the wording so it doesn't read as
+  contradicting the new Data Safety disclosure once both are live side by side.
+
+### Sequencing (not a commitment)
+
+1. Add the ProGuard keep rule; verify a signed release build actually works end-to-end on a real
+   device (the technical pre-flight above) — cheapest way to find a showstopper before investing
+   in the policy/store-listing work around it.
+2. Update Data Safety form + privacy policy + store description together, so they stay consistent
+   with each other rather than drifting.
+3. Submit the Background Location declaration in Play Console — expect this to be the longest
+   pole, so start it as early as the feature is technically solid, not right before a planned
+   release date.
+4. Internal → Closed Testing (per the established sequencing from versionCode 11's lesson,
+   documented earlier in this file) — recruit non-Pixel testers specifically for this round, given
+   the OEM background-execution gap above.
+5. Only promote to Production once: the background-location declaration is approved, non-Pixel
+   testers confirm real-world delivery, and Vitals on Closed Testing look clean.
+6. Staged rollout on Production (not immediate 100%, mirroring versionCode 12's precedent) —
+   this release carries more real behavioral risk (a new dangerous permission, background
+   execution) than most prior releases, which is exactly the kind of change staged rollout exists
+   for.
+
+### Open questions
+
+1. Is Production for this feature actually the goal right now, or is continued sideload/personal
+   use the actual near-term plan, with Production revisited later? Worth deciding explicitly
+   before investing in the Play Console policy process, which has real overhead.
+2. Should the daily digest (still unbuilt) ship in the same release as alert/status notifications,
+   or is it worth going through the Background Location review once for what's already built,
+   rather than delaying on a feature that isn't there yet?
+3. Given the background-location review's own uncertainty (timeline, whether the justification is
+   accepted as-is), is there value in a fallback plan — e.g., if the review pushes back hard, is
+   dropping the ongoing "Weather Status Notification" (arguably the harder case to justify, since
+   it's ambient rather than event-driven) and keeping only alert notifications an acceptable
+   fallback scope?
