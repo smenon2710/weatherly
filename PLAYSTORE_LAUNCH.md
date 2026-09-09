@@ -414,13 +414,18 @@ justify).
 
 ### Technical pre-flight (must happen before any Play Console work)
 
-- [ ] **R8/WorkManager risk (flagged above).** Add an explicit keep rule for the notification
-  package (`-keep class com.example.weatherly.notifications.** { *; }` in `proguard-rules.pro`,
-  matching the existing pattern already there for `data.model.**`), then actually build and
-  verify: `bundleRelease`/`assembleRelease`, install the **signed release APK** (not debug) on a
-  real device, enable a notification toggle, and confirm via `dumpsys jobscheduler`/`dumpsys
-  notification` that it still works exactly like every debug-build test this session did. Every
-  single verification so far has been on debug builds — this is genuinely unverified territory.
+- [x] **R8/WorkManager risk — fixed and verified, 2026-09-09.** Added
+  `-keep class com.example.weatherly.notifications.** { *; }` to `proguard-rules.pro` (matching
+  the existing pattern for `data.model.**`). Built a real signed `assembleRelease` (R8 minified,
+  `weatherly-release.jks`), verified via `apksigner verify` (V2 signer, matches the existing
+  keystore) and `aapt2 dump badging`. Installed on the reporting user's real device — required
+  uninstalling the previously-installed debug build first (different signing key, confirmed via
+  a clean `INSTALL_FAILED_UPDATE_INCOMPATIBLE` before proceeding, not assumed) — and confirmed
+  live: enabling "Weather Status Notification" produced `WM-WorkerWrapper: Starting work for
+  com.example.weatherly.notifications.WeatherAlertWorker` → `Worker result SUCCESS` (unmangled
+  class name) and a real posted notification via `dumpsys notification`, matching every prior
+  debug-build test exactly. The one genuine unknown this pre-flight item existed to catch is
+  closed.
 - [ ] `versionCode`/`versionName` bump (currently 15/1.0.14 → 16/1.0.15 or similar).
 - [ ] Full standard release verification, same bar as every prior release in this doc:
   `assembleDebug`/`lint`/`test` all `BUILD SUCCESSFUL`, `jarsigner -verify` on the AAB,
