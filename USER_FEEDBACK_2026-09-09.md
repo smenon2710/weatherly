@@ -62,6 +62,25 @@ different shape — a deterministic, rule-based (non-LLM) warning at genuinely e
 which is *more* conservative than what was dropped, not a repeat of it — but that precedent is
 directly relevant context for the discussion, not a reason to dismiss this one out of hand.
 
+**Addressed, 2026-09-09.** Extended `WeatherRepository.buildDayInsights()` — the deterministic,
+non-LLM insight generator behind the hero pill/`DetailSheet.Forecast` shipped for the "day
+summary" request — with two new safety-tier checks, ranked above the softer whole-day context
+(ordinary "very high" UV, air quality, temperature swing) already in that list:
+- **Extreme UV** (uvNow ≥ 11, `uvLabel()`'s own "Extreme" band, distinct from the existing "Very
+  High" ≥ 8 check it supersedes rather than duplicating): "UV is at an extreme level right now —
+  limit sun exposure, seek shade, and wear sunscreen and protective clothing."
+- **Freeze warning** (current temp or ~6h-out temp ≤ 0°C/32°F — a real Freeze-Warning-style
+  absolute threshold, distinct from `buildTips()`'s softer relative "cold, wear a jacket" tip):
+  "Freezing temperatures — dress warmly, watch for icy surfaces, and limit time outside if you
+  can."
+
+Both are plain, deterministic sentences from real thresholds — not LLM output — directly
+answering the original ask ("protect users from model text hallucinations"). Ranked below an
+actually-arriving storm/high-wind event (the more immediate hazard) but above everything else in
+the list. Built and installed for testing; not yet observed firing live (needs a real extreme-UV
+or sub-freezing location/moment, similar to how the original day-insights list needed a
+multi-signal location like Mexico City to actually see more than one item at once).
+
 ---
 
 ## Open questions for the discussion

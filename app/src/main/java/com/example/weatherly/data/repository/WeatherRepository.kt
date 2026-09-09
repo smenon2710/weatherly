@@ -600,14 +600,17 @@ class WeatherRepository(private val context: Context) {
     /**
      * Every currently-true "worth knowing about today" signal, most-important first — not a
      * metrics readout. Each entry is a plain sentence about an actual condition to be aware of
-     * (precip/thunder/fog arriving, high wind, live UV, live air quality, a real temperature
-     * swing a few hours out, a falling-pressure heads-up), never a bare number restated from a
-     * tile that already shows it elsewhere (metrics grid, the 7-day day-detail sheet) — user-
-     * reported that a numbers readout here didn't serve the "day summary" ask at all. index 0
-     * backs the hero pill; the rest back DetailSheet.Forecast's list beneath it. Safety-relevant
-     * near-term changes (storm/precip/fog arriving, high wind) always come before softer whole-day
-     * context (UV, air quality, a temperature swing, pressure), which in turn beats the generic
-     * "what's the sky like right now" fallback — only ever added when nothing else qualified.
+     * (precip/thunder/fog arriving, high wind, extreme UV, freezing temperatures, live UV, live
+     * air quality, a real temperature swing a few hours out, a falling-pressure heads-up), never a
+     * bare number restated from a tile that already shows it elsewhere (metrics grid, the 7-day
+     * day-detail sheet) — user-reported that a numbers readout here didn't serve the "day summary"
+     * ask at all. index 0 backs the hero pill; the rest back DetailSheet.Forecast's list beneath
+     * it. Priority, deliberately: an actually-arriving storm/high wind (the most immediate hazard)
+     * beats extreme UV/freeze warnings (genuine but slightly less immediate safety risks,
+     * user-requested explicitly as deterministic — not LLM-generated — checks), which in turn beat
+     * softer whole-day context (a "very high" but not extreme UV reading, air quality, a
+     * temperature swing, pressure), which beats the generic "what's the sky like right now"
+     * fallback — only ever added when nothing else qualified.
      */
     private fun buildDayInsights(
         rawHourly: HourlyBlock,
@@ -657,19 +660,47 @@ class WeatherRepository(private val context: Context) {
         val windThreshold = if (units == UnitSystem.IMPERIAL) 25 else 40
         if (maxWind >= windThreshold) add("Winds up to $maxWind $windUnit expected in the next few hours.")
 
+        // "A few hours from now" reference point, reused by both the temperature-swing check
+        // below and the freeze warning right after it, rather than each picking its own window —
+        // keeps "later today" meaning the same thing everywhere in this function.
+        val laterHour = hourly.getOrNull(6)
+
+        // Genuine safety-tier warnings — user-requested explicitly ("extreme UV or freeze
+        // indexes... protect users from model text hallucinations"): deterministic, not
+        // LLM-generated, and ranked above the softer whole-day context below (a real burn/
+        // frostbite risk outranks "it's a bit breezy"), though still behind an actually-arriving
+        // storm/high-wind event above, which is the more immediate hazard of the two.
+        //
+        // UV: >=11 is "Extreme" per uvLabel()'s own bands (>=8 is merely "Very High" — see the
+        // softer check further down, which this deliberately supersedes rather than doubling up
+        // on, since a reading can't be both at once). Live reading, not a whole-day max, so this
+        // never claims "UV is extreme" hours after the actual peak already passed.
+        val isExtremeUv = uvNow != null && uvNow >= 11
+        if (isExtremeUv) {
+            add("UV is at an extreme level right now — limit sun exposure, seek shade, and wear sunscreen and protective clothing.")
+        }
+        // Freezing right now, or about to be within a few hours — a real Freeze-Warning-style
+        // threshold (0°C/32°F), distinct from buildTips()'s softer "cold, wear a jacket" tip
+        // (that one fires well above freezing too, e.g. 5°C/41°F highs) and from the temperature-
+        // swing check below (which only fires on a large relative change, not an absolute
+        // freezing threshold — a swing from 2° to -3° over a few hours would trip this one and
+        // possibly not that one).
+        val freezeThreshold = if (units == UnitSystem.IMPERIAL) 32 else 0
+        if (currentTempC <= freezeThreshold || (laterHour != null && laterHour.tempC <= freezeThreshold)) {
+            add("Freezing temperatures — dress warmly, watch for icy surfaces, and limit time outside if you can.")
+        }
+
         // Live readings (not a whole-day max/average) for UV/AQI specifically, so this never
         // claims "UV is very high" hours after the actual peak already passed — a live reading is
         // accurate regardless of time of day.
-        if (uvNow != null && uvNow >= 8) add("UV is very high right now — wear sunscreen if you're headed out.")
+        if (!isExtremeUv && uvNow != null && uvNow >= 8) {
+            add("UV is very high right now — wear sunscreen if you're headed out.")
+        }
         // >150, not the softer >100 "unhealthy for sensitive groups" band — matches
         // WeatherAdvisor.walking()'s existing "poor air quality" threshold, so this and the
         // local-chat advice never disagree about what counts as worth mentioning.
         if (aqiNow != null && aqiNow > 150) add("Air quality is unhealthy right now — consider limiting time outdoors.")
 
-        // "A few hours from now" reference point, reused rather than a second independently-
-        // chosen window, so this always means the same thing regardless of which other signals
-        // also fired.
-        val laterHour = hourly.getOrNull(6)
         val tempSwingThreshold = if (units == UnitSystem.IMPERIAL) 12 else 7
         if (laterHour != null) {
             if (laterHour.tempC - currentTempC >= tempSwingThreshold) {
