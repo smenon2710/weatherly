@@ -1,9 +1,13 @@
 package com.example.weatherly.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,6 +84,17 @@ fun SettingsScreen(
     val storedModel by settingsViewModel.openRouterModel.collectAsStateWithLifecycle()
     val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
     val hapticsEnabled by settingsViewModel.hapticsEnabled.collectAsStateWithLifecycle()
+    val alertNotificationsEnabled by settingsViewModel.alertNotificationsEnabled.collectAsStateWithLifecycle()
+
+    // API 33+ only: posting to a channel needs no runtime grant below that, so the permission
+    // request is skipped entirely pre-33 (see the toggle's onClick below).
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // A denial just leaves the toggle off — Android won't re-prompt from here once denied;
+        // the user would need to grant it from system Settings, same as any other permission.
+        if (granted) settingsViewModel.setAlertNotificationsEnabled(true)
+    }
 
     // The key field never holds the stored secret — only whatever new value the
     // user is about to save. See SettingsViewModel for why.
@@ -232,6 +247,45 @@ fun SettingsScreen(
                         "A brief vibration when the forecast loads for a notable condition — an " +
                             "active severe alert, a thunderstorm, or heavy rain/snow. Ordinary " +
                             "weather stays silent.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Alert Notifications")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OptionPill(
+                            label = "On",
+                            icon = null,
+                            selected = alertNotificationsEnabled,
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    settingsViewModel.setAlertNotificationsEnabled(true)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OptionPill(
+                            label = "Off",
+                            icon = null,
+                            selected = !alertNotificationsEnabled,
+                            onClick = { settingsViewModel.setAlertNotificationsEnabled(false) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Get notified in the background when a severe weather alert is issued " +
+                            "for — or clears from — a saved location, even with the app closed " +
+                            "and no widget placed. Checks periodically, not instantly. Currently " +
+                            "only works for a saved place (add one from the locations sheet on " +
+                            "the Weather screen) — not \"current location\" mode.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )

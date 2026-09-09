@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weatherly.BuildConfig
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.notifications.WeatherNotificationChannels
+import com.example.weatherly.notifications.WeatherNotificationScheduler
 import com.example.weatherly.widget.WeatherWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,5 +76,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setHapticsEnabled(enabled: Boolean) {
         prefs.setHapticFeedbackEnabled(enabled)
         _hapticsEnabled.value = enabled
+    }
+
+    /**
+     * Master toggle for WeatherAlertWorker's background severe-alert/alert-resolved
+     * notifications (see NOTIFICATIONS_ROADMAP.md). SettingsScreen is responsible for requesting
+     * POST_NOTIFICATIONS first on API 33+ and only calling this once granted — this method just
+     * persists the choice and starts/stops the periodic WorkManager job to match.
+     */
+    private val _alertNotificationsEnabled = MutableStateFlow(prefs.getAlertNotificationsEnabled())
+    val alertNotificationsEnabled: StateFlow<Boolean> = _alertNotificationsEnabled.asStateFlow()
+
+    fun setAlertNotificationsEnabled(enabled: Boolean) {
+        prefs.setAlertNotificationsEnabled(enabled)
+        _alertNotificationsEnabled.value = enabled
+        val context = getApplication<Application>()
+        if (enabled) {
+            WeatherNotificationChannels.ensureCreated(context)
+            WeatherNotificationScheduler.schedule(context)
+        } else {
+            WeatherNotificationScheduler.cancel(context)
+        }
     }
 }

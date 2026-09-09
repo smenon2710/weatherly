@@ -9,6 +9,10 @@
     <!-- Normal permission, no runtime prompt: a single restrained haptic pulse for notable
          conditions (severe alert, thunderstorm, heavy rain/snow). See util/WeatherHaptics.kt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Runtime-prompted on API 33+ only (below that, posting to a channel needs no grant at
+         all). Gates the optional background weather-alert notifications feature (Settings
+         toggle, off by default) — see notifications/WeatherAlertWorker.kt. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"

@@ -129,6 +129,37 @@ class PreferencesStore(context: Context) {
         prefs.edit().putString(KEY_TRACKED_ALERTS, trackedAlertsAdapter.toJson(alerts)).apply()
     }
 
+    /** Separate tracked-alert slot for WeatherAlertWorker's background check — deliberately not
+     * the same key as [getTrackedAlerts] above. That one is a single global slot for "whatever
+     * place is currently being viewed in-app" (reset on every selectPlace()/selectCurrentLocation()
+     * call), while the background worker always checks the saved/selected place regardless of
+     * what's currently on screen (see WeatherAlertWorker's doc comment). Sharing one key would let
+     * a foreground view of "current location" and a background check of a different saved place
+     * corrupt each other's diff — e.g. a real alert at the saved place misreported as "resolved"
+     * just because the in-app tracked set was last written for a different location entirely.
+     * WeatherViewModel.resetAlertTracking() clears both slots together on a location change, since
+     * the background worker's own tracked state goes stale too whenever the selected place changes. */
+    fun getBackgroundTrackedAlerts(): List<TrackedAlert> =
+        prefs.getString(KEY_TRACKED_ALERTS_BG, null)?.let {
+            runCatching { trackedAlertsAdapter.fromJson(it) }.getOrNull()
+        } ?: emptyList()
+
+    fun setBackgroundTrackedAlerts(alerts: List<TrackedAlert>) {
+        prefs.edit().putString(KEY_TRACKED_ALERTS_BG, trackedAlertsAdapter.toJson(alerts)).apply()
+    }
+
+    // --- Background alert notifications ----------------------------------------
+    /** Master opt-in for WeatherAlertWorker's periodic background check (see that class and
+     * NOTIFICATIONS_ROADMAP.md). Defaults to off, unlike haptics (on by default with no
+     * permission needed) — this triggers a real POST_NOTIFICATIONS runtime prompt on API 33+ and
+     * schedules recurring background work, so it should be an explicit opt-in rather than
+     * silently on for every existing install. */
+    fun getAlertNotificationsEnabled(): Boolean = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, false)
+
+    fun setAlertNotificationsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply()
+    }
+
     // --- Appearance ---------------------------------------------------------
     fun getThemePreference(): ThemePreference =
         prefs.getString(KEY_THEME, null)?.let {
@@ -169,6 +200,8 @@ class PreferencesStore(context: Context) {
         private const val KEY_OR_MODEL = "openrouter_model"
         private const val KEY_THEME = "theme_preference"
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
+        private const val KEY_TRACKED_ALERTS_BG = "tracked_alerts_bg"
+        private const val KEY_NOTIFICATIONS_ENABLED = "alert_notifications_enabled"
         private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
         private const val KEY_HAPTICS_ENABLED = "haptics_enabled"
         private const val KEY_LLM_USAGE_DATE = "llm_usage_date"

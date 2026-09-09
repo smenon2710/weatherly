@@ -126,4 +126,8 @@ dependencies {
 
     // Home-screen widget (Jetpack Glance)
     implementation("androidx.glance:glance-appwidget:1.1.1")
+
+    // Background weather-alert notifications (see notifications/WeatherAlertWorker.kt) —
+    // periodic work survives process death/reboot without a BOOT_COMPLETED receiver of our own.
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 }

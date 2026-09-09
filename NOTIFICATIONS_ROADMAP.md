@@ -1,5 +1,7 @@
 # SkySpeak — Alerts & Notifications Infrastructure (Discussion Doc)
 
+> **v1 implemented (not yet built/installed anywhere) — see "What shipped" below the TL;DR.**
+
 > Not a decision, not a plan — a starting point for a conversation. Prompted by real user
 > research (not this app's own — general observation): most weather-app users never place a
 > home-screen widget and rarely open the app directly; they rely on push/local notifications as
@@ -32,6 +34,45 @@
   backend, no new paid data source, no reopening of the Open-Meteo licensing question. True
   minute-level "rain starting soon" push notifications are a different, harder problem — see
   "Out of scope for v1" below.
+
+---
+
+## What shipped (v1)
+
+Implemented per the recommendation above — WorkManager polling, opt-in, notification types #1
+and #2 only (daily digest deliberately not built yet, per the open question below). **Not yet
+built or installed anywhere** — source changes only, unverified by an actual compile.
+
+- `androidx.work:work-runtime-ktx:2.10.0` added; `POST_NOTIFICATIONS` declared in the manifest.
+- `data/repository/AlertTracker.kt` — the alert diff/update logic extracted out of
+  `WeatherViewModel.trackAlertChanges()` into a shared, parameterized class (takes `get`/`set`
+  functions rather than hardcoding a `PreferencesStore` slot) so the foreground path and the new
+  background path can't independently drift.
+- `PreferencesStore` gained `getAlertNotificationsEnabled`/`setAlertNotificationsEnabled` (the
+  master opt-in, default off) and a **separate** `getBackgroundTrackedAlerts`/
+  `setBackgroundTrackedAlerts` slot, distinct from the foreground's existing `getTrackedAlerts` —
+  needed because the background worker always checks the saved/selected place while the
+  foreground can be viewing a different one (e.g. "current location") at the same time; sharing
+  one slot would corrupt the diff. `WeatherViewModel.resetAlertTracking()` now clears both slots
+  on a location change.
+- `notifications/WeatherNotifications.kt` — two notification channels (severe alerts / alert
+  resolved) and the posting helpers, permission-guarded and silently no-op if
+  `POST_NOTIFICATIONS` isn't granted.
+- `notifications/WeatherAlertWorker.kt` — the `CoroutineWorker`. **Scoped to a saved/selected
+  place only, never live device location** — this is the concrete implementation of the "avoid
+  the background-location review trap" design goal below: it sidesteps
+  `ACCESS_BACKGROUND_LOCATION` entirely rather than relying on an assumption about last-known-
+  location access being exempt from it. A real, honest v1 limitation: a user on "current
+  location" mode (the default for a fresh install) gets nothing from this yet.
+- `notifications/WeatherNotificationScheduler.kt` — `schedule()`/`cancel()`, 30-minute interval
+  (matches the existing forecast-cache TTL), network-connected constraint.
+- Settings → "Alert Notifications" toggle (`SettingsScreen`/`SettingsViewModel`), following the
+  existing Haptics/Widget Background on-off pattern, requesting `POST_NOTIFICATIONS` on API 33+
+  before enabling.
+
+**Explicitly deferred, not forgotten:** the daily digest (#3), and any move toward "current
+location" background support (which would reopen the background-location question this
+implementation was designed to avoid).
 
 ---
 

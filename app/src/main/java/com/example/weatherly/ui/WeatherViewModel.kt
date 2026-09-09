@@ -11,6 +11,7 @@ import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.ForecastCache
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.data.repository.AlertTracker
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
 import com.example.weatherly.util.playConditionHaptic
@@ -36,6 +37,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val locationProvider = LocationProvider(app)
     private val prefs = PreferencesStore(app)
     private val forecastCache = ForecastCache(app)
+    private val alertTracker = AlertTracker(prefs::getTrackedAlerts, prefs::setTrackedAlerts)
 
     private val _state = MutableStateFlow<WeatherUiState>(WeatherUiState.Idle)
     val state: StateFlow<WeatherUiState> = _state.asStateFlow()
@@ -143,14 +145,11 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
      * that was tracked but is no longer active) — covers alerts that clear silently during a
      * background refresh, not just ones the user is staring at when they expire. */
     private fun trackAlertChanges(current: List<WeatherAlert>) {
-        val currentIds = current.map { it.id }.toSet()
-        val previous = prefs.getTrackedAlerts()
-        val newlyResolved = previous.filter { it.id !in currentIds }
+        val newlyResolved = alertTracker.diffAndUpdate(current).newlyResolved
         if (newlyResolved.isNotEmpty()) {
             val alreadyShown = _resolvedAlerts.value.map { it.id }.toSet()
             _resolvedAlerts.value = _resolvedAlerts.value + newlyResolved.filterNot { it.id in alreadyShown }
         }
-        prefs.setTrackedAlerts(current.map { TrackedAlert(it.id, it.event) })
     }
 
     fun dismissResolvedAlert(id: String) {
@@ -175,9 +174,13 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         load(forceRefresh = true)
     }
 
-    /** A tracked alert from the previous location isn't a real "resolution" for the new one. */
+    /** A tracked alert from the previous location isn't a real "resolution" for the new one.
+     * Clears the background worker's own tracked-alert slot too (see
+     * PreferencesStore.getBackgroundTrackedAlerts' doc comment) — its state goes stale the
+     * instant the selected place changes, same as the in-app slot. */
     private fun resetAlertTracking() {
         prefs.setTrackedAlerts(emptyList())
+        prefs.setBackgroundTrackedAlerts(emptyList())
         _resolvedAlerts.value = emptyList()
     }
 
