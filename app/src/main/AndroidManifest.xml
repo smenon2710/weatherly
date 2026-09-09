@@ -12,6 +12,16 @@
          NOTIFICATIONS_ROADMAP.md for the Play Console "background location" review this would
          need before ever shipping to Production. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Normal permission (no runtime prompt) that unlocks ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+         — a direct, one-tap system dialog asking the user to exempt this app from Doze/App
+         Standby battery restrictions, offered (never forced) via Settings → Battery Optimization
+         and the missing-setup prompt on the Weather screen, only relevant once a background
+         notification feature is actually enabled. Google Play reserves this specifically for apps
+         whose core functionality is degraded without it, which is exactly this app's case: OEM
+         battery managers (Samsung, Xiaomi, and others) are well known to kill/throttle background
+         WorkManager jobs well beyond stock Android's own Doze behavior — see
+         NOTIFICATIONS_ROADMAP.md and PLAYSTORE_LAUNCH.md's non-Pixel testing gap notes. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Normal permission, no runtime prompt: a single restrained haptic pulse for notable
          conditions (severe alert, thunderstorm, heavy rain/snow). See util/WeatherHaptics.kt. -->
     <uses-permission android:name="android.permission.VIBRATE" />

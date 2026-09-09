@@ -1,13 +1,17 @@
 package com.example.weatherly.notifications
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -16,6 +20,26 @@ import com.example.weatherly.R
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
+
+/**
+ * Whether the OS currently exempts this app from Doze/App Standby battery restrictions. Not
+ * required for the notification features to work — WorkManager's periodic job runs regardless —
+ * but OEM battery managers (Samsung, Xiaomi, and others) are well documented to kill or throttle
+ * background work far more aggressively than stock Android's own Doze behavior, independent of
+ * anything this app does correctly. Exempting the app materially improves real-world delivery
+ * reliability on those devices; see [batteryOptimizationSettingsIntent] for the one-tap request.
+ */
+fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+    return pm.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+/** Direct system dialog asking the user to exempt this app from battery optimization — one tap,
+ * no navigating through system Settings manually. Requires the normal
+ * `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` manifest permission (declared, no runtime prompt of its
+ * own); the dialog this intent triggers is the actual user-facing confirmation. */
+fun batteryOptimizationSettingsIntent(context: Context): Intent =
+    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
 
 /**
  * Notification channels for the background weather-alert feature (see [WeatherAlertWorker]) —
@@ -59,7 +83,15 @@ object WeatherNotificationChannels {
  * `PreferencesStore.getAlertNotificationsEnabled`'s doc comment) rather than crashing; the
  * Settings toggle is what actually requests the permission, so a denial here just means the
  * user's already-made choice is respected rather than surfacing a runtime exception.
+ *
+ * `@SuppressLint("MissingPermission")`: every `notify()` call here is guarded by [hasPermission]
+ * immediately above it, but that guard lives in a separate private function — lint's flow
+ * analysis only recognizes an inline `checkSelfPermission(...) == PERMISSION_GRANTED` check at
+ * the exact call site, not one performed through an extracted helper, so it flags all three calls
+ * as unchecked even though they aren't. Confirmed the real guard works correctly via on-device
+ * testing (both debug and R8-minified release builds) rather than just suppressing blind.
  */
+@SuppressLint("MissingPermission")
 object WeatherNotifier {
 
     fun notifySevereAlert(context: Context, alert: WeatherAlert) {

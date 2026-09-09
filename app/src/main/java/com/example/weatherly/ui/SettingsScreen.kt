@@ -66,6 +66,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.BuildConfig
 import com.example.weatherly.data.model.ThemePreference
 import com.example.weatherly.data.model.UnitSystem
+import com.example.weatherly.notifications.batteryOptimizationSettingsIntent
+import com.example.weatherly.notifications.isIgnoringBatteryOptimizations
 import com.example.weatherly.ui.components.AppBackground
 import com.example.weatherly.ui.components.Coral
 import com.example.weatherly.ui.components.Cyan
@@ -129,6 +131,20 @@ fun SettingsScreen(
                 context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         }
+    }
+
+    // Not a hard requirement (WorkManager still runs the job either way) — but OEM battery
+    // managers (Samsung, Xiaomi, and others) are well documented to kill/throttle background work
+    // far more than stock Android's own Doze, independent of anything this app does correctly.
+    // Re-checked on resume for the same reason as hasBackgroundLocation above: the system dialog
+    // this triggers isn't the only way this can change (the user can also flip it from system
+    // Settings directly).
+    var hasBatteryExemption by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { hasBatteryExemption = isIgnoringBatteryOptimizations(context) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        hasBatteryExemption = isIgnoringBatteryOptimizations(context)
     }
 
     // The key field never holds the stored secret — only whatever new value the
@@ -394,6 +410,38 @@ fun SettingsScreen(
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Battery Optimization")
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (hasBatteryExemption)
+                            "Exempted — background checks for the notifications above are less " +
+                                "likely to be delayed or skipped by your device's battery " +
+                                "management."
+                        else
+                            "Optional, but recommended if you've turned on either notification " +
+                                "above. Some phones — especially non-Pixel devices — " +
+                                "aggressively restrict background apps to save battery, which " +
+                                "can delay or block these checks. Exempting SkySpeak helps keep " +
+                                "them running on schedule.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    if (!hasBatteryExemption) {
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                batteryOptimizationLauncher.launch(batteryOptimizationSettingsIntent(context))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Cyan)
+                        ) {
+                            Text("Disable Battery Optimization")
+                        }
+                    }
                 }
             }
 

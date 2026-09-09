@@ -450,10 +450,25 @@ Android, independent of anything this app does correctly. Before Production:
 - [ ] Recruit at least a few Closed Testing testers specifically to exercise the notification
   toggles on non-Pixel hardware, and report back whether checks actually fire on their normal
   daily-use schedule (not just immediately after toggling, which this session's testing already
-  covers well).
-- [ ] Consider whether Settings copy should set expectations about this ("delivery timing varies
-  by device, especially with aggressive battery optimization enabled") rather than implying a
-  precise 30-minute guarantee.
+  covers well). Real non-Pixel device access still hasn't happened — this remains open.
+- [x] **Mitigation shipped, 2026-09-09** (doesn't replace the testing above, but reduces the
+  real-world failure rate regardless of what it finds): a battery-optimization exemption nudge.
+  `PowerManager.isIgnoringBatteryOptimizations()` + `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+  (the standard, Google-documented one-tap request for apps with genuine background work), surfaced
+  two ways — a new Settings → "Battery Optimization" card, and a second tier on the same
+  proactive Weather-screen dialog that already catches missing Background Location (shown only
+  once that's resolved, so at most one setup dialog appears at a time). Verified end-to-end on a
+  real release build: the real system "Let app always run in background?" dialog fires correctly,
+  granting it updates `dumpsys deviceidle whitelist` immediately, and both the in-app dialog and
+  the Settings card correctly stop asking once exempted.
+  - **New Play Store policy consideration, found via `./gradlew lint` (not just `assembleDebug`,
+    which doesn't run this check):** Android's own `BatteryLife` lint rule flags
+    `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` as a Play Store Content Policy-reviewed permission —
+    same general shape as `ACCESS_BACKGROUND_LOCATION`'s review, though not necessarily as heavy.
+    Left as a visible (non-blocking) lint warning rather than suppressed, since it's a genuine,
+    correct reminder for whoever handles Play Console submission — this app's real background
+    notification use case is a legitimate justification, but that case needs making explicitly
+    when the time comes, not assumed.
 
 ### Data Safety form + Privacy Policy updates
 

@@ -84,6 +84,8 @@ import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.notifications.batteryOptimizationSettingsIntent
+import com.example.weatherly.notifications.isIgnoringBatteryOptimizations
 import com.example.weatherly.ui.components.AlertBannerList
 import com.example.weatherly.ui.components.ResolvedAlertCard
 import com.example.weatherly.ui.components.AppBackground
@@ -104,6 +106,10 @@ import com.example.weatherly.ui.components.heroTextColors
 import com.example.weatherly.ui.components.heroWeight
 import com.example.weatherly.util.rememberLocalTimeText
 import kotlinx.coroutines.delay
+
+/** Which one-shot notification-setup nudge, if any, `WeatherScreen` should show on this resume —
+ * see the `LifecycleEventEffect` in `WeatherScreen` for the priority ordering between them. */
+private enum class SetupPrompt { None, MissingLocation, MissingBatteryExemption }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,35 +150,49 @@ fun WeatherScreen(
         if (state is WeatherUiState.Success) viewModel.load(background = true)
     }
 
-    // Catches a real silent-failure gap: WeatherAlertWorker's two Settings notification toggles
-    // now require ACCESS_BACKGROUND_LOCATION (it always resolves live current location, no
-    // saved-place fallback) — a user can flip a toggle on, skip the separate "Allow background
-    // location" step in Settings (or later revoke it via system Settings), and the feature just
-    // goes quiet with zero visible sign anything is wrong; Settings itself only explains this to
-    // someone who happens to scroll back there. Checked here, on the main screen, so it reaches a
-    // user who never revisits Settings after the first setup. Not a legacy-migration concern —
-    // this app has never shipped notifications before, so there's no previously-published install
-    // base with a toggle already on — just a general "enabled but not actually working" catch.
-    // Re-checked on every resume (not gated to once-per-session) since permission state can change
-    // outside the app too (the user revoking it from system Settings), and dismissing only
-    // suppresses it until the next resume rather than forever, so a still-broken state keeps
-    // surfacing rather than being silenced by one dismissal.
+    // Catches two real silent-failure gaps for the Settings notification toggles, checked in
+    // priority order (at most one dialog shown at a time — no point nudging about battery
+    // optimization while the feature can't run at all yet):
+    // 1. MissingLocation — WeatherAlertWorker always resolves live current location (no
+    //    saved-place fallback), so it hard-requires ACCESS_BACKGROUND_LOCATION. A user can flip a
+    //    toggle on, skip that separate grant step in Settings (or revoke it later), and the
+    //    feature goes quiet with zero visible sign anything is wrong.
+    // 2. MissingBatteryExemption — not a hard requirement (the job still runs), but OEM battery
+    //    managers (Samsung, Xiaomi, and others) are well documented to kill/throttle background
+    //    WorkManager jobs far more than stock Android's own Doze — see the non-Pixel testing gap
+    //    notes in NOTIFICATIONS_ROADMAP.md/PLAYSTORE_LAUNCH.md. Exempting the app materially
+    //    improves real-world delivery reliability on those devices.
+    // Both checked here (not just in Settings) so they reach a user who never revisits Settings
+    // after first setup. Re-checked on every resume (not gated to once-per-session) since both
+    // states can change outside the app too (the user revoking either via system Settings), and
+    // dismissing only suppresses until the next resume rather than forever, so a still-broken
+    // state keeps surfacing rather than being silenced by one dismissal.
     val context = LocalContext.current
-    var showNotificationPermissionPrompt by remember { mutableStateOf(false) }
+    var setupPrompt by remember { mutableStateOf(SetupPrompt.None) }
     val backgroundLocationPromptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { showNotificationPermissionPrompt = false }
+    ) { setupPrompt = SetupPrompt.None }
+    val batteryOptimizationPromptLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { setupPrompt = SetupPrompt.None }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         val prefs = PreferencesStore(context)
-        showNotificationPermissionPrompt =
-            (prefs.getAlertNotificationsEnabled() || prefs.getPersistentWeatherEnabled()) &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=
-                    PackageManager.PERMISSION_GRANTED
+        val notificationsEnabled = prefs.getAlertNotificationsEnabled() || prefs.getPersistentWeatherEnabled()
+        val missingLocation = notificationsEnabled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED
+        val missingBatteryExemption = notificationsEnabled && !missingLocation &&
+            !isIgnoringBatteryOptimizations(context)
+        setupPrompt = when {
+            missingLocation -> SetupPrompt.MissingLocation
+            missingBatteryExemption -> SetupPrompt.MissingBatteryExemption
+            else -> SetupPrompt.None
+        }
     }
-    if (showNotificationPermissionPrompt) {
-        AlertDialog(
-            onDismissRequest = { showNotificationPermissionPrompt = false },
+    when (setupPrompt) {
+        SetupPrompt.MissingLocation -> AlertDialog(
+            onDismissRequest = { setupPrompt = SetupPrompt.None },
             title = { Text("Notifications need one more permission") },
             text = {
                 Text(
@@ -187,9 +207,30 @@ fun WeatherScreen(
                 }) { Text("Grant Access") }
             },
             dismissButton = {
-                TextButton(onClick = { showNotificationPermissionPrompt = false }) { Text("Not Now") }
+                TextButton(onClick = { setupPrompt = SetupPrompt.None }) { Text("Not Now") }
             }
         )
+        SetupPrompt.MissingBatteryExemption -> AlertDialog(
+            onDismissRequest = { setupPrompt = SetupPrompt.None },
+            title = { Text("Improve notification reliability") },
+            text = {
+                Text(
+                    "Weather notifications are on and working, but your device's battery " +
+                        "management may delay or skip background checks — this is especially " +
+                        "common on non-Pixel phones. Exempting SkySpeak from battery " +
+                        "optimization helps keep checks running on schedule."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    batteryOptimizationPromptLauncher.launch(batteryOptimizationSettingsIntent(context))
+                }) { Text("Allow") }
+            },
+            dismissButton = {
+                TextButton(onClick = { setupPrompt = SetupPrompt.None }) { Text("Not Now") }
+            }
+        )
+        SetupPrompt.None -> {}
     }
 
     when (val s = state) {
