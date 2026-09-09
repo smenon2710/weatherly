@@ -65,7 +65,7 @@ object WeatherNotifier {
     fun notifySevereAlert(context: Context, alert: WeatherAlert) {
         if (!hasPermission(context)) return
         val notification = NotificationCompat.Builder(context, WeatherNotificationChannels.SEVERE_ALERTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(alert.event)
             .setContentText(alert.headline)
             .setStyle(NotificationCompat.BigTextStyle().bigText(alert.headline))
@@ -80,7 +80,7 @@ object WeatherNotifier {
     fun notifyAlertResolved(context: Context, resolved: TrackedAlert) {
         if (!hasPermission(context)) return
         val notification = NotificationCompat.Builder(context, WeatherNotificationChannels.ALERTS_RESOLVED)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("${resolved.event} has ended")
             .setContentText("This advisory is no longer active.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -103,7 +103,7 @@ object WeatherNotifier {
     fun notifyWeatherStatus(context: Context, data: WeatherData) {
         if (!hasPermission(context)) return
         val notification = NotificationCompat.Builder(context, WeatherNotificationChannels.WEATHER_STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("${data.currentTempC}° · ${data.condition}")
             .setContentText("${data.locationName} · H:${data.highTodayC}° L:${data.lowTodayC}°")
             .setPriority(NotificationCompat.PRIORITY_LOW)

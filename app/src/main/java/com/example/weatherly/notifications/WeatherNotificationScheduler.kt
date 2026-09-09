@@ -24,6 +24,17 @@ object WeatherNotificationScheduler {
     private const val UNIQUE_WORK_NAME = "weather_alert_check"
     private const val INTERVAL_MINUTES = 30L
 
+    /**
+     * `REPLACE`, not `KEEP` — deliberate, confirmed necessary via real-device testing.
+     * `SettingsViewModel.syncScheduler()` calls this whenever *either* of the two independent
+     * notification toggles is on, since both share one job. With `KEEP`, toggling one feature
+     * off-and-back-on while the other stayed enabled was a silent no-op — work already existed
+     * under this unique name, so the "new" request was discarded and the original ~30-minute
+     * countdown just kept running untouched, with no way to force an earlier check short of
+     * waiting it out. `REPLACE` guarantees every call actually cancels-and-re-enqueues fresh work,
+     * which is also what gives freshly-(re)enabled work its near-immediate first run — the same
+     * behavior a genuinely first-time enable already relied on.
+     */
     fun schedule(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -32,7 +43,7 @@ object WeatherNotificationScheduler {
             .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            .enqueueUniquePeriodicWork(UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, request)
     }
 
     fun cancel(context: Context) {

@@ -94,10 +94,62 @@ second one — no new scheduling infra.
   (`SettingsViewModel.syncScheduler()` schedules whenever either is on, cancels only when both
   are off). Same saved-place-only scoping as alert notifications, for the same
   background-location reason.
-- Built (`assembleDebug` succeeds) and installed to a real device for testing; **not yet
-  functionally verified** — unlike the alert-notification path above (confirmed end-to-end on
-  the emulator with a real live NWS alert), this one hasn't actually been triggered and observed
-  yet.
+- Verified on the reporting user's real device: toggled on, confirmed a real `weather_status`
+  notification posts (`dumpsys notification`), `ONGOING_EVENT|ONLY_ALERT_ONCE` flags present as
+  designed.
+- Real-device testing surfaced two follow-up fixes, both shipped same day (see below): a
+  `WeatherNotificationScheduler` bug where toggling one of the two notification features off/on
+  while the other stayed enabled silently never touched the underlying job, and a wrong
+  notification icon that broke light/dark theming.
+
+## Follow-up fixes (same day, real-device-reported)
+
+**Scheduler bug — `ExistingPeriodicWorkPolicy.KEEP` → `REPLACE`.** `SettingsViewModel.syncScheduler()`
+only calls `WeatherNotificationScheduler.cancel()` once *both* notification toggles are off, and
+calls `schedule()` otherwise — including when a user flips one toggle off-and-back-on while the
+other stays on. With `KEEP`, that second `schedule()` call found existing work under the same
+unique name and silently discarded the "new" request, leaving the original ~30-minute countdown
+completely untouched — so the "toggle it to force an immediate check" trick (used throughout this
+doc's own testing, where only one toggle was ever on at a time) quietly did nothing for a user
+with both enabled. `REPLACE` guarantees every `schedule()` call actually cancels-and-re-enqueues,
+which is also what gives freshly-enabled work its near-immediate first run. Confirmed fixed via
+live logcat on the reporting user's device: four `WeatherAlertWorker` executions fired within
+seconds of four toggle taps, versus zero in ~20 minutes before the fix.
+
+**Notification icon — full-color mipmap → monochrome vector.** All three notification types used
+`R.mipmap.ic_launcher` (the full-color adaptive launcher icon) as `setSmallIcon()`. Android
+notification icons are alpha-only — the system discards RGB and re-tints the icon to match the
+current light/dark shade theme — so a full-color source doesn't "not theme," it renders as
+whatever the OS's masking of that RGB image happens to produce, unpredictable and specifically
+reported as not respecting theme. Fixed by pointing all three at the existing
+`drawable/ic_launcher_foreground.xml` (the sun + speech-wave vector already used for the adaptive
+launcher icon's foreground layer) — a clean single-shape vector with solid alpha edges and no
+gradients, exactly what a notification icon needs; its literal fill color (`#E0B15C`) is
+irrelevant since the system ignores it.
+
+## v1.3 — background location fallback (user-requested)
+
+User feedback: requiring an explicitly *selected* place (not just a saved one) for both
+notification features read as unnecessary friction — "it should show the current location."
+Implemented, with the trade-off named explicitly before building it (see the "Avoid the
+background-location review trap" section above, which this directly reopens):
+
+- `ACCESS_BACKGROUND_LOCATION` added to the manifest. `WeatherAlertWorker`'s location resolution
+  now mirrors `WeatherViewModel.load()`'s exact existing foreground pattern: a selected place
+  wins if set (an explicit choice to watch a specific city should never be silently overridden by
+  wherever the device physically is); otherwise falls back to `LocationProvider`'s live device
+  location, **only if** the background permission is granted — without it, "current location"
+  mode still gets no background checks, exactly like before this change, so nothing regresses for
+  a user who doesn't grant it.
+- New Settings card, "Background Location" — status text plus an "Allow background location"
+  button (API 29+ only; below that, ordinary foreground location already covers background
+  access, so no separate grant exists to request). Requested as its own permission, never bundled
+  with the ordinary foreground request, per Android's own requirement since API 30.
+- **Explicitly scoped to sideload/personal testing for now.** Shipping this to Production would
+  need Play Console's background-location policy declaration (historically including a
+  justification video) — a real review step this app has never needed before across any of its
+  15 shipped versionCodes. That's a separate decision from "does the feature work," deliberately
+  not made here.
 
 ---
 

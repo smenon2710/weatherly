@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +58,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherly.BuildConfig
@@ -100,6 +104,32 @@ fun SettingsScreen(
         // the user would need to grant it from system Settings, same as any other permission.
         if (granted) pendingNotificationEnable?.invoke()
         pendingNotificationEnable = null
+    }
+
+    // ACCESS_BACKGROUND_LOCATION (API 29+ only) lets WeatherAlertWorker fall back to the device's
+    // live location when no place is explicitly selected — see that class's doc comment. Requires
+    // its own separate request (Android disallows bundling it with the ordinary foreground
+    // location request since API 30), and only succeeds if foreground location is already
+    // granted, which the Weather screen's own permission flow already establishes for most users.
+    var hasBackgroundLocation by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val backgroundLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasBackgroundLocation = granted }
+    // The system's "Allow all the time" dialog (or, on some OEMs, a redirect to system Settings)
+    // returns here via onResume — re-check rather than trusting only the launcher callback, since
+    // a user who went to Settings manually wouldn't otherwise be reflected.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            hasBackgroundLocation = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        }
     }
 
     // The key field never holds the stored secret — only whatever new value the
@@ -289,10 +319,10 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Get notified in the background when a severe weather alert is issued " +
-                            "for — or clears from — a saved location, even with the app closed " +
-                            "and no widget placed. Checks periodically, not instantly. Currently " +
-                            "only works for a saved place (add one from the locations sheet on " +
-                            "the Weather screen) — not \"current location\" mode.",
+                            "for — or clears from — your location, even with the app closed and " +
+                            "no widget placed. Checks periodically, not instantly. Uses a saved, " +
+                            "explicitly selected place if you have one; otherwise your live " +
+                            "current location, if you've granted Background Location below.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
@@ -328,14 +358,46 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "An ongoing notification showing current conditions for a saved " +
-                            "location, updated roughly every 30 minutes. It stays in your " +
-                            "notification shade until you turn this off — it can't be swiped " +
-                            "away on its own. Same saved-place requirement as Alert " +
-                            "Notifications above.",
+                        "An ongoing notification showing current conditions, updated roughly " +
+                            "every 30 minutes. It stays in your notification shade until you " +
+                            "turn this off — it can't be swiped away on its own. Same location " +
+                            "source as Alert Notifications above.",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
+                }
+            }
+
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    SettingsSectionLabel("Background Location")
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (hasBackgroundLocation)
+                            "Granted — the two notification features above will use your live " +
+                                "current location when no place is explicitly selected, instead " +
+                                "of only working for a saved place."
+                        else
+                            "Optional. Without this, the notifications above only work for a " +
+                                "saved place (Locations → search and select a city). Granting " +
+                                "it lets them use your live current location instead when " +
+                                "nothing is explicitly selected. Requires a separate \"Allow " +
+                                "all the time\" system permission beyond ordinary location " +
+                                "access.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    if (!hasBackgroundLocation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Cyan)
+                        ) {
+                            Text("Allow background location")
+                        }
+                    }
                 }
             }
 

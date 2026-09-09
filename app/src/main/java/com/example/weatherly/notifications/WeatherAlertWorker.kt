@@ -1,25 +1,33 @@
 package com.example.weatherly.notifications
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.AlertTracker
 import com.example.weatherly.data.repository.WeatherRepository
+import com.example.weatherly.location.LocationProvider
 
 /**
  * Periodic background check (see [WeatherNotificationScheduler]) for new severe/extreme NWS
  * alerts and alerts that have since resolved, surfaced as system notifications — for the users
  * `NOTIFICATIONS_ROADMAP.md` is aimed at, who never open the app or place a widget.
  *
- * Deliberately scoped to a saved/selected place ([PreferencesStore.getSelected]) only — **never**
- * the device's live "current location" — so this worker never touches location from a background
- * context at all, sidestepping `ACCESS_BACKGROUND_LOCATION` and the heavier Play Console review
- * it requires entirely (see the roadmap doc's "Avoid the background-location review trap"). A
- * user relying on "current location" mode (the default for a fresh install) simply doesn't get
- * background alerts yet — a known, deliberate v1 limitation, not an oversight. Extending this to
- * device location is a separate decision given the real review-surface cost.
+ * Location resolution mirrors [com.example.weatherly.ui.WeatherViewModel.load]'s exact
+ * foreground pattern: a saved/selected place ([PreferencesStore.getSelected]) wins if set —
+ * someone explicitly watching a specific city should always get that city, not wherever the
+ * device happens to be — otherwise falls back to the device's live location via
+ * [LocationProvider], **only if** `ACCESS_BACKGROUND_LOCATION` is granted (Settings → Background
+ * Location). Without that grant, "current location" mode simply gets no background checks,
+ * same as before this was added. User-requested (over the original saved-place-only v1 scope)
+ * with an explicit trade-off called out: this permission needs its own "Allow all the time"
+ * system flow and, if this ever ships to Production, a Play Console background-location policy
+ * declaration this app has never needed before — sideload-testing only for now.
  *
  * Uses its own [PreferencesStore.getBackgroundTrackedAlerts] slot rather than the foreground's
  * [PreferencesStore.getTrackedAlerts] — see that method's doc comment for why sharing one would
@@ -39,11 +47,21 @@ class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
         val statusEnabled = prefs.getPersistentWeatherEnabled()
         if (!alertsEnabled && !statusEnabled) return Result.success()
 
-        val place = prefs.getSelected() ?: return Result.success()
+        val selected = prefs.getSelected()
+        val lat: Double
+        val lon: Double
+        val placeName: String?
+        if (selected != null) {
+            lat = selected.lat; lon = selected.lon; placeName = selected.name
+        } else {
+            if (!hasBackgroundLocationPermission(applicationContext)) return Result.success()
+            val ll = LocationProvider(applicationContext).currentLatLon() ?: return Result.success()
+            lat = ll.first; lon = ll.second; placeName = null
+        }
 
         val repository = WeatherRepository(applicationContext)
         val fetched = repository.getWeather(
-            lat = place.lat, lon = place.lon, units = prefs.getUnitSystem(), placeName = place.name
+            lat = lat, lon = lon, units = prefs.getUnitSystem(), placeName = placeName
         )
         val data = fetched.getOrNull() ?: return Result.retry()
 
@@ -65,3 +83,10 @@ class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
         return Result.success()
     }
 }
+
+/** `ACCESS_BACKGROUND_LOCATION` only exists from API 29 — below that, ordinary foreground
+ * location permission already covers background access, so there's nothing separate to check. */
+fun hasBackgroundLocationPermission(context: Context): Boolean =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) true
+    else ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED

@@ -6,6 +6,12 @@
     <!-- Location: COARSE is enough for city-level weather. FINE is optional. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Optional, user-granted separately from the two above (Settings → Background Location):
+         lets WeatherAlertWorker resolve the device's live location when no place is explicitly
+         selected, instead of only working for a saved place. Sideload-testing only for now — see
+         NOTIFICATIONS_ROADMAP.md for the Play Console "background location" review this would
+         need before ever shipping to Production. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Normal permission, no runtime prompt: a single restrained haptic pulse for notable
          conditions (severe alert, thunderstorm, heavy rain/snow). See util/WeatherHaptics.kt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
