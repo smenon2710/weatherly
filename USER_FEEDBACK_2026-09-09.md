@@ -77,9 +77,21 @@ summary" request — with two new safety-tier checks, ranked above the softer wh
 Both are plain, deterministic sentences from real thresholds — not LLM output — directly
 answering the original ask ("protect users from model text hallucinations"). Ranked below an
 actually-arriving storm/high-wind event (the more immediate hazard) but above everything else in
-the list. Built and installed for testing; not yet observed firing live (needs a real extreme-UV
-or sub-freezing location/moment, similar to how the original day-insights list needed a
-multi-signal location like Mexico City to actually see more than one item at once).
+the list. Built and installed for testing.
+
+**Verification, 2026-09-09:**
+- **Freeze warning — confirmed live.** Ushuaia, Argentina (currently -1.2°C) triggers it
+  immediately, no waiting on a specific hour needed.
+- **Extreme UV — not verified; logic reviewed, no real-world trigger found today.** Checked
+  ~20 locations worldwide — the best real candidates for UV 11+ (equatorial + very high altitude:
+  Quito, Cayambe, Chacaltaya, Sajama, El Tatio, Mount Kenya, Kampala, Bujumbura, and more),
+  including each location's *clear-sky theoretical maximum* (removing cloud interference
+  entirely) via Open-Meteo's `uv_index_clear_sky` field, not just actual cloud-affected readings.
+  Every one topped out around 10.0–10.25 today, genuinely short of 11 — not a search failure or
+  bad luck, but a real seasonal fact: today (near the September equinox) just isn't the right time
+  of year for any location on Earth to hit "Extreme" UV, even at the best-known high-altitude
+  equatorial sites. Sajama, Bolivia (9.8, 0% cloud) was closest. Worth retrying in a few months
+  once a Southern Hemisphere high-altitude site like Sajama is closer to its December solstice.
 
 ---
 
