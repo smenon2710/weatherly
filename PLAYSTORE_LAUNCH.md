@@ -509,6 +509,18 @@ justify).
   `versionCode='16' versionName='1.0.15'`, targetSdk 36, `WeatherAlertWorker` kept by R8, new
   briefing text present in the dex. Installed on the Pixel 9 Pro in place; launched with no
   crash in logcat. **Still no visual check of this build** (phone locked; no emulator pass).
+- [x] **Re-verified 2026-10-05 on commit `5142dc6`** (one small change after the hand check
+  below: turning Alert Notifications off now clears the background tracked-alert list) — **this
+  is the current build to upload.** Same clean build and checks: `test` 54/54, `lint` 51
+  warnings / no errors, `bundleRelease` + `assembleRelease` `BUILD SUCCESSFUL`,
+  `jarsigner -verify` → `jar verified`, `apksigner verify` → verifies (v2, same keystore
+  SHA-256), `aapt2` → `versionCode='16' versionName='1.0.15'`, targetSdk 36,
+  `WeatherAlertWorker` kept by R8. Installed on the Pixel 9 Pro in place; launched with no crash
+  in logcat (the app's only warning lines were two Android runtime "Missing inline cache" JIT
+  notices, which are harmless), and a screen capture showed a current-location forecast loaded
+  (Franklin Township, NJ). The hand check below was done on `6a25d2e`, not this
+  build; the one changed behaviour (off → on again does not announce stale "ended" alerts) has
+  not been exercised on a device.
 - [x] **Hand-checked on the Pixel 9 Pro by the developer, 2026-10-05, on the `6a25d2e` release
   build** — reported good, covering the five checks asked for: the Forecast Insight sheet's new
   sections (including "Looking ahead") read well and fit; a current-location forecast loads; the
