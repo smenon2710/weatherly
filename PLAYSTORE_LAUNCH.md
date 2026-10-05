@@ -501,6 +501,14 @@ justify).
   the Pixel 9 Pro in place and launched with no crash in logcat. **No visual check of this
   build anywhere:** the phone was locked, and the emulator's system process hung before the
   sheet could be opened — no emulator sanity pass was completed for `d83ee1f`.
+- [x] **Re-verified 2026-10-05 on commit `6a25d2e`** (the "Looking ahead" rework) — **this is the
+  current build to upload.** Same clean build and checks as the two entries above: `test` 54/54
+  (`WeatherAdvisorTest` 38, `AlertTrackerTest` 5, `ForecastBriefingTest` 11), `lint` 54 warnings /
+  no errors, `bundleRelease` + `assembleRelease` `BUILD SUCCESSFUL`, `jarsigner -verify` →
+  `jar verified`, `apksigner verify` → verifies (v2, same keystore SHA-256), `aapt2` →
+  `versionCode='16' versionName='1.0.15'`, targetSdk 36, `WeatherAlertWorker` kept by R8, new
+  briefing text present in the dex. Installed on the Pixel 9 Pro in place; launched with no
+  crash in logcat. **Still no visual check of this build** (phone locked; no emulator pass).
 - [ ] **Still to check by hand on the phone before upload:** the Forecast Insight sheet's new
   sections read well and fit (tap the hero pill); a current-location forecast loads;
   the Weather Status notification posts/updates with the app closed; the battery-optimization
