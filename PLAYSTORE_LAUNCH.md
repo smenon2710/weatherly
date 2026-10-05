@@ -615,10 +615,16 @@ at that time — there is no server-side alternative to fall back to.
 
 - Both features are off by default. The user must explicitly enable each one, individually, in
   Settings.
-- Enabling either one triggers the standard Android system "Allow all the time" location dialog —
-  the app never requests background location eagerly on launch or as a side effect of any other
-  flow. It is requested only at the exact moment the user takes the specific action of turning on
-  one of these two toggles.
+- Enabling either one shows an in-app prominent disclosure ("SkySpeak collects location data to
+  enable Alert Notifications and the Weather Status Notification even when the app is closed or
+  not in use…", naming Open-Meteo and the National Weather Service as the only recipients), and
+  only on "Continue" the standard Android system "Allow all the time" location dialog — the app
+  never requests background location eagerly on launch or as a side effect of any other flow. It
+  is requested only once the user has turned on one of these two toggles; the Settings "Allow
+  background location" button and the Weather-screen reminder dialog show the same disclosure and
+  likewise only appear while a toggle is on. (Matches the code as of 2026-10-05 —
+  `SettingsScreen.kt`'s `BACKGROUND_LOCATION_DISCLOSURE`; before that the toggle only requested
+  notification permission and this paragraph described a flow the app didn't have.)
 - Settings shows the current grant status at all times, and the user can revoke access (via
   system Settings) or simply turn the toggles back off at any time, with no other loss of app
   functionality — every other part of the app works fully without this permission.
@@ -649,9 +655,9 @@ depending on background access, not just the permission being requested. Suggest
    Status Notification" both Off, and "Background Location" showing as not yet granted.
 2. **Turn a toggle on.** Tap "Alert Notifications" → On. Show the `POST_NOTIFICATIONS` system
    prompt appearing and being granted.
-3. **Show the Background Location card/prompt.** Either scroll to the Settings card and tap
-   "Allow background location," or close the app to the home screen and reopen it to show the
-   proactive missing-permission dialog firing, then tap through it.
+3. **Show the in-app disclosure.** It appears on its own right after the notification prompt —
+   the "Allow background location?" dialog. Hold on it long enough to be readable (reviewers look
+   for this specifically), then tap "Continue".
 4. **Grant "Allow all the time"** on the real system location-permission page — show this
    specific screen, since it's the crux of what's being justified.
 5. **Close the app entirely** (swipe it away from Recents, not just background it) to make clear

@@ -106,7 +106,7 @@ object WeatherNotifier {
             .setAutoCancel(true)
             .setContentIntent(contentIntent(context))
             .build()
-        NotificationManagerCompat.from(context).notify(alert.id.hashCode(), notification)
+        NotificationManagerCompat.from(context).notify(alertNotificationId(alert.event), notification)
     }
 
     fun notifyAlertResolved(context: Context, resolved: TrackedAlert) {
@@ -119,8 +119,13 @@ object WeatherNotifier {
             .setAutoCancel(true)
             .setContentIntent(contentIntent(context))
             .build()
-        NotificationManagerCompat.from(context).notify(resolved.id.hashCode(), notification)
+        NotificationManagerCompat.from(context).notify(alertNotificationId(resolved.event), notification)
     }
+
+    // Keyed by event name, not the NWS alert id: the id changes on every NWS update to the same
+    // alert (see AlertTracker.diffAndUpdate), so an id-keyed "ended" notification would no longer
+    // replace the alert notification it's closing out once that alert had been updated.
+    private fun alertNotificationId(event: String): Int = event.hashCode()
 
     // Fixed, arbitrary id — every call re-posts to this same id so the notification updates in
     // place each periodic check instead of stacking a new one every ~30 minutes.

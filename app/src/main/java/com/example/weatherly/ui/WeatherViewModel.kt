@@ -175,12 +175,12 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** A tracked alert from the previous location isn't a real "resolution" for the new one.
-     * Clears the background worker's own tracked-alert slot too (see
-     * PreferencesStore.getBackgroundTrackedAlerts' doc comment) — its state goes stale the
-     * instant the selected place changes, same as the in-app slot. */
+     * Deliberately leaves the background worker's own slot alone (see
+     * PreferencesStore.getBackgroundTrackedAlerts' doc comment): that one follows the device's
+     * real location, which browsing a different city in-app doesn't change — clearing it here
+     * made the next background check re-notify every alert still active where the user is. */
     private fun resetAlertTracking() {
         prefs.setTrackedAlerts(emptyList())
-        prefs.setBackgroundTrackedAlerts(emptyList())
         _resolvedAlerts.value = emptyList()
     }
 

@@ -22,12 +22,23 @@ class AlertTracker(
 ) {
     data class Diff(val newlyAppeared: List<WeatherAlert>, val newlyResolved: List<TrackedAlert>)
 
+    /**
+     * An alert counts as the same one across fetches if either its id or its event name matches.
+     * Id alone is not enough: NWS issues every update to an in-effect product (messageType
+     * "Update") under a brand-new id — checked against the live feed, every active severe/extreme
+     * update carried an id different from the one it superseded — so an id-only diff reports a
+     * warning that was merely updated as "ended" plus a fresh new alert. The accepted trade-off is
+     * that a second, genuinely separate alert of the same event type arriving while the first is
+     * still active isn't reported as new.
+     */
     fun diffAndUpdate(current: List<WeatherAlert>): Diff {
         val previous = get()
         val previousIds = previous.map { it.id }.toSet()
+        val previousEvents = previous.map { it.event }.toSet()
         val currentIds = current.map { it.id }.toSet()
-        val newlyAppeared = current.filter { it.id !in previousIds }
-        val newlyResolved = previous.filter { it.id !in currentIds }
+        val currentEvents = current.map { it.event }.toSet()
+        val newlyAppeared = current.filter { it.id !in previousIds && it.event !in previousEvents }
+        val newlyResolved = previous.filter { it.id !in currentIds && it.event !in currentEvents }
         set(current.map { TrackedAlert(it.id, it.event) })
         return Diff(newlyAppeared, newlyResolved)
     }

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -100,18 +101,16 @@ fun SettingsScreen(
     // first tap (needing an off/on retry to actually take): the callback is an async system
     // round-trip, and if anything about that composition/lifecycle timing hiccups, the toggle
     // just never flips with no visible error. Instead, each toggle's onClick enables itself
-    // immediately (see below) and independently fires this request only if not yet granted —
-    // WeatherNotifier already no-ops posting until permission is actually granted, so "enabled but
-    // not yet permitted" is a real, honestly-represented state rather than something to prevent.
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* no-op: the toggle already reflects "on"; this only affects whether it can post */ }
-
-    // ACCESS_BACKGROUND_LOCATION (API 29+ only) lets WeatherAlertWorker fall back to the device's
-    // live location when no place is explicitly selected — see that class's doc comment. Requires
-    // its own separate request (Android disallows bundling it with the ordinary foreground
-    // location request since API 30), and only succeeds if foreground location is already
-    // granted, which the Weather screen's own permission flow already establishes for most users.
+    // immediately (see below) and independently starts the permission steps only where something
+    // is still missing — WeatherNotifier already no-ops posting until permission is actually
+    // granted, so "enabled but not yet permitted" is a real, honestly-represented state rather
+    // than something to prevent.
+    //
+    // ACCESS_BACKGROUND_LOCATION (API 29+ only) is what WeatherAlertWorker needs to resolve the
+    // device's live location with the app closed — see that class's doc comment. Requires its own
+    // separate request (Android disallows bundling it with the ordinary foreground location
+    // request since API 30), and only succeeds if foreground location is already granted — hence
+    // foregroundLocationLauncher below, for a user who has only ever used a searched city.
     var hasBackgroundLocation by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
@@ -122,6 +121,57 @@ fun SettingsScreen(
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasBackgroundLocation = granted }
+    val foregroundLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    }
+    // Turning either notification toggle on leads straight here (after the POST_NOTIFICATIONS
+    // prompt, if one is needed — Android only shows one permission request at a time, so the two
+    // are chained rather than launched together): an in-app disclosure of what background
+    // location is used for, shown before the system "Allow all the time" request rather than
+    // leaving that request to a separate button the user has to go find. This is the flow the
+    // Play Console Background Location declaration and docs/privacy.html both describe — keep
+    // all three in step if this changes.
+    var showBackgroundLocationDisclosure by remember { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        // The toggle already reflects "on" whatever the answer here; move on to the location step.
+        if (!hasBackgroundLocation) showBackgroundLocationDisclosure = true
+    }
+    val onNotificationFeatureEnabled = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else if (!hasBackgroundLocation) {
+            showBackgroundLocationDisclosure = true
+        }
+    }
+    if (showBackgroundLocationDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showBackgroundLocationDisclosure = false },
+            title = { Text("Allow background location?") },
+            text = { Text(BACKGROUND_LOCATION_DISCLOSURE) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBackgroundLocationDisclosure = false
+                    val hasForeground = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasForeground) {
+                        backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    } else {
+                        foregroundLocationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    }
+                }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackgroundLocationDisclosure = false }) { Text("Not Now") }
+            }
+        )
+    }
     // The system's "Allow all the time" dialog (or, on some OEMs, a redirect to system Settings)
     // returns here via onResume — re-check rather than trusting only the launcher callback, since
     // a user who went to Settings manually wouldn't otherwise be reflected.
@@ -321,12 +371,13 @@ fun SettingsScreen(
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
-                    if (!hasBackgroundLocation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Only offered once a notification feature is actually on — background
+                    // location is never requested ahead of the user opting into something that
+                    // needs it (a commitment docs/privacy.html makes in so many words).
+                    if (!hasBackgroundLocation && (alertNotificationsEnabled || persistentWeatherEnabled)) {
                         Spacer(Modifier.height(12.dp))
                         Button(
-                            onClick = {
-                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                            },
+                            onClick = { showBackgroundLocationDisclosure = true },
                             colors = ButtonDefaults.buttonColors(containerColor = Cyan)
                         ) {
                             Text("Allow background location")
@@ -346,11 +397,7 @@ fun SettingsScreen(
                             selected = alertNotificationsEnabled,
                             onClick = {
                                 settingsViewModel.setAlertNotificationsEnabled(true)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
+                                onNotificationFeatureEnabled()
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -385,11 +432,7 @@ fun SettingsScreen(
                             selected = persistentWeatherEnabled,
                             onClick = {
                                 settingsViewModel.setPersistentWeatherEnabled(true)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
+                                onNotificationFeatureEnabled()
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -528,6 +571,20 @@ fun SettingsScreen(
         }
     }
 }
+
+/**
+ * The in-app disclosure shown before any `ACCESS_BACKGROUND_LOCATION` request, here and on the
+ * Weather screen's missing-permission dialog. Worded to Google Play's prominent-disclosure
+ * format ("collects location data to enable <feature> even when the app is closed or not in
+ * use") and naming the same recipients as docs/privacy.html.
+ */
+internal const val BACKGROUND_LOCATION_DISCLOSURE =
+    "SkySpeak collects location data to enable Alert Notifications and the Weather Status " +
+        "Notification even when the app is closed or not in use. About every 30 minutes it " +
+        "checks where you are and sends that location only to Open-Meteo and the U.S. National " +
+        "Weather Service, to fetch the weather and any active alerts for that spot. It's never " +
+        "used for ads or shared with anyone else.\n\nOn the next screen, choose \"Allow all the " +
+        "time\"."
 
 @Composable
 private fun SettingsSectionLabel(text: String) {

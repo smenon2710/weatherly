@@ -196,9 +196,9 @@ fun WeatherScreen(
             title = { Text("Notifications need one more permission") },
             text = {
                 Text(
-                    "You've turned on a weather notification in Settings, but it needs " +
-                        "Background Location access to actually check conditions — without it, " +
-                        "it's on but won't do anything. Grant it now, or head to Settings later."
+                    "You've turned on a weather notification in Settings, but without " +
+                        "Background Location access it's on and won't do anything.\n\n" +
+                        BACKGROUND_LOCATION_DISCLOSURE
                 )
             },
             confirmButton = {

@@ -132,13 +132,14 @@ class PreferencesStore(context: Context) {
     /** Separate tracked-alert slot for WeatherAlertWorker's background check — deliberately not
      * the same key as [getTrackedAlerts] above. That one is a single global slot for "whatever
      * place is currently being viewed in-app" (reset on every selectPlace()/selectCurrentLocation()
-     * call), while the background worker always checks the saved/selected place regardless of
-     * what's currently on screen (see WeatherAlertWorker's doc comment). Sharing one key would let
-     * a foreground view of "current location" and a background check of a different saved place
-     * corrupt each other's diff — e.g. a real alert at the saved place misreported as "resolved"
-     * just because the in-app tracked set was last written for a different location entirely.
-     * WeatherViewModel.resetAlertTracking() clears both slots together on a location change, since
-     * the background worker's own tracked state goes stale too whenever the selected place changes. */
+     * call), while the background worker always checks the device's live current location
+     * regardless of what's currently on screen (see WeatherAlertWorker's doc comment). Sharing one
+     * key would let a foreground view of some other city and a background check of where the
+     * device actually is corrupt each other's diff — e.g. a real alert at the user's location
+     * misreported as "resolved" just because the in-app tracked set was last written for a
+     * different place entirely. For the same reason an in-app place change must not clear this
+     * slot: WeatherViewModel.resetAlertTracking() only resets the foreground one. Holds
+     * severe/extreme alerts only — that's all the worker tracks. */
     fun getBackgroundTrackedAlerts(): List<TrackedAlert> =
         prefs.getString(KEY_TRACKED_ALERTS_BG, null)?.let {
             runCatching { trackedAlertsAdapter.fromJson(it) }.getOrNull()
