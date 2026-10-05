@@ -126,6 +126,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         syncScheduler()
     }
 
+    /** Background location has just been granted: if a notification feature is on, reschedule so
+     * a check runs now (see [WeatherNotificationScheduler.schedule] — REPLACE re-enqueues, which
+     * runs immediately) rather than waiting out the rest of the current 30-minute period. */
+    fun onBackgroundLocationGranted() = syncScheduler()
+
     /** [WeatherAlertWorker] serves both notification features off one periodic job — only cancel
      * it once neither feature needs it, and (re)schedule whenever at least one does. */
     private fun syncScheduler() {

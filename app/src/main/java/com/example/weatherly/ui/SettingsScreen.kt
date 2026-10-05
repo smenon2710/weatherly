@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -87,6 +88,9 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    // Without this the system Back button/gesture finished the activity from Settings — MainActivity
+    // swaps screens with AnimatedContent, not a back stack. Same handler ChatScreen already has.
+    BackHandler(onBack = onBack)
     val hasOwnKey by settingsViewModel.hasOwnOpenRouterKey.collectAsStateWithLifecycle()
     val storedModel by settingsViewModel.openRouterModel.collectAsStateWithLifecycle()
     val widgetTransparent by settingsViewModel.widgetTransparent.collectAsStateWithLifecycle()
@@ -121,6 +125,15 @@ fun SettingsScreen(
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasBackgroundLocation = granted }
+    // The check that ran when the toggle was switched on had no background location yet and did
+    // nothing, and the next one is ~30 minutes out — so the moment the permission flips to
+    // granted (via the launcher above, or the ON_RESUME re-check below after a trip through
+    // system Settings), reschedule to get an immediate run instead of a half-hour of silence.
+    val lastBackgroundLocation = remember { booleanArrayOf(hasBackgroundLocation) }
+    LaunchedEffect(hasBackgroundLocation) {
+        if (hasBackgroundLocation && !lastBackgroundLocation[0]) settingsViewModel.onBackgroundLocationGranted()
+        lastBackgroundLocation[0] = hasBackgroundLocation
+    }
     val foregroundLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->

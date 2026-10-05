@@ -85,6 +85,7 @@ import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TrackedAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.prefs.PreferencesStore
+import com.example.weatherly.notifications.WeatherNotificationScheduler
 import com.example.weatherly.notifications.batteryOptimizationSettingsIntent
 import com.example.weatherly.notifications.isIgnoringBatteryOptimizations
 import com.example.weatherly.ui.components.AlertBannerList
@@ -179,7 +180,12 @@ fun WeatherScreen(
     }
     val backgroundLocationPromptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { setupPrompt = SetupPrompt.None }
+    ) { granted ->
+        setupPrompt = SetupPrompt.None
+        // This dialog only shows while a notification feature is on, so a grant here means the
+        // worker can finally do something — run a check now rather than up to 30 minutes later.
+        if (granted) WeatherNotificationScheduler.schedule(context)
+    }
     val batteryOptimizationPromptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { setupPrompt = SetupPrompt.None }
