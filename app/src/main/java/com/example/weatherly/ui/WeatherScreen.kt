@@ -79,6 +79,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.weatherly.data.advice.ForecastBriefing
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.SavedPlace
 import com.example.weatherly.data.model.TrackedAlert
@@ -635,7 +636,8 @@ private fun SharedTransitionScope.WeatherContentBody(
                             onForecastClick = {
                                 onSheetChange(DetailSheet.Forecast(
                                     headline = data.headline ?: data.comparedToYesterday ?: "No notable changes expected.",
-                                    otherInsights = data.dayInsights.drop(1)
+                                    otherInsights = data.dayInsights.drop(1),
+                                    sections = ForecastBriefing.build(data)
                                 ))
                             }
                         )

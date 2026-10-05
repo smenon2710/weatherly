@@ -96,6 +96,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.weatherly.data.advice.BriefingSection
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
@@ -1348,15 +1349,16 @@ sealed interface DetailSheet {
 
     data class AlertList(val alerts: List<WeatherAlert>) : DetailSheet
 
-    // The hero's tap-to-expand AI summary — see CurrentHeader's pulsing ring doc comment. The
-    // pill shows only `headline` (the single most notable thing); `otherInsights` is everything
-    // ELSE currently true — see WeatherRepository.buildDayInsights' doc comment. Deliberately
-    // plain sentences ("UV is very high right now"), not raw metric numbers — those already live
-    // in the metrics grid and the 7-day day-detail sheet, and duplicating them here was
-    // user-reported as not what a "day summary" should be.
+    // The hero's tap-to-expand forecast summary. The pill shows only `headline` (the single
+    // most notable thing); the sheet adds `sections` — a plain-language read of temperature,
+    // sky, precipitation, alerts and the days ahead (see ForecastBriefing) — and `otherInsights`,
+    // everything ELSE currently true from WeatherRepository.buildDayInsights. Two earlier
+    // versions both missed: a raw metrics readout (duplicated the metrics grid), then headline +
+    // otherInsights alone (user-reported as showing nothing the pill didn't already say).
     data class Forecast(
         val headline: String,
-        val otherInsights: List<String>
+        val otherInsights: List<String>,
+        val sections: List<BriefingSection> = emptyList()
     ) : DetailSheet
 }
 
@@ -2331,9 +2333,18 @@ fun DetailSheetContent(sheet: DetailSheet, onAlertSelected: (WeatherAlert) -> Un
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(sheet.headline, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                sheet.sections.forEach { section ->
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        section.title.uppercase(),
+                        color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(section.text, color = TextPrimary, fontSize = 15.sp, lineHeight = 22.sp)
+                }
                 // Everything ELSE currently worth knowing about today — plain sentences, not a
-                // metrics readout (see DetailSheet.Forecast's doc comment for why: those numbers
-                // already live in the metrics grid and the 7-day day-detail sheet).
+                // metrics readout (see DetailSheet.Forecast's doc comment).
                 if (sheet.otherInsights.isNotEmpty()) {
                     Spacer(Modifier.height(16.dp))
                     HorizontalDivider(color = TextSecondary.copy(alpha = 0.12f))
