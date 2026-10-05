@@ -509,12 +509,18 @@ justify).
   `versionCode='16' versionName='1.0.15'`, targetSdk 36, `WeatherAlertWorker` kept by R8, new
   briefing text present in the dex. Installed on the Pixel 9 Pro in place; launched with no
   crash in logcat. **Still no visual check of this build** (phone locked; no emulator pass).
-- [ ] **Still to check by hand on the phone before upload:** the Forecast Insight sheet's new
-  sections read well and fit (tap the hero pill); a current-location forecast loads;
-  the Weather Status notification posts/updates with the app closed; the battery-optimization
-  dialog appears at most once; and — after revoking location to "While using" in system
-  Settings — the Weather-screen reminder shows the new disclosure text and leads to "Allow all
-  the time". The path for a user who never granted ordinary location is untested anywhere.
+- [x] **Hand-checked on the Pixel 9 Pro by the developer, 2026-10-05, on the `6a25d2e` release
+  build** — reported good, covering the five checks asked for: the Forecast Insight sheet's new
+  sections (including "Looking ahead") read well and fit; a current-location forecast loads; the
+  Weather Status notification appears with the app closed; the battery-optimization dialog stays
+  gone after "Not Now"; and, after setting location back to "While using the app", the
+  Weather-screen reminder shows the new disclosure and leads to "Allow all the time". This is the
+  visual check the three build entries above were missing.
+- [ ] **Not tested anywhere:** the path for a user who never granted ordinary location (the
+  disclosure's "Continue" should ask for foreground location first, then background). Also not
+  yet observed: a real severe-alert notification, and an NWS update arriving without a false
+  "ended" notification — both need a live alert at the device's location; `AlertTrackerTest`
+  covers the logic.
 - [x] Manifest permissions read against the built APK, 2026-10-05: `POST_NOTIFICATIONS`,
   `ACCESS_BACKGROUND_LOCATION` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` are present as intended.
   The merged manifest also carries `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`
