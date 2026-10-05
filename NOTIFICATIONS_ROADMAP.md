@@ -1,6 +1,9 @@
 # SkySpeak — Alerts & Notifications Infrastructure (Discussion Doc)
 
-> **v1 implemented (not yet built/installed anywhere) — see "What shipped" below the TL;DR.**
+> **Implemented through v1.5 and verified on a real device in a signed release build (versionCode
+> 16); not yet released to Production. The sections below are kept as the build history — where
+> an earlier one conflicts with a later one (e.g. saved-place scoping, dropped in v1.4), the later
+> one is current. `CLAUDE.md`'s "Background notifications" section describes the code as it is.**
 
 > Not a decision, not a plan — a starting point for a conversation. Prompted by real user
 > research (not this app's own — general observation): most weather-app users never place a
@@ -40,8 +43,9 @@
 ## What shipped (v1)
 
 Implemented per the recommendation above — WorkManager polling, opt-in, notification types #1
-and #2 only (daily digest deliberately not built yet, per the open question below). **Not yet
-built or installed anywhere** — source changes only, unverified by an actual compile.
+and #2 only (daily digest deliberately not built yet, per the open question below). *(As first
+written this was source-only and uncompiled; it has since been built and device-tested — see the
+later sections.)*
 
 - `androidx.work:work-runtime-ktx:2.10.0` added; `POST_NOTIFICATIONS` declared in the manifest.
 - `data/repository/AlertTracker.kt` — the alert diff/update logic extracted out of

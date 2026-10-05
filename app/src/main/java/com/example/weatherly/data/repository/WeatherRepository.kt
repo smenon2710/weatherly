@@ -379,8 +379,8 @@ class WeatherRepository(private val context: Context) {
         val tips = buildTips(tipsCode, tipDay?.highC ?: highToday, tipDay?.lowC ?: lowToday, tipsPop.takeIf { it > 0 }, tipDay?.windMaxKmh, units)
         // A sustained drop of >= 3 hPa within the next 6 hours — a real, widely-recognized signal
         // that unsettled weather may be approaching, independent of what the WMO code currently
-        // says. Backs the hero's pulsing AI ring, and (below) folds into the insight list as a
-        // plain sentence rather than a raw hPa reading.
+        // says. Folds into the insight list (below) as a plain sentence rather than a raw hPa
+        // reading; the pulsing hero ring it once also drove has been removed.
         val pressureDropAlert = run {
             val nowP = hourlyPressure.getOrNull(0)
             val futureMin = hourlyPressure.drop(1).take(6).minOrNull()
@@ -766,8 +766,8 @@ class WeatherRepository(private val context: Context) {
         if (isEmpty()) add(WeatherTip("🌤️", "No major weather to plan around today.", TipTone.NEUTRAL))
     }.take(2)
 
-    // Per-day "how to plan around this" advice for the 7-day forecast's own detail sheet
-    // (DetailSheet.Day) — deliberately a separate function from buildTips() above, not a shared
+    // Per-day "how to plan around this" advice for the 7-day forecast's expanded day view
+    // (DayDetailBody) — deliberately a separate function from buildTips() above, not a shared
     // call with a parameter, even though the threshold logic overlaps: buildTips()'s wording is
     // hardcoded "today"/"tonight"-relative for the hero TipBanner (which only ever shows for the
     // current day, with its own night-rollover-to-tomorrow logic), and reusing it verbatim for an

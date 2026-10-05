@@ -84,15 +84,11 @@ import kotlin.math.roundToInt
 // tier. SMALL is left unshrunk — it's the floor of the declared set (Responsive always falls back
 // to it), so there's nothing for it to downgrade to.
 //
-// KNOWN TRADE-OFF, not yet resolved: shrinking the declared breakpoint also shrinks the layout
-// canvas Glance composes that tier's content for (Glance has no way to decouple "match against
-// this size" from "lay out content for this size"). XLARGE had slack in its original design and
-// renders cleanly at the smaller canvas. MEDIUM/TALL/WIDE/LARGE did not — their content, tuned to
-// just fit the original (larger) declared size, now visibly clips at MARGIN=16 (confirmed via the
-// QA harness: cut-off degree symbols, truncated location text, a clipped last hourly row/column).
-// Fixing that needs actual layout tightening inside `MediumWidget`/`TallWidget`/`WideWidget`/
-// `LargeWidget` (smaller fonts and/or tighter spacing) sized for a real MARGIN-dp-smaller canvas,
-// not another constant tweak — deliberately not attempted yet, flagged as the next step instead.
+// Trade-off: shrinking the declared breakpoint also shrinks the layout canvas Glance composes
+// that tier's content for (Glance has no way to decouple "match against this size" from "lay out
+// content for this size"). XLARGE had slack in its original design; MEDIUM/TALL/WIDE/LARGE did
+// not, so their padding, spacing and font sizes are tuned tight for the MARGIN-dp-smaller canvas
+// (see the padding note in WidgetContent below). Raising MARGIN again means re-tuning those four.
 private const val MARGIN = 16
 private val SMALL  = DpSize(110.dp,        50.dp)        // 2×1: temp + emoji only
 private val MEDIUM = DpSize((110 - MARGIN).dp, (110 - MARGIN).dp)  // 2×2: chrono-dynamic vertical stack

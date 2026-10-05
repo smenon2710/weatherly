@@ -234,7 +234,7 @@ private enum class Scene(val rainIntensity: RainIntensity? = null, val snowInten
 }
 
 /**
- * WMO weather codes — same ranges used by WeatherRepository.buildUpcomingHeadline/buildTips and
+ * WMO weather codes — same ranges used by WeatherRepository.buildDayInsights/buildTips and
  * WeatherAdvisor, kept consistent rather than re-derived, extended here with the finer-grained
  * codes (freezing rain/drizzle, snow grains, thunderstorm+hail) those simpler call sites don't
  * need to distinguish. Priority order: an active Tornado/Hurricane alert overrides everything

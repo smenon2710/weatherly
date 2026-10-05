@@ -16,7 +16,9 @@ in-app donation link supports the developer if you'd like to.
 - Current conditions, next 24 hours, and a 7-day forecast in a single API call
 - Full-screen animated weather background (rain, snow, fog, clouds, haze, sleet, hail, thunder, freezing rain, and more — 26 conditions in all) driven entirely by real data: WMO code, cloud cover %, visibility, air quality, wind speed, and active NWS alerts. Visible in the hero and in the gaps around cards, which stay fully opaque for legibility.
 - Rain and snow are tracked and shown as genuinely distinct hazards — separate real amounts (not a single ambiguous "precipitation" figure), distinct units where they actually differ (snowfall is cm/in, not mm/in), and the AI assistant and quick-suggestion advice (umbrella, driving, hiking, etc.) all correctly distinguish "it's snowing" from "it's raining" rather than treating a generic precipitation-chance percentage as if it always meant rain
-- Official National Weather Service advisories (severe warnings, watches, air quality alerts — US locations only), no API key, shown with severity-colored cards and full detail sheets
+- Official National Weather Service advisories (severe warnings, watches, air quality alerts — US locations only), no API key, shown as a compact severity-colored strip with full detail sheets
+- Optional background notifications (both off by default): severe-alert start/end notifications and an ongoing current-conditions notification, checked roughly every 30 minutes for the device's current location — on `main`, not yet in a Production release
+- Today's high/low tide times for US coastal locations (NOAA CO-OPS, no API key)
 - Home-screen widget with size-aware layouts, chrono-dynamic content (morning/daytime/night), and Material You dynamic colors
 - Automatic location via FusedLocationProvider + on-device reverse geocoding
 - Pull-to-refresh, plus quiet auto-refresh on resume and every 30 minutes
@@ -38,16 +40,20 @@ for non-commercial use.
 The chat icon (top-right of the weather screen) opens an assistant. The quick
 suggestion chips (umbrella, jacket, walk/jog, driving, hiking, what to wear) are
 answered instantly on-device from the current forecast — no key, no network. For
-free-form typed questions it uses **OpenRouter**, configured entirely by the
-developer (the user never sees or enters a key):
+free-form typed questions it uses **OpenRouter**. A build can ship with a
+developer key (below), and a user can also enter their own key and model in
+Settings, which takes precedence. To build with a key:
 
 1. Create a free key at https://openrouter.ai/keys.
 2. Add it to `local.properties` (never committed): `OPENROUTER_API_KEY=...`
 3. Optionally set `OPENROUTER_MODEL` there too (default: a free Gemma route).
    Free model IDs rotate — see https://openrouter.ai/models (filter: Free).
 
-Both values are read at build time via `BuildConfig`. If no key is set, the
-suggestion chips still work; only typed questions are disabled.
+Both values are read at build time via `BuildConfig`. If no key is set at build
+time or in Settings, the suggestion chips still work; only typed questions are
+disabled. A build-time key is embedded in the APK and can be extracted, so give
+it a spending limit on the OpenRouter side — the in-app daily cap and model
+lock only restrain the app itself.
 
 ## Data source & attribution
 Weather data is provided by Open-Meteo (https://open-meteo.com) under the
@@ -57,28 +63,30 @@ far beyond personal needs; this app also caches results for 30 minutes in memory
 
 Weather advisories are provided by the National Weather Service
 (https://api.weather.gov), a free public U.S. government API — no key, no
-attribution requirement (public domain), US locations only.
+attribution requirement (public domain), US locations only. Tide predictions
+come from NOAA CO-OPS (https://api.tidesandcurrents.noaa.gov) on the same terms.
 
 ## Project structure
 ```
 app/src/main/java/com/example/weatherly/
 ├─ MainActivity.kt           # shares WeatherViewModel across Weather/Chat/Settings screens
 ├─ data/
-│  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models, NWS alert models
-│  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter, NWS) + network module
-│  ├─ repository/   # WeatherRepository + ChatRepository (weather-aware prompts)
+│  ├─ model/        # Open-Meteo models, WeatherData domain model, chat models, NWS alert + tide models
+│  ├─ remote/       # Retrofit interfaces (OpenMeteo, OpenRouter, NWS, NOAA tides) + network module
+│  ├─ repository/   # WeatherRepository, ChatRepository (weather-aware prompts), AlertTracker
 │  ├─ advice/       # WeatherAdvisor — local, no-network rule-based advice (umbrella, driving, etc.)
 │  └─ prefs/        # unit/place selection, on-device OpenRouter key/model, forecast cache
 ├─ location/        # FusedLocationProvider wrapper
+├─ notifications/   # WorkManager background check + alert/status notifications
 ├─ ui/
 │  ├─ WeatherViewModel.kt / WeatherScreen.kt   # pull-to-refresh + chat/settings entry
 │  ├─ ChatViewModel.kt / ChatScreen.kt         # AI assistant
-│  ├─ SettingsViewModel.kt / SettingsScreen.kt # theme, units, OpenRouter key/model
+│  ├─ SettingsViewModel.kt / SettingsScreen.kt # theme, units, notifications, OpenRouter key/model
 │  ├─ Previews.kt   # @Preview composables with sample data
 │  ├─ components/   # Header, hourly row, daily list, metric tiles, attribution, WeatherBackground
 │  └─ theme/        # Colors, type, Material 3 theme
 ├─ widget/          # Jetpack Glance home-screen widget
-└─ util/            # WMO weather-code -> emoji + text, moon-phase calculator
+└─ util/            # WMO weather-code text, moon phase, tide stations, haptics, local time
 ```
 
 See `CLAUDE.md` for full architecture details.

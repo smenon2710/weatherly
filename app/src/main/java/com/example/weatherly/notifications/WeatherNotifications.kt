@@ -57,7 +57,7 @@ object WeatherNotificationChannels {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(SEVERE_ALERTS, "Severe weather alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "New severe or extreme National Weather Service advisories for your saved location."
+                description = "New severe or extreme National Weather Service advisories for your current location."
             }
         )
         manager.createNotificationChannel(
@@ -70,7 +70,7 @@ object WeatherNotificationChannels {
         // user roughly every 30 minutes, which is the opposite of "ambient".
         manager.createNotificationChannel(
             NotificationChannel(WEATHER_STATUS, "Weather status", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "An ongoing notification showing current conditions for your saved location, updated periodically."
+                description = "An ongoing notification showing current conditions for your current location, updated periodically."
                 setShowBadge(false)
             }
         )
@@ -78,7 +78,7 @@ object WeatherNotificationChannels {
 }
 
 /**
- * Posts the two notification types [WeatherAlertWorker] can trigger. Both quietly no-op if
+ * Posts the three notification types [WeatherAlertWorker] can trigger. All quietly no-op if
  * `POST_NOTIFICATIONS` isn't granted (API 33+ only — see
  * `PreferencesStore.getAlertNotificationsEnabled`'s doc comment) rather than crashing; the
  * Settings toggle is what actually requests the permission, so a denial here just means the

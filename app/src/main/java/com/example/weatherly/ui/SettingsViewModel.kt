@@ -82,9 +82,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Master toggle for WeatherAlertWorker's background severe-alert/alert-resolved
-     * notifications (see NOTIFICATIONS_ROADMAP.md). SettingsScreen is responsible for requesting
-     * POST_NOTIFICATIONS first on API 33+ and only calling this once granted — this method just
-     * persists the choice and starts/stops the periodic WorkManager job to match.
+     * notifications (see NOTIFICATIONS_ROADMAP.md). Called as soon as the toggle is tapped, not
+     * gated on any permission result — SettingsScreen starts the permission steps separately —
+     * so this just persists the choice and starts/stops the periodic WorkManager job to match.
      */
     private val _alertNotificationsEnabled = MutableStateFlow(prefs.getAlertNotificationsEnabled())
     val alertNotificationsEnabled: StateFlow<Boolean> = _alertNotificationsEnabled.asStateFlow()

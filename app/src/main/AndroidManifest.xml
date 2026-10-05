@@ -6,11 +6,11 @@
     <!-- Location: COARSE is enough for city-level weather. FINE is optional. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Optional, user-granted separately from the two above (Settings → Background Location):
-         lets WeatherAlertWorker resolve the device's live location when no place is explicitly
-         selected, instead of only working for a saved place. Sideload-testing only for now — see
-         NOTIFICATIONS_ROADMAP.md for the Play Console "background location" review this would
-         need before ever shipping to Production. -->
+    <!-- Optional, user-granted separately from the two above, and only requested once the user
+         turns on one of the two notification features in Settings: WeatherAlertWorker always
+         checks the device's live location (no saved-place fallback), so those features do nothing
+         without it. Needs Play Console's Background Location declaration before shipping to
+         Production — see PLAYSTORE_LAUNCH.md. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Normal permission (no runtime prompt) that unlocks ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
          — a direct, one-tap system dialog asking the user to exempt this app from Doze/App

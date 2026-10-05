@@ -11,7 +11,7 @@
 | Google Play Console registration | **$25 one-time** |
 | Open-Meteo (weather data) | **Free** — non-commercial only (see Monetization section) |
 | Privacy policy hosting (GitHub Pages) | **Free** |
-| OpenRouter API | **Free tier** — user-provided key, costs you $0 |
+| OpenRouter API | **Free model on a shared build-time key** — $0 while calls stay on a free model; see "AI Assistant Cost & the Build-Time Key" below |
 | Backend / server | **None needed** — pure client app |
 
 **Minimum to ship: $25.**
@@ -283,20 +283,26 @@ Replace Open-Meteo with a weather API that permits commercial use on a free tier
 
 ---
 
-## Zero-Cost AI Assistant
+## AI Assistant Cost & the Build-Time Key
 
-- **Quick-suggest chips** (jacket, umbrella, etc.) run entirely locally via `WeatherAdvisor.kt` — cost $0.
-- **Free-form chat** uses the user's own OpenRouter key stored on-device. You bear no token costs.
-- Keep this design as-is — it's the right model for a solo app.
+*(Rewritten 2026-10-05. This section used to say free-form chat ran only on a user-supplied key
+and that the build-time key was empty — neither matches how the app is built and described now.)*
 
----
-
-## Security Reminder — OpenRouter API Key
-
-`OPENROUTER_API_KEY` is injected into `BuildConfig` at build time. APKs can be decompiled.
-
-- The current default is empty — users supply their own key at runtime. This is safe.
-- Never put a real production key in `local.properties` before a release build.
+- **Quick-suggest chips** (jacket, umbrella, etc.), and typed questions that match one of them,
+  run entirely locally via `WeatherAdvisor.kt` — cost $0.
+- **Free-form chat** uses the user's own OpenRouter key if they entered one in Settings;
+  otherwise it falls back to `BuildConfig.OPENROUTER_API_KEY`, i.e. whatever
+  `OPENROUTER_API_KEY` was in `local.properties` when the build was made. Settings tells users
+  without their own key that they are "Using the app's built-in key", and `CLAUDE.md` treats that
+  shared key as the normal case.
+- **What protects the shared key inside the app:** a 20-message daily cap, the off-topic
+  pre-filter, and the model lock (a model override only applies once the user has their own key).
+  All three are client-side.
+- **What they don't cover:** the key is a string in the APK and can be extracted by decompiling
+  it; anyone who does that can call OpenRouter directly, past every in-app limit. The only real
+  control is on OpenRouter's side — give the key used for release builds a hard credit limit (or
+  no credits at all, so it can only ever reach free models), and rotate it if usage looks wrong.
+  Check this before each release build rather than assuming it is still set.
 
 ---
 

@@ -26,8 +26,8 @@ import com.example.weatherly.location.LocationProvider
  * `ACCESS_BACKGROUND_LOCATION` (Settings → Background Location) — without it, this worker simply
  * has no location to check and both notification features silently do nothing, since there's no
  * selected-place fallback anymore. This permission needs its own "Allow all the time" system flow
- * and, if this ever ships to Production, a Play Console background-location policy declaration
- * this app has never needed before — sideload-testing only for now.
+ * and a Play Console background-location policy declaration before it can ship to Production —
+ * see PLAYSTORE_LAUNCH.md's "Shipping the Notifications Feature to Production" section.
  *
  * Uses its own [PreferencesStore.getBackgroundTrackedAlerts] slot rather than the foreground's
  * [PreferencesStore.getTrackedAlerts] — see that method's doc comment for why sharing one would
