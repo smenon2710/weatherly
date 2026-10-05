@@ -489,7 +489,20 @@ justify).
   in logcat; nothing was checked visually (the screen capture came back black — phone likely
   locked). Notification, fine-location and background-location permissions were already granted
   on this phone from the earlier testing.
-- [ ] **Still to check by hand on the phone before upload:** a current-location forecast loads;
+- [x] **Re-verified 2026-10-05 on commit `d83ee1f`** (adds the Forecast Insight briefing — see
+  `CLAUDE.md`; supersedes the `aa8540c` artifacts above. **Itself superseded the same day:** the
+  next commit reworked the briefing's "Looking ahead" section, so rebuild and re-run these checks
+  from the current `main` before uploading). Same clean
+  build and checks: `test` 51/51 (`WeatherAdvisorTest` 38, `AlertTrackerTest` 5,
+  `ForecastBriefingTest` 8), `lint` 54 warnings / no errors, `bundleRelease` + `assembleRelease`
+  `BUILD SUCCESSFUL`, `jarsigner -verify` → `jar verified`, `apksigner verify` → verifies (v2,
+  same keystore SHA-256), `aapt2` → `versionCode='16' versionName='1.0.15'`, targetSdk 36,
+  `WeatherAlertWorker` kept by R8, briefing and disclosure text present in the dex. Installed on
+  the Pixel 9 Pro in place and launched with no crash in logcat. **No visual check of this
+  build anywhere:** the phone was locked, and the emulator's system process hung before the
+  sheet could be opened — no emulator sanity pass was completed for `d83ee1f`.
+- [ ] **Still to check by hand on the phone before upload:** the Forecast Insight sheet's new
+  sections read well and fit (tap the hero pill); a current-location forecast loads;
   the Weather Status notification posts/updates with the app closed; the battery-optimization
   dialog appears at most once; and — after revoking location to "While using" in system
   Settings — the Weather-screen reminder shows the new disclosure text and leads to "Allow all

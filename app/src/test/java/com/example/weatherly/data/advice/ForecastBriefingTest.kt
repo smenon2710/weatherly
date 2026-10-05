@@ -3,8 +3,10 @@ package com.example.weatherly.data.advice
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
 import com.example.weatherly.data.model.HourEntry
+import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
+import com.example.weatherly.data.model.WeatherTip
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -15,10 +17,14 @@ class ForecastBriefingTest {
     private fun hour(label: String, temp: Int, code: Int = 0, pop: Int = 0) =
         HourEntry(label, temp, code, isDay = true, precipChance = pop)
 
-    private fun day(label: String, code: Int, low: Int, high: Int, pop: Int) = DayEntry(
+    private fun day(
+        label: String, code: Int, low: Int, high: Int, pop: Int,
+        wind: Int? = null, tips: List<WeatherTip> = emptyList(), feels: List<Int> = emptyList()
+    ) = DayEntry(
         dayLabel = label, fullDateLabel = label, highC = high, lowC = low, icon = code,
         phrase = null, sunrise = null, sunset = null, uvMax = null, precipProbMax = pop,
-        windMaxKmh = null, precipSumMm = null
+        windMaxKmh = wind, precipSumMm = null, tips = tips,
+        dayHourly = feels.map { HourEntry("1 PM", it, code, isDay = true, precipChance = pop, feelsLikeC = it) }
     )
 
     private fun weather(
@@ -135,7 +141,7 @@ class ForecastBriefingTest {
         assertTrue(text, text.startsWith("An Air Quality Alert is in effect until 8:00 PM."))
     }
 
-    @Test fun `looking ahead covers tomorrow and the wettest later day`() {
+    @Test fun `looking ahead compares tomorrow with today and names the wettest later day`() {
         val text = section(
             weather(
                 daily = listOf(
@@ -146,8 +152,50 @@ class ForecastBriefingTest {
             "Looking ahead"
         )
         assertEquals(
-            "Tomorrow looks overcast, ranging from 14° to 22°, with a 40% chance of precipitation. " +
+            "Tomorrow looks overcast, ranging from 14° to 22°, with a 40% chance of rain. " +
+                "That's about 3° cooler than today. Rain is more likely than today. " +
                 "After that, Wed looks like the wettest day (82%).",
+            text
+        )
+    }
+
+    @Test fun `looking ahead - warmer, muggier, windier, with tomorrow's tip`() {
+        val tip = WeatherTip("💧", "Hot conditions — stay hydrated, carry water, and take breaks in the shade.", TipTone.HOT)
+        val text = section(
+            weather(
+                daily = listOf(
+                    day("Today", 0, 18, 26, 0, wind = 12),
+                    day("Tue", 1, 19, 31, 5, wind = 35, tips = listOf(tip), feels = listOf(30, 36))
+                )
+            ),
+            "Looking ahead"
+        )
+        assertEquals(
+            "Tomorrow looks clear, ranging from 19° to 31°. That's about 5° warmer than today. " +
+                "It will feel muggier than the numbers suggest — closer to 36° at the peak. " +
+                "It will be noticeably windier than today, with winds up to 35 km/h. " +
+                "Hot conditions — stay hydrated, carry water, and take breaks in the shade.",
+            text
+        )
+    }
+
+    @Test fun `looking ahead - an unremarkable tomorrow stays short`() {
+        val neutral = WeatherTip("🌤️", "No major weather concerns for this day.", TipTone.NEUTRAL)
+        val text = section(
+            weather(daily = listOf(day("Today", 2, 15, 22, 10, wind = 10), day("Tue", 2, 15, 23, 10, wind = 12, tips = listOf(neutral)))),
+            "Looking ahead"
+        )
+        assertEquals("Tomorrow looks partly cloudy, ranging from 15° to 23°. Temperatures will be much the same as today.", text)
+    }
+
+    @Test fun `looking ahead - drier and colder nights`() {
+        val text = section(
+            weather(daily = listOf(day("Today", 63, 10, 16, 80), day("Tue", 3, 5, 16, 20))),
+            "Looking ahead"
+        )
+        assertEquals(
+            "Tomorrow looks overcast, ranging from 5° to 16°, with a 20% chance of rain. " +
+                "Daytime will be much like today, but the night turns about 5° colder. It should be drier than today.",
             text
         )
     }

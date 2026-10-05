@@ -1,6 +1,7 @@
 package com.example.weatherly.data.advice
 
 import com.example.weatherly.data.model.HourEntry
+import com.example.weatherly.data.model.TipTone
 import com.example.weatherly.data.model.WeatherData
 import java.util.Locale
 
@@ -131,14 +132,74 @@ object ForecastBriefing {
         return parts.joinToString(" ")
     }
 
+    /**
+     * Tomorrow, read against today rather than as a standalone set of figures — warmer or
+     * cooler, wetter or drier, windier or calmer, and whether it will feel different from what
+     * the thermometer says — followed by the day's own practical tip. User-requested: the
+     * "3° warmer than yesterday" line in the Temperature section was the part that landed, and
+     * the same kind of comparison was wanted here. Each comparison only appears when the
+     * difference is big enough to notice, so an unremarkable tomorrow stays short.
+     */
     private fun ahead(w: WeatherData): String? {
+        val today = w.daily.firstOrNull() ?: return null
         val tomorrow = w.daily.getOrNull(1) ?: return null
         val look = Sky.of(tomorrow.icon)?.day ?: return null
+        val metric = w.windUnit == "km/h"
         val pop = tomorrow.precipProbMax ?: 0
+        val kind = if ((tomorrow.snowfallSum ?: 0.0) > 0 || isSnow(tomorrow.icon)) "snow" else "rain"
         val parts = mutableListOf(
             "Tomorrow looks $look, ranging from ${tomorrow.lowC}° to ${tomorrow.highC}°" +
-                (if (pop >= 20) ", with a $pop% chance of precipitation." else ".")
+                (if (pop >= 20) ", with a $pop% chance of $kind." else ".")
         )
+
+        // Temperature against today — by daytime high first, falling back to the overnight low
+        // when the days match but the nights don't.
+        val tempGap = if (metric) 2 else 3
+        val highDiff = tomorrow.highC - today.highC
+        val lowDiff = tomorrow.lowC - today.lowC
+        parts += when {
+            highDiff >= tempGap -> "That's about $highDiff° warmer than today."
+            highDiff <= -tempGap -> "That's about ${-highDiff}° cooler than today."
+            lowDiff >= tempGap -> "Daytime will be much like today, but the night stays about $lowDiff° milder."
+            lowDiff <= -tempGap -> "Daytime will be much like today, but the night turns about ${-lowDiff}° colder."
+            else -> "Temperatures will be much the same as today."
+        }
+
+        // Whether it will feel different from the thermometer (humidity or wind chill), from
+        // tomorrow's own hourly feels-like — there's no per-day humidity figure to compare.
+        val feelsGap = if (metric) 3 else 5
+        val feelsMax = tomorrow.dayHourly.maxOfOrNull { it.feelsLikeC }
+        val feelsMin = tomorrow.dayHourly.minOfOrNull { it.feelsLikeC }
+        if (feelsMax != null && feelsMax - tomorrow.highC >= feelsGap) {
+            parts += "It will feel muggier than the numbers suggest — closer to $feelsMax° at the peak."
+        } else if (feelsMin != null && tomorrow.lowC - feelsMin >= feelsGap) {
+            parts += "It will feel colder than the numbers suggest — closer to $feelsMin° at its coldest."
+        }
+
+        val popToday = today.precipProbMax ?: 0
+        if (pop >= 30 && pop - popToday >= 20) {
+            parts += "${kind.replaceFirstChar { it.uppercase() }} is more likely than today."
+        } else if (popToday >= 30 && popToday - pop >= 20) {
+            parts += "It should be drier than today."
+        }
+
+        val windTomorrow = tomorrow.windMaxKmh
+        val windToday = today.windMaxKmh
+        if (windTomorrow != null && windToday != null) {
+            val windGap = if (metric) 15 else 10
+            val breezy = if (metric) 30 else 20
+            if (windTomorrow - windToday >= windGap && windTomorrow >= breezy) {
+                parts += "It will be noticeably windier than today, with winds up to $windTomorrow ${w.windUnit}."
+            } else if (windToday - windTomorrow >= windGap && windToday >= breezy) {
+                parts += "Winds ease off compared with today."
+            }
+        }
+
+        // The day's own practical advice (WeatherRepository.buildDayOutlookTips), skipping the
+        // "nothing to plan around" fillers.
+        tomorrow.tips.firstOrNull { it.tone != TipTone.NEUTRAL && it.tone != TipTone.NICE }
+            ?.let { parts += it.text }
+
         val wettest = w.daily.drop(2).maxByOrNull { it.precipProbMax ?: 0 }
         val wettestPop = wettest?.precipProbMax ?: 0
         if (wettest != null && wettestPop >= 50) {
