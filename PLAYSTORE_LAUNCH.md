@@ -99,6 +99,12 @@ name individual third-party recipients (Open-Meteo, NWS) — it only captures da
 purpose, so checking "Shared: Yes, App functionality" for Location is the complete disclosure
 Console requires; the specific recipient names live in `docs/privacy.html` instead.
 
+**Confirmed 2026-10-05:** the developer stepped through the live Data Safety form and found no
+"background" option for location, so nothing was changed there — the existing Location answers
+(collected, shared, optional, App functionality) stand, and the background detail lives in the
+Location permissions declaration and `docs/privacy.html`. The paragraph below is kept as the
+earlier open question.
+
 **On whether the Data Safety form itself has a distinct "background" checkbox:** not confirmed —
 unlike everything else in this section (checked against the live form as of the last
 submission), this specific point hasn't been verified against the *current* Play Console UI,
@@ -207,7 +213,7 @@ PRIVACY BY DESIGN
 • No ads, no ad SDK, no tracking for advertising purposes
 • No analytics or crash-reporting SDKs
 • Your location is used only to fetch your forecast, plus — only if you turn on the optional notification features above — periodically in the background to keep them up to date. Never sold or shared for marketing, either way
-• Full privacy policy available in-app and on our website
+• Full privacy policy available on our website
 
 ABOUT THE DATA
 Forecasts come from Open-Meteo, a free and open weather data provider, attributed at the bottom of the weather screen. Weather advisories come from the National Weather Service, the official U.S. government forecasting agency.
@@ -217,7 +223,9 @@ SkySpeak is free to use with no paywalled features. If you find it useful, an op
 Whether you're deciding what to wear this morning or planning a weekend outdoors, SkySpeak gives you the forecast and the judgment to go with it.
 ```
 
-*(Character count re-verified 2026-09-09: 2569/4000 — safe to paste directly into Play Console.)*
+*(Character count re-verified 2026-10-05: 2558/4000. The privacy-policy line was changed that day from
+"available in-app and on our website" to "available on our website": the app has no in-app link to
+the policy. This text is what was pasted into Play Console on 2026-10-05.)*
 
 **Category:** Weather
 
@@ -538,6 +546,27 @@ justify).
   status notification posted ~15 seconds later; the disclosure dialog appeared on toggle-on; no
   reminder or grant button appeared with both toggles off; turning a toggle off removed the
   ongoing notification.
+- [x] **versionCode 16 / 1.0.15 (`f280b5f`) uploaded to Internal Testing and rolled out,
+  2026-10-05 12:01** — Console shows "Available to internal testers". Only message at upload:
+  the usual non-blocking "contains native code, no debug symbols" warning
+  (`libandroidx.graphics.path.so`, from Compose — same as versionCode 12 onward). Console did
+  **not** raise the background-location or battery-optimization permissions at this stage.
+- [x] **Location permissions declaration filled in, 2026-10-05.** It appeared under App content →
+  "Need attention" once the Internal Testing release was live. Console now lists it under
+  "Actioned" as **"Ready to send for review"** — i.e. saved but not yet submitted — covering
+  `ACCESS_BACKGROUND_LOCATION`, `ACCESS_COARSE_LOCATION` and `ACCESS_FINE_LOCATION`. Answers
+  used: app purpose (weather app: conditions, forecast, NWS alerts for the user's location);
+  feature needing background location (Alert Notifications, opt-in, ~30-minute on-device check
+  with the app closed, no server, in-app disclosure first; also updates the optional status
+  notification); and the screencast link.
+- [x] **Data Safety form reviewed in Console, 2026-10-05** — no background option exists; no
+  change needed (see section 4).
+- [x] **Store description pasted into Console's Main store listing, 2026-10-05** — the draft above,
+  with the privacy-policy line corrected.
+- [x] **Declaration and listing changes sent for review, 2026-10-05** (developer-reported, via
+  Publishing overview). Awaiting Google's result — the location declaration review is separate
+  from release review and has historically taken from a few days to 2+ weeks; the outcome is
+  emailed to the account owner.
 - [x] **Declaration screencast recorded and uploaded, 2026-10-05.** 60 s, recorded on the
   Pixel 9 Pro on the `5142dc6` build — before the immediate-check fix, so it enables a second
   toggle after granting to trigger the notification; still an accurate depiction of the flow.
