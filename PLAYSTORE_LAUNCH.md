@@ -521,6 +521,23 @@ justify).
   (Franklin Township, NJ). The hand check below was done on `6a25d2e`, not this
   build; the one changed behaviour (off → on again does not announce stale "ended" alerts) has
   not been exercised on a device.
+- [x] **Re-verified 2026-10-05 on commit `f280b5f`** (adds: an immediate background check as
+  soon as background location is granted, and system Back from Settings returning to the weather
+  screen instead of closing the app) — **this is the current build to upload**, superseding the
+  `5142dc6` entry below. Same clean build and checks: `test` 54/54, `lint` 54 warnings / no
+  errors, `bundleRelease` + `assembleRelease` `BUILD SUCCESSFUL`, `jarsigner -verify` →
+  `jar verified`, `apksigner verify` → verifies (v2, same keystore SHA-256), `aapt2` →
+  `versionCode='16' versionName='1.0.15'`, targetSdk 36, `WeatherAlertWorker` kept by R8.
+  Installed on the Pixel 9 Pro in place: launched with no crash, Back from Settings returned to
+  the weather screen. The two fixes were exercised over adb on the same phone just before, on a
+  release build of the same source: granting "Allow all the time" from the Weather-screen
+  reminder and from Settings (one toggle only) each started a worker run at once, with the
+  status notification posted ~15 seconds later; the disclosure dialog appeared on toggle-on; no
+  reminder or grant button appeared with both toggles off; turning a toggle off removed the
+  ongoing notification.
+- [x] **Declaration screencast recorded 2026-10-05** (60 s, saved outside the repo), on the
+  `5142dc6` build — before the immediate-check fix, so it enables a second toggle after granting
+  to trigger the notification. Still an accurate depiction of the flow.
 - [x] **Hand-checked on the Pixel 9 Pro by the developer, 2026-10-05, on the `6a25d2e` release
   build** — reported good, covering the five checks asked for: the Forecast Insight sheet's new
   sections (including "Looking ahead") read well and fit; a current-location forecast loads; the
