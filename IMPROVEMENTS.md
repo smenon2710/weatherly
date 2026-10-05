@@ -1684,3 +1684,31 @@ Follow-up to the fixes above, same session: the deferred "empty space" item. Use
 **How consistency is guaranteed, not just tested for:** `WeatherRepository`'s existing inline hourly-mapping lambda was extracted into a named function, `hourEntryAt(i: Int): HourEntry`. Both the main screen's `hourly` list and every day's new `dayHourly` slice call this exact same function against indices into the exact same raw Open-Meteo arrays — `hourly = window.map { hourEntryAt(it) }`, `dayHourly = hourTimes.indices.filter { hourTimes[it].startsWith(dayDate) }.map { hourEntryAt(it) }`. There is structurally no way for the two to disagree on a shared hour, since there's only one computation, not two that happen to currently produce the same answer. The visual side got the same treatment: the per-hour glyph/temp/precip% column, previously inlined directly in `HourlyCard`'s `LazyRow`, was extracted into a shared private `HourColumn` composable used by both `HourlyCard` and the new `DayHourlyStrip` — so a shared hour isn't just numerically identical between the two views, it's pixel-identical.
 
 **Verified live on-device with a direct side-by-side comparison** (not just "looks plausible"): screenshotted the main screen's "Next 24 Hours" card, then opened Today's expanded detail and scrolled its new hourly strip to the same hours. Every one of 5 compared hours (Now, 8 PM, 9 PM, 10 PM, 11 PM) matched exactly — temperature, precipitation chance, weather icon, and the "Now" bold-highlighting all identical between the two views. `assembleDebug`, `test` (38/38), and `lint` all green.
+
+---
+
+## Completed — Pre-Submission Review, Notification Fixes, Forecast Insight Briefing (2026-10-05)
+
+A full read of the docs and most of the code ahead of the versionCode 16 submission. Notification
+fixes are itemised in `NOTIFICATIONS_ROADMAP.md`'s "v1.6" section; the rest:
+
+| Item | What changed |
+|---|---|
+| Forecast Insight sheet | User-reported that the sheet repeated the pill. Added `ForecastBriefing` (`data/advice/`): plain-language paragraphs for temperature, sky, precipitation, active alerts and "Looking ahead", generated locally from the loaded forecast (no LLM, works on cached data). "Looking ahead" compares tomorrow with today — warmer/cooler, muggier or colder than the numbers suggest (from tomorrow's hourly feels-like; there is no per-day humidity field), rain more or less likely, windier or calmer — then tomorrow's own practical tip. Covered by `ForecastBriefingTest`. |
+| Non-English device locales | `formatHour()`/`clock()` used the device locale, but their output is read back by code (the `"12 AM"` day-boundary checks, `parseTimeHour()`'s AM/PM parsing). On other locales the chart day marker vanished, today's rain-chance correction widened to 24 hours, and the sun arc misread PM times. Both now format with `Locale.US`. |
+| Back in Settings | System Back closed the app from Settings (screens are swapped with `AnimatedContent`, not a back stack). Added a `BackHandler`, as `ChatScreen` already had. |
+| Stale docs and comments | Manifest, worker, widget, view-model and repository comments; `CLAUDE.md` (tests exist; the day sheet is gone); `README.md`; `NOTIFICATIONS_ROADMAP.md` header; `PLAYSTORE_LAUNCH.md`'s AI-key section, which had said the build-time key was empty. |
+| Store description | The line "Full privacy policy available in-app and on our website" was not true — the app has no in-app link. Changed to "available on our website" in the draft and in Console. |
+| Build tooling | AGP 9.4.0 → 9.4.1. |
+
+Unit tests went from 38 to 54 (`AlertTrackerTest` 5, `ForecastBriefingTest` 11).
+
+**Open, found during the review and not addressed:**
+- The OpenRouter key ships inside the APK; in-app limits don't stop someone who extracts it. Mitigated on OpenRouter's side with a $2 credit limit (developer-reported), not in code.
+- No in-app link to the privacy policy. Google tends to expect one for apps using background location; adding it would go out as versionCode 17.
+- `WeatherViewModel.load()` doesn't cancel an in-flight load, so two quick place changes can let the older result land last.
+- "Now" in the hourly strip is the next full hour's forecast (the first hourly slot at or after the current 15-minute timestamp), not the current hour's.
+- The home-screen widget resolves location from the background; without "Allow all the time" its scheduled refreshes probably fall back to the cached forecast. Not verified.
+- NOAA CO-OPS (tides) is contacted with a station id but isn't listed in the privacy policy's third parties.
+- `android:allowBackup="true"` means app preferences, including a user-entered OpenRouter key, can be included in device backups, while the privacy policy says uninstalling removes all data.
+- Not read in this pass: most of `WeatherComponents.kt`, `WeatherBackground.kt`, `WeatherGlyph.kt`, `ChatScreen.kt`, and the layout half of `WeatherWidget.kt`.

@@ -373,3 +373,46 @@ Two more real-device-reported issues, same day:
   Background Location isn't granted" and offers a direct "Grant Access" button. Re-checking every
   resume (not just once per session) also catches a user who revokes the permission later via
   system Settings, not just first-time setup.
+
+## v1.6 — review fixes before submission (2026-10-05)
+
+A read-through of the feature ahead of the Play submission found several problems; all fixed the
+same day, unit-tested where the logic is pure, and exercised on the Pixel 9 Pro in a release build.
+
+- **False "ended" notifications on every NWS update.** `AlertTracker` matched alerts by NWS id
+  only, but NWS issues each update to an in-effect alert under a new id (checked live: 46 of 46
+  active severe/extreme "Update" messages carried an id different from the one they superseded).
+  An updated warning was therefore reported as "ended" plus a brand-new alert. Alerts now count
+  as the same if either the id or the event name matches. This also fixed the in-app "has ended"
+  card, which shares the diff. Trade-off: a second, separate alert of the same event type
+  arriving while the first is active isn't announced as new. Covered by `AlertTrackerTest`.
+- **"Ended" notifications for alerts never announced.** The worker filtered new alerts to
+  severe/extreme but not resolved ones. It now filters before tracking, so only severe/extreme
+  alerts are tracked in the background at all.
+- **Browsing another city re-notified everything.** `WeatherViewModel.resetAlertTracking()`
+  still cleared the background slot — a leftover from v1.0–1.3, when the worker tracked the
+  selected place. It now clears only the foreground slot.
+- **Notification ids follow the event, not the NWS id**, so the "ended" notification still
+  replaces the alert it closes out after an update.
+- **Turning Alert Notifications off clears the background tracked list**, so re-enabling days
+  later doesn't announce long-gone alerts as "ended".
+- **The opt-in flow now matches the privacy policy and the Play declaration.** Turning a toggle
+  on chains the notification prompt → an in-app prominent disclosure ("SkySpeak collects location
+  data to enable … even when the app is closed or not in use") → the system "Allow all the time"
+  request, asking for foreground location first if it was never granted. The Settings "Allow
+  background location" button uses the same disclosure and only appears while a toggle is on.
+  Before this, the toggle requested notification permission only.
+- **Immediate check on grant.** The run triggered by switching a toggle on happens before
+  background location is granted and does nothing; the next was ~30 minutes away. Granting from
+  Settings or from the Weather-screen reminder now reschedules, which runs at once (observed:
+  worker start immediately, notification posted ~15 s later). A grant made directly in system
+  Settings while the app sits on the Weather screen still waits for the next cycle.
+- **Battery-optimization dialog is asked once.** It used to reappear on every return to the
+  Weather screen; any answer is now remembered. The Settings card remains.
+- **Channel descriptions** say "current location", not "saved location".
+
+**Submission status:** versionCode 16 is on Internal Testing and the Location permissions
+declaration is in Google's review as of 2026-10-05 — see `PLAYSTORE_LAUNCH.md`.
+
+**Still open:** real non-Pixel device testing; a live severe alert observed end to end
+(announce, update without a false "ended", end); the never-granted-foreground-location path.
