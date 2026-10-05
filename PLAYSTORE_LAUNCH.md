@@ -466,11 +466,39 @@ justify).
   correctly), Settings → About confirmed "Version 1.0.15" in the running app, and the
   WeatherAlertWorker → SUCCESS → posted-notification chain reconfirmed end to end on this exact
   build via `dumpsys`.
-- [ ] Full standard release verification, same bar as every prior release in this doc:
-  `assembleDebug`/`lint`/`test` all `BUILD SUCCESSFUL`, `jarsigner -verify` on the AAB,
-  `apksigner verify` on the APK, `aapt2 dump badging` confirming the version strings landed.
-- [ ] Confirm the manifest's `POST_NOTIFICATIONS` and `ACCESS_BACKGROUND_LOCATION` entries are
-  correctly scoped (they are, per this session's build — but worth a final read before shipping).
+- [x] **Full standard release verification — done 2026-10-05, on commit `aa8540c`** (AGP 9.4.1;
+  includes the alert-tracking fixes, the background-location disclosure flow, the ask-once
+  battery prompt and the `Locale.US` time-label fix made the same day — see `CLAUDE.md`). Clean
+  build: `test` (43/43 — `WeatherAdvisorTest` 38, new `AlertTrackerTest` 5), `lint` (54 warnings,
+  no errors), `bundleRelease` and `assembleRelease` all `BUILD SUCCESSFUL`. `jarsigner -verify` on
+  the AAB → `jar verified` (cert valid to 2053-11-16). `apksigner verify` on the APK → verifies
+  (v2), signer SHA-256 matching `weatherly-release.jks`. `aapt2 dump badging` →
+  `versionCode='16' versionName='1.0.15'`, minSdk 26, targetSdk 36. `WeatherAlertWorker` kept its
+  unmangled name through R8 (checked in the dex and `mapping.txt`).
+- [x] **Sanity install of that release APK on the API 36 emulator, 2026-10-05.** Replaced an old
+  debug build there (signature mismatch). Clean launch with zero app crashes in logcat; city
+  search returned results and a full forecast loaded (Miami); turning Alert Notifications on
+  showed the notification prompt → the in-app "Allow background location?" disclosure → the
+  system page offering "Allow all the time"; after granting, Settings showed "Granted"; the
+  "Allow background location" button was absent while both toggles were off; `WeatherAlertWorker`
+  ran and returned SUCCESS. **Not covered there:** the headless emulator never produced a location
+  fix, so current-location loading and an actually-posted alert/status notification were not
+  exercised.
+- [x] **Same APK installed on the Pixel 9 Pro, 2026-10-05**, as an in-place update over the
+  2026-09-09 release-signed test build (same versionCode, app data kept). Launched with no crash
+  in logcat; nothing was checked visually (the screen capture came back black — phone likely
+  locked). Notification, fine-location and background-location permissions were already granted
+  on this phone from the earlier testing.
+- [ ] **Still to check by hand on the phone before upload:** a current-location forecast loads;
+  the Weather Status notification posts/updates with the app closed; the battery-optimization
+  dialog appears at most once; and — after revoking location to "While using" in system
+  Settings — the Weather-screen reminder shows the new disclosure text and leads to "Allow all
+  the time". The path for a user who never granted ordinary location is untested anywhere.
+- [x] Manifest permissions read against the built APK, 2026-10-05: `POST_NOTIFICATIONS`,
+  `ACCESS_BACKGROUND_LOCATION` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` are present as intended.
+  The merged manifest also carries `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`
+  and `FOREGROUND_SERVICE`, added by WorkManager rather than declared by this app — expect them
+  in Play Console's permission list.
 
 ### Testing gap: this has only ever run on one Pixel
 
