@@ -163,12 +163,19 @@ fun WeatherScreen(
     //    notes in NOTIFICATIONS_ROADMAP.md/PLAYSTORE_LAUNCH.md. Exempting the app materially
     //    improves real-world delivery reliability on those devices.
     // Both checked here (not just in Settings) so they reach a user who never revisits Settings
-    // after first setup. Re-checked on every resume (not gated to once-per-session) since both
-    // states can change outside the app too (the user revoking either via system Settings), and
-    // dismissing only suppresses until the next resume rather than forever, so a still-broken
-    // state keeps surfacing rather than being silenced by one dismissal.
+    // after first setup, and re-checked on every resume since both states can change outside the
+    // app too (the user revoking either via system Settings). They differ in how persistent they
+    // are: MissingLocation keeps coming back until fixed, since the feature is broken without it;
+    // MissingBatteryExemption is offered once and then never again however it's answered (see
+    // PreferencesStore.getBatteryPromptAnswered) — it's optional, and this effect re-fires on
+    // every return from Chat/Settings too, so re-asking read as a nag with no way to say no.
     val context = LocalContext.current
+    val setupPrefs = remember { PreferencesStore(context) }
     var setupPrompt by remember { mutableStateOf(SetupPrompt.None) }
+    val dismissBatteryPrompt = {
+        setupPrefs.setBatteryPromptAnswered()
+        setupPrompt = SetupPrompt.None
+    }
     val backgroundLocationPromptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { setupPrompt = SetupPrompt.None }
@@ -176,14 +183,14 @@ fun WeatherScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { setupPrompt = SetupPrompt.None }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        val prefs = PreferencesStore(context)
+        val prefs = setupPrefs
         val notificationsEnabled = prefs.getAlertNotificationsEnabled() || prefs.getPersistentWeatherEnabled()
         val missingLocation = notificationsEnabled &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=
                 PackageManager.PERMISSION_GRANTED
         val missingBatteryExemption = notificationsEnabled && !missingLocation &&
-            !isIgnoringBatteryOptimizations(context)
+            !prefs.getBatteryPromptAnswered() && !isIgnoringBatteryOptimizations(context)
         setupPrompt = when {
             missingLocation -> SetupPrompt.MissingLocation
             missingBatteryExemption -> SetupPrompt.MissingBatteryExemption
@@ -211,7 +218,7 @@ fun WeatherScreen(
             }
         )
         SetupPrompt.MissingBatteryExemption -> AlertDialog(
-            onDismissRequest = { setupPrompt = SetupPrompt.None },
+            onDismissRequest = dismissBatteryPrompt,
             title = { Text("Improve notification reliability") },
             text = {
                 Text(
@@ -223,11 +230,14 @@ fun WeatherScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
+                    // Counts as answered too: declining in the system dialog that follows is a
+                    // decision, not a reason to ask again.
+                    setupPrefs.setBatteryPromptAnswered()
                     batteryOptimizationPromptLauncher.launch(batteryOptimizationSettingsIntent(context))
                 }) { Text("Allow") }
             },
             dismissButton = {
-                TextButton(onClick = { setupPrompt = SetupPrompt.None }) { Text("Not Now") }
+                TextButton(onClick = dismissBatteryPrompt) { Text("Not Now") }
             }
         )
         SetupPrompt.None -> {}

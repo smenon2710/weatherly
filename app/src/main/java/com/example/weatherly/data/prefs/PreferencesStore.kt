@@ -173,6 +173,17 @@ class PreferencesStore(context: Context) {
         prefs.edit().putBoolean(KEY_PERSISTENT_WEATHER_ENABLED, enabled).apply()
     }
 
+    /** Whether the Weather screen's proactive "exempt SkySpeak from battery optimization" dialog
+     * has already been answered (either button, or dismissed). That exemption is optional, so the
+     * dialog is offered once and not again — Settings → Battery Optimization stays available for
+     * anyone who changes their mind. Unlike the missing-Background-Location dialog, which keeps
+     * reappearing because the notification features can't work at all without it. */
+    fun getBatteryPromptAnswered(): Boolean = prefs.getBoolean(KEY_BATTERY_PROMPT_ANSWERED, false)
+
+    fun setBatteryPromptAnswered() {
+        prefs.edit().putBoolean(KEY_BATTERY_PROMPT_ANSWERED, true).apply()
+    }
+
     // --- Appearance ---------------------------------------------------------
     fun getThemePreference(): ThemePreference =
         prefs.getString(KEY_THEME, null)?.let {
@@ -216,6 +227,7 @@ class PreferencesStore(context: Context) {
         private const val KEY_TRACKED_ALERTS_BG = "tracked_alerts_bg"
         private const val KEY_NOTIFICATIONS_ENABLED = "alert_notifications_enabled"
         private const val KEY_PERSISTENT_WEATHER_ENABLED = "persistent_weather_enabled"
+        private const val KEY_BATTERY_PROMPT_ANSWERED = "battery_prompt_answered"
         private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
         private const val KEY_HAPTICS_ENABLED = "haptics_enabled"
         private const val KEY_LLM_USAGE_DATE = "llm_usage_date"

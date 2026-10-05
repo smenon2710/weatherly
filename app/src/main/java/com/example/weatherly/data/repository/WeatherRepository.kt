@@ -854,8 +854,15 @@ class WeatherRepository(private val context: Context) {
         return dirs[idx]
     }
 
+    // Locale.US, not the device locale, for formatHour() and clock() specifically: their output
+    // isn't only displayed, it's read back by code — the "12 AM" day-boundary checks (above, and
+    // buildMetricTiles' dayChangeIndex) and parseTimeHour()'s AM/PM parsing of sunrise/sunset. In
+    // a device locale that writes those markers differently ("12 a. m.", "午前0時", non-Latin
+    // digits) every one of those silently stopped matching: no "tmrw" marker on the charts,
+    // today's rain-chance correction widening to the full 24 hours, and the sun arc reading a PM
+    // sunset as AM. The rest of the UI is English-only anyway ("Now", "Today", "tmrw").
     private fun formatHour(iso: String) =
-        parse(iso, "yyyy-MM-dd'T'HH:mm")?.let { SimpleDateFormat("h a", Locale.getDefault()).format(it) } ?: "--"
+        parse(iso, "yyyy-MM-dd'T'HH:mm")?.let { SimpleDateFormat("h a", Locale.US).format(it) } ?: "--"
 
     private fun formatDay(iso: String) =
         parse(iso, "yyyy-MM-dd")?.let { SimpleDateFormat("EEE", Locale.getDefault()).format(it) } ?: "--"
@@ -864,7 +871,7 @@ class WeatherRepository(private val context: Context) {
         parse(iso, "yyyy-MM-dd")?.let { SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(it) } ?: "--"
 
     private fun clock(iso: String?) =
-        iso?.let { parse(it, "yyyy-MM-dd'T'HH:mm") }?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(it) }
+        iso?.let { parse(it, "yyyy-MM-dd'T'HH:mm") }?.let { SimpleDateFormat("h:mm a", Locale.US).format(it) }
 
     private fun parse(value: String, pattern: String): java.util.Date? = try {
         SimpleDateFormat(pattern, Locale.US).parse(value)
