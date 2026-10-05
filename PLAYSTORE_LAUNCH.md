@@ -584,6 +584,14 @@ justify).
   gone after "Not Now"; and, after setting location back to "While using the app", the
   Weather-screen reminder shows the new disclosure and leads to "Allow all the time". This is the
   visual check the three build entries above were missing.
+- [x] **versionCode 16 / 1.0.15 promotion to Closed testing - Track_1 started, 2026-10-05**
+  (developer-reported as in progress; completion not confirmed in this file). Same artifact as
+  Internal Testing. The location declaration result was still pending at the time.
+- [ ] **Found by a code read-through the same day, not fixed, present in this build:** a failed
+  NWS request is treated as "no alerts", so the background worker can post a false "\<event\> has
+  ended" notification for an alert still in effect, and then re-announce it. Fix before promoting
+  to Production. See `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)" (R1),
+  which also lists the lower-priority findings (R2–R7) and privacy-policy wording to correct.
 - [ ] **Not tested anywhere:** the path for a user who never granted ordinary location (the
   disclosure's "Continue" should ask for foreground location first, then background). Also not
   yet observed: a real severe-alert notification, and an NWS update arriving without a false

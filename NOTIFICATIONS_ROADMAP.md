@@ -414,5 +414,9 @@ same day, unit-tested where the logic is pure, and exercised on the Pixel 9 Pro 
 **Submission status:** versionCode 16 is on Internal Testing and the Location permissions
 declaration is in Google's review as of 2026-10-05 — see `PLAYSTORE_LAUNCH.md`.
 
+**Known bug, not fixed (found by code read 2026-10-05):** a failed NWS request is treated as "no
+alerts", so the worker can post a false "has ended" notification and then re-announce the alert —
+R1 in `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)".
+
 **Still open:** real non-Pixel device testing; a live severe alert observed end to end
 (announce, update without a false "ended", end); the never-granted-foreground-location path.

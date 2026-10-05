@@ -1712,3 +1712,37 @@ Unit tests went from 38 to 54 (`AlertTrackerTest` 5, `ForecastBriefingTest` 11).
 - NOAA CO-OPS (tides) is contacted with a station id but isn't listed in the privacy policy's third parties.
 - `android:allowBackup="true"` means app preferences, including a user-entered OpenRouter key, can be included in device backups, while the privacy policy says uninstalling removes all data.
 - Not read in this pass: most of `WeatherComponents.kt`, `WeatherBackground.kt`, `WeatherGlyph.kt`, `ChatScreen.kt`, and the layout half of `WeatherWidget.kt`.
+
+---
+
+## Open — Second Read-Through Findings (2026-10-05)
+
+A second pass the same day covering every doc and every Kotlin source file, including the files
+the pass above skipped. **Found by reading the code only — nothing here was reproduced on a
+device, and the build and tests were not run.** None of it is fixed. All of it is present in
+versionCode 16 (`f280b5f`), which was being promoted to Closed Testing (Track_1) when this was
+written.
+
+| # | Issue | Where | Suggested fix |
+|---|---|---|---|
+| R1 | **A failed NWS request produces a false "has ended" alert.** The alerts fetch is wrapped in `runCatching { }.getOrNull()`, so a timeout or 5xx from `api.weather.gov` becomes an empty alert list, indistinguishable from "no alerts". `AlertTracker.diffAndUpdate()` then reports every tracked alert as resolved. In the background worker that posts "\<event\> has ended — This advisory is no longer active" for an alert that is still in effect, then announces it again as new on the next successful check. In the app it shows the green "has ended" strip. | `WeatherRepository.kt:110` (fetch), `mapAlerts()`; `WeatherAlertWorker.kt:68`; `WeatherViewModel.trackAlertChanges()` | Carry "alerts unknown" separately from "no alerts" (e.g. a nullable list or a flag on `WeatherData`) and skip the diff when the fetch failed. Worth a test in `AlertTrackerTest` or a worker-level one. **The one to fix before versionCode 16 goes to Production.** |
+| R2 | **Wind thresholds ignore the unit system.** Raw wind values (mph for imperial users) are compared against km/h thresholds, breaking the "convert before thresholding" invariant in `CLAUDE.md`. A 39 mph gust reads "Breezy" where the same wind in metric reads "Strong gusts"; the wind-streak overlay needs 45 mph instead of 28 mph. | Wind tile advisory in `buildMetricTiles` (`WeatherComponents.kt:1571`); `windIntensityColor()` (`WeatherComponents.kt:1703`) and its legend; `severeWind = gustKmh >= 45` (`WeatherBackground.kt:74`) | Convert to km/h first, as `WeatherAdvisor.toKmh` does. |
+| R2a | `WeatherAdvisor.driving()` converts the gust correctly but prints it as "km/h" to imperial users. `driving()` also compares raw visibility `<= 2` (2 mi vs 2 km). | `WeatherAdvisor.kt:195`, `:201` | Print the user's own value and unit; convert visibility. |
+| R3 | **"Rain expected" can appear during snow.** If the current code is snow showers (85/86) and an upcoming hour is snow (71–77), the snow branch is skipped as "already snowing" and the hour falls through to `code in 61..82 && !alreadyRain`, so the hero pill says "Rain expected around 3 PM". | `WeatherRepository.buildDayInsights()`, the `match` block (`WeatherRepository.kt:639`) | Exclude snow codes from the rain branch (`61..67`, `80..82`), or return null once a snow code is seen while already snowing. |
+| R4 | **The showcase chat example is misrouted.** "Best day this week for a long run?" — an example row in the chat empty state and in the store description — matches `WALKING_RE` on "run" and gets the local "right now" walk/jog answer instead of reaching the LLM. | `ChatScreen.kt:270`; `WeatherAdvisor.matchIntent()` | Don't route locally when the message names another time frame ("this week", "tomorrow", a weekday, "best day"). |
+| R5 | **Background animation likely gets choppy with device uptime.** `wrap01()` and the `timeMs / 1000f` calls convert the frame clock to `Float`, which loses millisecond precision as it grows: 16 ms steps after about 37 hours of awake time, 64 ms (roughly 15 fps) after about 150 hours. Arithmetic, not observed. | `WeatherBackground.kt:372` and every renderer using `timeMs / 1000f` | Record the first frame time and animate on the difference. |
+| R6 | **Device clock used for a remote city.** `SunTile` places the sun dot using the phone's local time against the viewed city's sunrise/sunset, so it is wrong for a place in another timezone. The dawn/dusk sky tint and golden-hour motes have the same issue. | `SunTile` (`WeatherComponents.kt:1115`); `skyColor()` in `ConditionColors.kt`; `WeatherBackground.kt:84` | Use `WeatherData.timezone` (already available) for "now". |
+| R7 | **Rain/snow labelling slips.** `skyColor()` checks `71..86` before `51..82`, so rain showers (80–82) get the snow sky tone (`heroBackdropIsDark()` mirrors the same order). The expanded day view says "Chance of rain" and has no snowfall row on snow days. The chat context strip and the widget say "% rain" for a type-neutral probability. | `ConditionColors.kt:25`; `DayDetailBody` (`WeatherComponents.kt:2280`); `ChatScreen.kt:217`; `WeatherWidget.kt:586`, `:1014` | Split the ranges; say "precipitation" or pick the type from `snowfallSum`. |
+
+**Docs that don't match the app:**
+- `docs/privacy.html`: the data table says chat text leaves the device "only if you've configured
+  an OpenRouter API key", but the Play build ships with one; it says the key is entered "in the
+  app's chat screen" (it is in Settings); and it says NWS receives background location only with
+  Alert Notifications on, while the Weather Status Notification alone also calls NWS. Same file as
+  the NOAA omission noted above — fix together, and keep the Play declaration text in step.
+- `PLAYSTORE_LAUNCH.md` still has an unchecked "No stale-while-revalidate — NOT fixed" item; it was
+  fixed 2026-08-24.
+- `premium_widget_strategy.md` points to `playstore_claude_agy.md`, which doesn't exist.
+- `MetricTileData.advisory`'s comment says only UV and AQI populate it; Wind and Humidity do too.
+
+Suggested order: R1, then R2 and R3 (both contradict accuracy claims the app makes), then R4.
