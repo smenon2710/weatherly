@@ -303,6 +303,9 @@ and that the build-time key was empty — neither matches how the app is built a
   control is on OpenRouter's side — give the key used for release builds a hard credit limit (or
   no credits at all, so it can only ever reach free models), and rotate it if usage looks wrong.
   Check this before each release build rather than assuming it is still set.
+- **Status, 2026-10-05:** the developer set a $2 credit limit on the key used for release builds
+  (reported, not something visible from this repo). Whether the limit is a lifetime cap or one
+  that resets periodically wasn't confirmed — a resetting limit caps each period, not the total.
 
 ---
 
@@ -535,9 +538,16 @@ justify).
   status notification posted ~15 seconds later; the disclosure dialog appeared on toggle-on; no
   reminder or grant button appeared with both toggles off; turning a toggle off removed the
   ongoing notification.
-- [x] **Declaration screencast recorded 2026-10-05** (60 s, saved outside the repo), on the
-  `5142dc6` build — before the immediate-check fix, so it enables a second toggle after granting
-  to trigger the notification. Still an accurate depiction of the flow.
+- [x] **Declaration screencast recorded and uploaded, 2026-10-05.** 60 s, recorded on the
+  Pixel 9 Pro on the `5142dc6` build — before the immediate-check fix, so it enables a second
+  toggle after granting to trigger the notification; still an accurate depiction of the flow.
+  Personal details on the test device (home screen, other apps' notifications, quick-settings
+  tiles, town name) were blurred before upload. Uploaded to YouTube as an unlisted video titled
+  "SkySpeak – Background location demo" on the developer's channel. **The link is deliberately
+  not written here:** this repo is public (it has to be, for the privacy-policy page), and an
+  unlisted link is only private while it stays unpublished. Find it in YouTube Studio. YouTube
+  published it as a Short; use the standard `youtube.com/watch?v=…` form of the link in the Play
+  Console declaration (confirmed working by the developer) so it opens in the normal player.
 - [x] **Hand-checked on the Pixel 9 Pro by the developer, 2026-10-05, on the `6a25d2e` release
   build** — reported good, covering the five checks asked for: the Forecast Insight sheet's new
   sections (including "Looking ahead") read well and fit; a current-location forecast loads; the
