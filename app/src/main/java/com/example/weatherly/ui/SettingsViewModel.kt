@@ -92,7 +92,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAlertNotificationsEnabled(enabled: Boolean) {
         prefs.setAlertNotificationsEnabled(enabled)
         _alertNotificationsEnabled.value = enabled
-        if (enabled) WeatherNotificationChannels.ensureCreated(getApplication())
+        if (enabled) {
+            WeatherNotificationChannels.ensureCreated(getApplication())
+        } else {
+            // Forget what the background worker last saw. Nothing updates that list while the
+            // feature is off, so re-enabling days later would otherwise diff against it and
+            // announce every long-gone alert as "ended". Starting empty means the first check
+            // after re-enabling reports whatever is active then as new, which is the honest read.
+            prefs.setBackgroundTrackedAlerts(emptyList())
+        }
         syncScheduler()
     }
 
