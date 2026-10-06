@@ -97,3 +97,4 @@ See `CLAUDE.md` for full architecture details.
 - Library versions are recent stable picks; bump them if Android Studio suggests.
 - minSdk 26; compileSdk/targetSdk 36.
 - Play Store submission status and checklist: see `PLAYSTORE_LAUNCH.md`.
+- Open work: see `IMPROVEMENT_BACKLOG.md`. Completed work and its verification notes: `IMPROVEMENTS.md`.

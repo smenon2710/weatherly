@@ -917,8 +917,8 @@ data class MetricTileData(
     val chart: MetricChart? = null,
     val gaugeFraction: Float? = null,
     // Short, tile-length "so what does this mean for me today" callout (see PrimaryStatCell's
-    // matching doc comment) — populated only for UV Index and Air Quality initially, since those
-    // are the two tiles with a natural "what should I do" phrase already computed.
+    // matching doc comment) — populated for UV Index, Air Quality, Wind and Humidity, the tiles
+    // with a natural "what should I do" phrase; null for the rest.
     val advisory: String? = null,
 )
 

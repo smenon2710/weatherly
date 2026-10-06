@@ -270,7 +270,7 @@ its value proposition (retention/glanceability) is different from the safety-dri
 
 **Hyper-local "rain starting in 15 minutes" push.** This needs genuine minute-level
 precipitation nowcasting, which Open-Meteo's standard forecast (hourly granularity) doesn't
-provide — the same wall `AI_ROADMAP_NEXT_VERSION.md`/`premium_widget_strategy.md` already hit
+provide — the same wall `AI_ROADMAP_NEXT_VERSION.md`/`premium_widget_strategy.md` (removed 2026-10-06; in git history) already hit
 for the "hyper-local proactive alerts" proposal. It also needs push-grade timing precision (a
 15-minute warning delivered 40 minutes late via a throttled background job is useless), which
 per the analysis above means FCM, which means a backend. Two compounding reasons this is a

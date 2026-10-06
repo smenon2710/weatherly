@@ -1,6 +1,11 @@
-# Weatherly — Improvements
+# SkySpeak — Improvements (completed-work record)
 
-Fixes and features ordered by effort. Items within each tier are independent.
+The history of fixes and features: what changed, why, and how it was verified. *(The app was
+formerly named Weatherly.)*
+
+**For what is still open, see `IMPROVEMENT_BACKLOG.md`** — since 2026-10-06 it is the single list of
+outstanding work. Sections below marked "Open" or "Pending" are kept for their investigation
+notes; the backlog is the current list.
 
 ## Status
 
@@ -165,7 +170,7 @@ Both verified by re-reading the full diff against the reported symptom before co
 | # | Title | Effort |
 |---|---|---|
 | 28 | Localization: replace hardcoded strings with `strings.xml` | 1–2 days |
-| 29 | Weather-change push notification | 1–2 days |
+| 29 | ~~Weather-change push notification~~ — superseded: background notifications shipped in a different form in versionCode 16 (see `NOTIFICATIONS_ROADMAP.md`) | — |
 | 30 | Share current weather | half-day |
 | 33 | Onboarding walkthrough for new users | 1–2 days |
 | 34 | Play Store screenshot text overlays | half-day (asset work, not app code) |
@@ -1301,7 +1306,7 @@ Touches ~15 files. Use IDE rename refactoring (not find-replace) to catch all us
 
 ---
 
-## Design Upgrades ⬜ Pending
+## Design Upgrades — D1–D5, D7 and D8 (items 1–2) implemented; D6 obsolete (the Radar screen was removed)
 
 ### D1. Time-of-day hero gradient tinting
 
@@ -1753,9 +1758,23 @@ at the earliest.
   app's chat screen" (it is in Settings); and it says NWS receives background location only with
   Alert Notifications on, while the Weather Status Notification alone also calls NWS. Same file as
   the NOAA omission noted above — fix together, and keep the Play declaration text in step.
-- `PLAYSTORE_LAUNCH.md` still has an unchecked "No stale-while-revalidate — NOT fixed" item; it was
-  fixed 2026-08-24.
-- `premium_widget_strategy.md` points to `playstore_claude_agy.md`, which doesn't exist.
-- `MetricTileData.advisory`'s comment says only UV and AQI populate it; Wind and Humidity do too.
+- ~~`PLAYSTORE_LAUNCH.md` still has an unchecked "No stale-while-revalidate — NOT fixed" item~~ — closed 2026-10-06.
+- ~~`premium_widget_strategy.md` points to a file that doesn't exist~~ — the document was removed 2026-10-06.
+- ~~`MetricTileData.advisory`'s comment says only UV and AQI populate it~~ — corrected 2026-10-06.
 
 Suggested order: R1, then R2 and R3 (both contradict accuracy claims the app makes), then R4.
+
+---
+
+## Completed — Documentation Consolidation (2026-10-06)
+
+- Added `IMPROVEMENT_BACKLOG.md`: every open item from this file, the roadmap documents and
+  `PLAYSTORE_LAUNCH.md`, merged and de-duplicated, with each code finding re-checked against the
+  source at `14af251` (read only — nothing built or run).
+- Removed `premium_widget_strategy.md` (a June brainstorm: its widget ideas shipped, its
+  subscription idea was not adopted, and it linked to a file that never existed) and
+  `USER_FEEDBACK_2026-09-09.md` (all three points resolved the same day). Both remain in git
+  history; their one open question — whether the app stays free on Open-Meteo — is in the backlog.
+- `CLAUDE.md`'s launch-status section now holds only the current state; the superseded release
+  history moved unchanged to `PLAYSTORE_LAUNCH.md`.
+- Closed eight stale unchecked items in `PLAYSTORE_LAUNCH.md`'s Launch Checklist.
