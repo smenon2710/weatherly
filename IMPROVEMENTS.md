@@ -1721,11 +1721,12 @@ A second pass the same day covering every doc and every Kotlin source file, incl
 the pass above skipped. **Found by reading the code only — nothing here was reproduced on a
 device, and the build and tests were not run.** None of it is fixed. All of it is present in
 versionCode 16 (`f280b5f`), which was being promoted to Closed Testing (Track_1) when this was
-written.
+written. **Update 2026-10-06:** that build was submitted to Production the next day and is in
+Google's review, so every fix below ships as versionCode 17 (not started).
 
 | # | Issue | Where | Suggested fix |
 |---|---|---|---|
-| R1 | **A failed NWS request produces a false "has ended" alert.** The alerts fetch is wrapped in `runCatching { }.getOrNull()`, so a timeout or 5xx from `api.weather.gov` becomes an empty alert list, indistinguishable from "no alerts". `AlertTracker.diffAndUpdate()` then reports every tracked alert as resolved. In the background worker that posts "\<event\> has ended — This advisory is no longer active" for an alert that is still in effect, then announces it again as new on the next successful check. In the app it shows the green "has ended" strip. | `WeatherRepository.kt:110` (fetch), `mapAlerts()`; `WeatherAlertWorker.kt:68`; `WeatherViewModel.trackAlertChanges()` | Carry "alerts unknown" separately from "no alerts" (e.g. a nullable list or a flag on `WeatherData`) and skip the diff when the fetch failed. Worth a test in `AlertTrackerTest` or a worker-level one. **The one to fix before versionCode 16 goes to Production.** |
+| R1 | **A failed NWS request produces a false "has ended" alert.** The alerts fetch is wrapped in `runCatching { }.getOrNull()`, so a timeout or 5xx from `api.weather.gov` becomes an empty alert list, indistinguishable from "no alerts". `AlertTracker.diffAndUpdate()` then reports every tracked alert as resolved. In the background worker that posts "\<event\> has ended — This advisory is no longer active" for an alert that is still in effect, then announces it again as new on the next successful check. In the app it shows the green "has ended" strip. | `WeatherRepository.kt:110` (fetch), `mapAlerts()`; `WeatherAlertWorker.kt:68`; `WeatherViewModel.trackAlertChanges()` | Carry "alerts unknown" separately from "no alerts" (e.g. a nullable list or a flag on `WeatherData`) and skip the diff when the fetch failed. Worth a test in `AlertTrackerTest` or a worker-level one. **Was the one to fix before versionCode 16 went to Production; it didn't make it — first item for versionCode 17.** |
 | R2 | **Wind thresholds ignore the unit system.** Raw wind values (mph for imperial users) are compared against km/h thresholds, breaking the "convert before thresholding" invariant in `CLAUDE.md`. A 39 mph gust reads "Breezy" where the same wind in metric reads "Strong gusts"; the wind-streak overlay needs 45 mph instead of 28 mph. | Wind tile advisory in `buildMetricTiles` (`WeatherComponents.kt:1571`); `windIntensityColor()` (`WeatherComponents.kt:1703`) and its legend; `severeWind = gustKmh >= 45` (`WeatherBackground.kt:74`) | Convert to km/h first, as `WeatherAdvisor.toKmh` does. |
 | R2a | `WeatherAdvisor.driving()` converts the gust correctly but prints it as "km/h" to imperial users. `driving()` also compares raw visibility `<= 2` (2 mi vs 2 km). | `WeatherAdvisor.kt:195`, `:201` | Print the user's own value and unit; convert visibility. |
 | R3 | **"Rain expected" can appear during snow.** If the current code is snow showers (85/86) and an upcoming hour is snow (71–77), the snow branch is skipped as "already snowing" and the hour falls through to `code in 61..82 && !alreadyRain`, so the hero pill says "Rain expected around 3 PM". | `WeatherRepository.buildDayInsights()`, the `match` block (`WeatherRepository.kt:639`) | Exclude snow codes from the rain branch (`61..67`, `80..82`), or return null once a snow code is seen while already snowing. |
@@ -1733,6 +1734,18 @@ written.
 | R5 | **Background animation likely gets choppy with device uptime.** `wrap01()` and the `timeMs / 1000f` calls convert the frame clock to `Float`, which loses millisecond precision as it grows: 16 ms steps after about 37 hours of awake time, 64 ms (roughly 15 fps) after about 150 hours. Arithmetic, not observed. | `WeatherBackground.kt:372` and every renderer using `timeMs / 1000f` | Record the first frame time and animate on the difference. |
 | R6 | **Device clock used for a remote city.** `SunTile` places the sun dot using the phone's local time against the viewed city's sunrise/sunset, so it is wrong for a place in another timezone. The dawn/dusk sky tint and golden-hour motes have the same issue. | `SunTile` (`WeatherComponents.kt:1115`); `skyColor()` in `ConditionColors.kt`; `WeatherBackground.kt:84` | Use `WeatherData.timezone` (already available) for "now". |
 | R7 | **Rain/snow labelling slips.** `skyColor()` checks `71..86` before `51..82`, so rain showers (80–82) get the snow sky tone (`heroBackdropIsDark()` mirrors the same order). The expanded day view says "Chance of rain" and has no snowfall row on snow days. The chat context strip and the widget say "% rain" for a type-neutral probability. | `ConditionColors.kt:25`; `DayDetailBody` (`WeatherComponents.kt:2280`); `ChatScreen.kt:217`; `WeatherWidget.kt:586`, `:1014` | Split the ranges; say "precipitation" or pick the type from `snowfallSum`. |
+
+**R8 — user-reported 2026-10-06, recorded only, not investigated or fixed:** the hero temperature
+sometimes shows X° while the "Now" entry in the Next 24 Hours strip shows X+1° (seen in °C;
+intermittent). Likely the same thing as the first review's open note above — "Now" in the hourly
+strip is the next full hour's forecast, not the current reading — since the hero uses
+Open-Meteo's `current` block (15-minute data) and the strip uses the hourly array, so the two can
+legitimately differ by a degree, more so late in the hour or when the temperature is changing
+fast. Not confirmed against the code or a captured response. Candidate fixes if it is: have the
+"Now" column show the current temperature, or pick the hourly slot for the current hour rather
+than the next one. Note the day view's hourly strip shares `hourEntryAt()`, so check the
+"byte-identical" guarantee in `CLAUDE.md` still holds after any change. Ships with versionCode 17
+at the earliest.
 
 **Docs that don't match the app:**
 - `docs/privacy.html`: the data table says chat text leaves the device "only if you've configured

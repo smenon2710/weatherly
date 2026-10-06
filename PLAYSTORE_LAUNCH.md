@@ -427,7 +427,7 @@ Verified before committing, same bar as every prior release:
 
 ---
 
-## Planning: Shipping the Notifications Feature to Production (2026-09-09, not started)
+## Planning: Shipping the Notifications Feature to Production (planned 2026-09-09; in Production review since 2026-10-06)
 
 > Not a decision, not started — a plan to work from. Covers the background-alert/weather-status
 > notifications built this session (`WeatherAlertWorker`, `ACCESS_BACKGROUND_LOCATION`, the two
@@ -584,13 +584,27 @@ justify).
   gone after "Not Now"; and, after setting location back to "While using the app", the
   Weather-screen reminder shows the new disclosure and leads to "Allow all the time". This is the
   visual check the three build entries above were missing.
-- [x] **versionCode 16 / 1.0.15 promotion to Closed testing - Track_1 started, 2026-10-05**
-  (developer-reported as in progress; completion not confirmed in this file). Same artifact as
-  Internal Testing. The location declaration result was still pending at the time.
-- [ ] **Found by a code read-through the same day, not fixed, present in this build:** a failed
+- [x] **versionCode 16 / 1.0.15 promoted to Closed testing - Track_1 and published, 2026-10-05
+  1:44 PM** (Submission ID 26, status "Published" — from the Submission activity screenshot of
+  2026-10-06). Same artifact as Internal Testing. The store-listing change is Submission ID 25
+  (2026-10-05 12:23 PM), also "Published".
+- [x] **versionCode 16 / 1.0.15 promoted to Production and sent for review, 2026-10-06 12:12 PM**
+  (Submission ID 27, status **"In review"** as of that day). Same artifact (`f280b5f`). Not
+  recorded: the rollout percentage chosen — the plan below called for a staged rollout; confirm
+  it on the Production release page. This went in ahead of three steps in the Sequencing list
+  below: R1 (next item) is unfixed and in this build, no non-Pixel tester has reported on the
+  notifications, and no explicit approval of the location declaration has been seen.
+  versionCode 17 has not been started.
+- [x] **App content checked, 2026-10-06** (screenshots): "Need attention" is empty ("You've
+  caught up with everything"); "Actioned" lists 11 declarations, with Location permissions last
+  edited 5 Oct 2026 and Data safety 16 Jul 2026. Console shows no issue against the location
+  declaration. That is not the same as an approval notice — none has been recorded; watch the
+  account owner's email and the Submission 27 result.
+- [ ] **Found by a code read-through 2026-10-05, not fixed, present in this build:** a failed
   NWS request is treated as "no alerts", so the background worker can post a false "\<event\> has
-  ended" notification for an alert still in effect, and then re-announce it. Fix before promoting
-  to Production. See `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)" (R1),
+  ended" notification for an alert still in effect, and then re-announce it. Was meant to be
+  fixed before promoting to Production; the build went to Production review without it
+  (2026-10-06), so the fix now ships as versionCode 17. See `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)" (R1),
   which also lists the lower-priority findings (R2–R7) and privacy-policy wording to correct.
 - [ ] **Not tested anywhere:** the path for a user who never granted ordinary location (the
   disclosure's "Continue" should ask for foreground location first, then background). Also not

@@ -1,7 +1,7 @@
 # SkySpeak — Alerts & Notifications Infrastructure (Discussion Doc)
 
-> **Implemented through v1.5 and verified on a real device in a signed release build (versionCode
-> 16); not yet released to Production. The sections below are kept as the build history — where
+> **Implemented through v1.6 and verified on a real device in a signed release build (versionCode
+> 16); submitted to Production 2026-10-06 and in Google's review, not yet released. The sections below are kept as the build history — where
 > an earlier one conflicts with a later one (e.g. saved-place scoping, dropped in v1.4), the later
 > one is current. `CLAUDE.md`'s "Background notifications" section describes the code as it is.**
 
@@ -411,10 +411,11 @@ same day, unit-tested where the logic is pure, and exercised on the Pixel 9 Pro 
   Weather screen; any answer is now remembered. The Settings card remains.
 - **Channel descriptions** say "current location", not "saved location".
 
-**Submission status:** versionCode 16 is on Internal Testing and the Location permissions
-declaration is in Google's review as of 2026-10-05 — see `PLAYSTORE_LAUNCH.md`.
+**Submission status:** versionCode 16 is published on Internal and Closed Testing (2026-10-05)
+and was submitted to Production on 2026-10-06, where it is in Google's review — see
+`PLAYSTORE_LAUNCH.md`. versionCode 17 has not been started.
 
-**Known bug, not fixed (found by code read 2026-10-05):** a failed NWS request is treated as "no
+**Known bug, not fixed, in the build under Production review (found by code read 2026-10-05):** a failed NWS request is treated as "no
 alerts", so the worker can post a false "has ended" notification and then re-announce the alert —
 R1 in `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)".
 
