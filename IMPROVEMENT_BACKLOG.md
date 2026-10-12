@@ -14,6 +14,10 @@ to-do list: when an item is finished, delete it here and record the detail in `I
 2026-10-06 and is still present at the line given. Nothing was run — no build, no tests, no
 device. The IDs (R1, V5, #28 …) are the ones used in the source documents.
 
+**Re-checked 2026-10-12** against `main` at `90de198` (same code as `14af251`): every item in
+sections 1 and 2 is still present at the line given, and the unit tests pass (54/54). That
+read-through added the items marked "(2026-10-12)" below; none of them was reproduced on a device.
+
 ---
 
 ## 1. versionCode 17 — correctness fixes
@@ -29,7 +33,10 @@ priority.
 | R3 | **"Rain expected" can appear during snow.** With snow showers now (85/86) and snow ahead (71–77), the snow branch is skipped as "already snowing" and the hour falls through to `code in 61..82`. | `WeatherRepository.buildDayInsights()`, `WeatherRepository.kt:629–644` | Restrict the rain branch to `61..67` and `80..82`. |
 | R7 | **Rain/snow labelling slips.** `skyColor()` tests `71..86` before `51..82`, so rain showers (80–82) get the snow sky (`heroBackdropIsDark()` mirrors the order). The day view says "Chance of rain" and has no snowfall row on snow days. The chat context strip and the widget say "% rain" for a probability that doesn't distinguish type. | `ConditionColors.kt:25–28`; `WeatherComponents.kt:2280`; `ChatScreen.kt:217`; `WeatherWidget.kt:585`, `:1014` | Split the ranges; say "precipitation", or pick the word from `snowfallSum`. |
 | R4 | **The showcase chat example is misrouted.** "Best day this week for a long run?" — shown in the chat empty state and the store description — matches `WALKING_RE` on "run" and gets the local "right now" answer instead of reaching the LLM. | `ChatScreen.kt:270`; `WeatherAdvisor.kt:45`, `matchIntent()` | Don't route locally when the message names another time frame ("this week", "tomorrow", a weekday, "best day"). |
-| R8 | **Hero temperature and the "Now" hourly cell can differ by a degree** (user-reported 2026-10-06, intermittent). The hero uses Open-Meteo's `current` block; "Now" is the first hourly slot at or after the current time, i.e. the next full hour. Likely cause, not confirmed against a captured response. | `nowIndex`, `WeatherRepository.kt:194`; `hourEntryAt()` | Show the current temperature in the "Now" cell, or relabel it. The day view shares `hourEntryAt()`, so re-check the "identical values in both strips" guarantee afterwards. |
+| R8 | **Hero temperature and the "Now" hourly cell can differ by a degree** (user-reported 2026-10-06, intermittent). The hero uses Open-Meteo's `current` block; "Now" is the first hourly slot at or after the current time, i.e. the next full hour. Cause confirmed 2026-10-12: `current` is 15-minute data (`interval: 900`), and a live call with `current.time` at 21:30 selected the 22:00 hourly slot — so "Now" is the next hour's forecast except in the first quarter of each hour. | `nowIndex`, `WeatherRepository.kt:194`; `hourEntryAt()` | Show the current temperature in the "Now" cell, or relabel it. The day view shares `hourEntryAt()`, so re-check the "identical values in both strips" guarantee afterwards. |
+| R8a | **Late-evening knock-on of R8** (2026-10-12). From about 23:15 to midnight the hourly window starts at tomorrow's 00:00, labelled "Now", so no "12 AM" label exists in it and today's corrected rain chance is taken from all 24 of tomorrow's hours. Current UV and visibility are also read from the next hour's slot at any time of day. | `todayRemainingCount`, `WeatherRepository.kt:274`; `dayPop`, `:291`; `uvNow`/`visMeters`, `:342` | Pick the hourly slot at or before the current time instead of at or after it. Fixes this and R8 together. |
+| — | **Full reload on every return from Chat or Settings for users who denied location but use a saved city** (2026-10-12). `WeatherScreen` re-requests the permission each time it re-enters composition; the denied branch calls `onPermissionDenied()`, which does a foreground `load()`. The screen drops to the spinner, scroll position is lost, and the condition haptic can replay. The granted branch already guards against this. | `WeatherScreen.kt:147`; `WeatherViewModel.kt:159` | Use a background load when content is already showing, as the granted branch does; better, don't re-request a permission that was already denied. |
+| — | **Chat error wording** (2026-10-12). The 401 message says "Check it in the key field above", but the key field is in Settings. The 402 message refers to "your OpenRouter account" even for users on the shared key, which is what they would see if the shared key's credit limit is reached. | `ChatRepository.httpMessage()`, `ChatRepository.kt:133` | Point to Settings; give shared-key users a message that doesn't mention an account they don't have. |
 | — | **Two quick place changes can show the older result.** `load()` keeps no job handle and never cancels an in-flight load. | `WeatherViewModel.kt:93` | Hold the load `Job` and cancel it when a new load starts. |
 | R6 | **Device clock used for a remote city.** The sun dot, the dawn/dusk sky tint and the golden-hour motes use the phone's time against the viewed city's sunrise/sunset. | `WeatherComponents.kt:1115`; `ConditionColors.kt:38`; `WeatherBackground.kt:84` | Take "now" from `WeatherData.timezone`. |
 | R5 | **Background animation probably gets choppy with uptime.** The frame clock is converted to `Float`, which loses millisecond precision as it grows — about 16 ms steps after 37 hours awake, 64 ms after 150. From arithmetic, not observed. | `wrap01()`, `WeatherBackground.kt:372`, and each `timeMs / 1000f` | Record the first frame time and animate on the difference. Can wait for a later release. |
@@ -42,7 +49,8 @@ most of the bugs above live.
 - Same physical wind and visibility in metric and imperial gives the same advice (R2, R2a).
 - WMO 80–82 take the rain path; 71–77 and 85–86 take the snow path (R3, R7).
 - `matchIntent()` returns null for future-time-frame questions (R4).
-- "Now" selection with a mid-hour current timestamp (R8).
+- "Now" selection with a mid-hour current timestamp (R8), and today's rain chance with a
+  current timestamp after 23:00 (R8a).
 - Old cached JSON without newer fields still deserializes (`ForecastCache` defaults).
 
 **Signed-build checks before shipping 17:** NWS unreachable with an alert tracked; an alert
@@ -59,6 +67,7 @@ they are meant to say the same thing.
 | Problem | Where | Fix |
 |---|---|---|
 | NOAA CO-OPS (tides) receives a station id but isn't listed among third parties. | `docs/privacy.html` (no mention of NOAA) | Add it. |
+| Reverse geocoding isn't disclosed (2026-10-12). When no place name is supplied, coordinates go to Android's `Geocoder`, which is Google-backed on most phones — in the app, the background worker and the widget. The in-app disclosure says location is sent "only to Open-Meteo and the U.S. National Weather Service", and the privacy page lists the same two. Whether a platform service counts as a recipient is a judgement call; the word "only" is the weak point. | `reverseGeocode()`, `WeatherRepository.kt:807`; `BACKGROUND_LOCATION_DISCLOSURE`, `SettingsScreen.kt:594`; `docs/privacy.html` | Mention the device's geocoding service in all three, or drop reverse geocoding from the background path (the worker only needs a name for the status notification). |
 | Says chat text leaves the device "only if you've configured an OpenRouter API key"; the Play build ships with one. | `docs/privacy.html:64`, `:134` | Describe the shipped behaviour. |
 | Says the key is entered in the chat screen; it is in Settings. | `docs/privacy.html` | Correct. |
 | Says NWS receives background location only with Alert Notifications on; the Weather Status Notification alone also calls NWS. | `docs/privacy.html:53` area | Correct. |
@@ -111,6 +120,7 @@ Not started. Roughly smallest first.
 | More local advice intents | Cycling, gardening, outdoor events in `WeatherAdvisor`. | 1 day |
 | Onboarding walkthrough (#33) | 2–3 first-launch screens (chat, widget, notifications), skippable, "seen" flag in `PreferencesStore`. | 1–2 days |
 | Daily digest notification | One morning notification with high/low and the top tip. Deliberately left out of the first notifications release. | 1–2 days |
+| Dead code removal (2026-10-12) | `WeatherData.tips` and `buildTips()` are computed and cached on every fetch but never rendered (only `DayEntry.tips` is). Also unused: the `MetricTile` composable, `OpenRouterApi`, `NetworkModule.openRouterApi` and `ChatCompletionResponse` (chat uses the raw streaming call). Removing `WeatherData.tips` changes the cached JSON shape — old caches still load, since Moshi ignores unknown keys. | Half a day |
 | Field naming cleanup | `currentTempC`, `windKmh` and similar hold values in the user's unit, not the unit in the name. This is the trap behind R2 and the earlier range-bar bug. IDE rename across about 15 files; cached JSON keys need care. | 1 day |
 | Localization (#28) | `strings.xml` holds only the app name. Around 60 strings to extract. The hour labels are parsed by code and must stay `Locale.US` until that parsing is replaced. | 1–2 days |
 
@@ -118,9 +128,18 @@ Not started. Roughly smallest first.
 
 ## 5. Documentation cleanup
 
-Done 2026-10-06 (see the last entry in `IMPROVEMENTS.md`). One thing left: the "Test device vs.
-Production" paragraph in `CLAUDE.md` still describes the Pixel 9 Pro as of 2026-09-04; update it
-once the phone is back on the Play Store build.
+Done 2026-10-06 (see the last entry in `IMPROVEMENTS.md`). Still open, all in `CLAUDE.md`:
+
+- The "Test device vs. Production" paragraph still describes the Pixel 9 Pro as of 2026-09-04;
+  update it once the phone is back on the Play Store build.
+- (2026-10-12) The command-line build recipe's `find … | head -1` picks whichever Gradle
+  distribution sorts first. With 9.4.1 and 9.6.0 both cached it picks 9.4.1 and the build fails
+  ("Minimum supported Gradle version is 9.6.0"). Match the version in
+  `gradle/wrapper/gradle-wrapper.properties` instead.
+- (2026-10-12) The "`TipBanner` source data" paragraph says the rain chance passed to
+  `buildTips` is always merged with the next 12 hours. The code does that only at night, and the
+  result is unused (see "Dead code removal" in section 4). Correct or remove with that cleanup.
+- (2026-10-12) Says `glance-appwidget:1.1.0`; the build uses 1.1.1.
 
 ---
 
