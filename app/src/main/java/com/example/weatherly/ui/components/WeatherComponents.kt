@@ -109,6 +109,8 @@ import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.data.model.WeatherData
 import com.example.weatherly.data.model.WeatherTip
 import com.example.weatherly.ui.theme.LocalIsDarkTheme
+import com.example.weatherly.util.windAdvisory
+import com.example.weatherly.util.windToKmh
 import com.example.weatherly.util.MoonCalculator
 import com.example.weatherly.util.rememberLocalTimeText
 import com.example.weatherly.util.skyColor
@@ -1568,15 +1570,8 @@ private fun buildMetricTiles(d: WeatherData): List<MetricTileData> = buildList {
 
     // Today's forecast peak gust (Open-Meteo's wind_gusts_10m_max) — real signal, not current
     // conditions guessed forward: an upcoming windy day couldn't be flagged at all before this.
-    val windGustMaxToday = d.daily.firstOrNull()?.windGustMaxKmh
-    val windShortAdvisory = when {
-        windGustMaxToday == null -> null
-        windGustMaxToday < 10 -> "Calm all day"
-        windGustMaxToday < 20 -> "Light breeze"
-        windGustMaxToday < 40 -> "Breezy"
-        windGustMaxToday < 60 -> "Windy"
-        else -> "Strong gusts"
-    }
+    val windShortAdvisory = d.daily.firstOrNull()?.windGustMaxKmh
+        ?.let { windAdvisory(windToKmh(it.toFloat(), d.windUnit)) }
     add(MetricTileData(Icons.Filled.Air, "Wind", d.windKmh?.let { "$it ${d.windUnit}" } ?: "--",
         listOfNotNull(d.windDir, d.windGustKmh?.let { "gusts $it" }).joinToString(" · ").ifBlank { null }, Teal,
         "Wind is blowing" + (d.windDir?.let { " from the $it" } ?: "") +
@@ -1700,11 +1695,12 @@ private fun windDirToAngle(dir: String?): Float = when (dir?.uppercase()?.trim()
     else  -> 0f
 }
 
-private fun windIntensityColor(speed: Float): Color = when {
-    speed < 10 -> Color(0xFF5B9B78)
-    speed < 20 -> Color(0xFF6B9BB0)
-    speed < 40 -> Color(0xFFC8A86A)
-    speed < 60 -> Color(0xFFCC7B40)
+/** Takes km/h — convert with windToKmh() first; the legend's sample values are km/h too. */
+private fun windIntensityColor(speedKmh: Float): Color = when {
+    speedKmh < 10 -> Color(0xFF5B9B78)
+    speedKmh < 20 -> Color(0xFF6B9BB0)
+    speedKmh < 40 -> Color(0xFFC8A86A)
+    speedKmh < 60 -> Color(0xFFCC7B40)
     else       -> Color(0xFFC05050)
 }
 
@@ -1883,7 +1879,7 @@ private fun WindDetailContent(sheet: DetailSheet.Metric) {
             values.forEachIndexed { i, v ->
                 val barH = size.height * (0.18f + 0.80f * ((v - mn) / rng))
                 drawRoundRect(
-                    color = windIntensityColor(v),
+                    color = windIntensityColor(windToKmh(v, chart.unit)),
                     topLeft = Offset(i * (barW + gap), size.height - barH),
                     size = Size(barW, barH), cornerRadius = r
                 )

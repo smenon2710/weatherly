@@ -546,6 +546,7 @@ private fun SharedTransitionScope.WeatherContentBody(
             visibilityUnit = data.visibilityUnit,
             windKmh = data.windKmh,
             windGustKmh = data.windGustKmh,
+            windUnit = data.windUnit,
             alerts = data.alerts,
             modifier = Modifier.fillMaxSize()
         )

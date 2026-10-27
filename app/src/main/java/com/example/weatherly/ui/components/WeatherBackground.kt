@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
+import com.example.weatherly.util.isSevereWind
+import com.example.weatherly.util.windToKmh
 import com.example.weatherly.data.model.WeatherAlert
 import com.example.weatherly.ui.theme.LocalIsDarkTheme
 import java.util.Calendar
@@ -59,6 +61,7 @@ fun WeatherBackground(
     visibilityUnit: String,
     windKmh: Int?,
     windGustKmh: Int?,
+    windUnit: String,
     alerts: List<WeatherAlert>,
     modifier: Modifier = Modifier
 ) {
@@ -71,8 +74,8 @@ fun WeatherBackground(
     // top of whatever base scene is active — not a separate WMO-driven scene, since gusty wind can
     // occur alongside almost any condition. Paired with SNOW_HEAVY this is what produces a
     // blizzard-style whiteout; on its own it's the "Severe Squall/Wind" treatment.
-    val gustKmh = windGustKmh ?: windKmh ?: 0
-    val severeWind = gustKmh >= 45
+    val gust = windGustKmh ?: windKmh ?: 0
+    val severeWind = isSevereWind(windToKmh(gust.toFloat(), windUnit))
 
     var timeMs by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
