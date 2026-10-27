@@ -176,7 +176,7 @@ fun ChatScreen(
                 }
             }
 
-            SuggestionRow(onPick = { answerLocally(it) })
+            SuggestionRow(enabled = !sending, onPick = { answerLocally(it) })
 
             InputBar(
                 value = input,
@@ -413,7 +413,7 @@ private fun TypingBubble() {
 }
 
 @Composable
-private fun SuggestionRow(onPick: (Suggestion) -> Unit) {
+private fun SuggestionRow(enabled: Boolean, onPick: (Suggestion) -> Unit) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -423,6 +423,7 @@ private fun SuggestionRow(onPick: (Suggestion) -> Unit) {
             val tint = suggestionTint(s.intent)
             AssistChip(
                 onClick = { onPick(s) },
+                enabled = enabled,
                 label = { Text(s.label) },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = tint.copy(alpha = 0.14f),

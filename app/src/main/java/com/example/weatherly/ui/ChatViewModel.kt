@@ -140,8 +140,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         addLocalExchange(question, reply)
     }
 
-    /** Streams a locally computed answer word-by-word so it feels like LLM output. */
+    /** Streams a locally computed answer word-by-word so it feels like LLM output. Ignored while
+     * another answer is still streaming — the same guard [send] has; without it a chip tap
+     * mid-answer started a second stream writing into the same `_streamingText`, mixing the two. */
     fun addLocalExchange(question: String, answer: String) {
+        if (_sending.value) return
         _messages.value = _messages.value + ChatMessage(ChatRole.USER, question)
         _sending.value = true
         _streamingText.value = ""
