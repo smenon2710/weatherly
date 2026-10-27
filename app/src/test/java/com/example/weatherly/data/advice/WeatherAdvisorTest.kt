@@ -143,6 +143,31 @@ class WeatherAdvisorTest {
         assertTrue(advise(AdviceIntent.DRIVING, weather(code = 0)).contains("fine for driving"))
     }
 
+    private fun imperial(w: WeatherData) =
+        w.copy(windUnit = "mph", visibilityUnit = "mi")
+
+    @Test fun `driving - gusts are printed in the user's unit (R2a)`() {
+        val metric = advise(AdviceIntent.DRIVING, weather(wind = 30, gusts = 64))
+        assertTrue(metric.contains("strong gusts (64 km/h)"))
+        // 40 mph is about 64 km/h: same warning, but in mph.
+        val imperial = WeatherAdvisor.advise(
+            AdviceIntent.DRIVING, imperial(weather(wind = 20, gusts = 40)), UnitSystem.IMPERIAL
+        )
+        assertTrue(imperial.contains("strong gusts (40 mph)"))
+        assertFalse(imperial.contains("km/h"))
+    }
+
+    @Test fun `driving - visibility is converted before comparing (R2a)`() {
+        fun drive(vis: Int, imperial: Boolean): String {
+            val base = weather().copy(visibility = vis)
+            return if (imperial) WeatherAdvisor.advise(AdviceIntent.DRIVING, imperial(base), UnitSystem.IMPERIAL)
+            else advise(AdviceIntent.DRIVING, base)
+        }
+        assertTrue(drive(2, imperial = false).contains("visibility"))   // 2 km
+        assertFalse(drive(2, imperial = true).contains("reduced visibility"))  // 2 mi = 3.2 km
+        assertTrue(drive(1, imperial = true).contains("reduced visibility"))   // 1 mi = 1.6 km
+    }
+
     @Test fun `driving - fog triggers visibility warning`() {
         assertTrue(advise(AdviceIntent.DRIVING, weather(code = 45)).contains("visibility"))
     }

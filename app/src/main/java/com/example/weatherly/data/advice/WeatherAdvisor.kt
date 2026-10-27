@@ -134,6 +134,12 @@ object WeatherAdvisor {
         val feelsLabel = "${w.realFeelC ?: w.currentTempC}${units.tempLabel}"
         val tempLabel = "${w.currentTempC}${units.tempLabel}"
         val windLabel = w.windKmh?.let { "$it ${w.windUnit}" } ?: "calm"
+        // The user's own gust value and unit — gustK is converted for the thresholds only.
+        val gustLabel = "${w.windGustKmh ?: w.windKmh ?: 0} ${w.windUnit}"
+        // Visibility comes in the user's distance unit; the threshold is in km.
+        val visibilityKm: Double? = w.visibility?.let {
+            if (w.visibilityUnit == UnitSystem.IMPERIAL.distanceLabel) it * 1.609344 else it.toDouble()
+        }
     }
 
     private fun umbrella(c: Ctx): String {
@@ -192,13 +198,13 @@ object WeatherAdvisor {
 
     private fun driving(c: Ctx): String {
         val hazards = buildList {
-            if (isFog(c.code) || (c.w.visibility ?: 99) <= 2) add("reduced visibility — use low-beam headlights and slow down")
+            if (isFog(c.code) || (c.visibilityKm ?: 99.0) <= 2.0) add("reduced visibility — use low-beam headlights and slow down")
             // c.isSnowy also catches snow arriving in the next few hours, not just the current
             // icon, unlike a bare isSnowOrIce(c.code) check.
             if (c.isSnowy) add("snow or ice is possible, so roads may be slippery — leave extra braking distance")
             if (c.rain >= 60 || c.code in 63..65 || c.code == 82) add("wet roads from heavy rain — ease off the speed")
             if (isThunder(c.code)) add("thunderstorms can bring sudden downpours and poor visibility")
-            if (c.gustK >= 55) add("strong gusts (${c.gustK} km/h) — watch for crosswinds on open stretches")
+            if (c.gustK >= 55) add("strong gusts (${c.gustLabel}) — watch for crosswinds on open stretches")
         }
         return if (hazards.isEmpty()) {
             "Conditions look fine for driving — visibility is good and roads should be clear. Usual care is enough."
