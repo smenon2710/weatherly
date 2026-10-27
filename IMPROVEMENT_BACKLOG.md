@@ -1,6 +1,6 @@
 # SkySpeak — Improvement Backlog
 
-**Compiled:** 2026-10-06, against `main` at `14af251` (versionCode 16 / 1.0.15, in Production review).
+**Compiled:** 2026-10-06, against `main` at `14af251` (versionCode 16 / 1.0.15, then in Production review — published at 100% by 2026-10-27).
 
 Everything still open, in one place. Pulled from `IMPROVEMENTS.md`, `NOTIFICATIONS_ROADMAP.md`,
 `PREMIUM_UX_ROADMAP.md`, `AI_ROADMAP_NEXT_VERSION.md`, `PLAYSTORE_LAUNCH.md`, a same-day review
@@ -27,7 +27,7 @@ priority.
 
 | # | Problem | Where | Fix |
 |---|---|---|---|
-| R1 | **A failed NWS request produces a false "has ended" alert.** `runCatching { }.getOrNull()` turns a timeout or 5xx into an empty alert list, which the tracker reads as every alert having ended. The worker then posts "\<event\> has ended" for an alert still in effect and re-announces it on the next good check; the app shows the green "has ended" strip. This is in the build now in Production review. | `WeatherRepository.kt:111`; `WeatherAlertWorker.kt:68`; `WeatherViewModel.kt:148` | Carry "alerts could not be checked" separately from "no alerts" and skip the diff when the fetch failed. A small sealed result for the optional sources (alerts, air quality, tides) would cover this and let the UI say "couldn't check" instead of implying none. |
+| R1 | **A failed NWS request produces a false "has ended" alert.** `runCatching { }.getOrNull()` turns a timeout or 5xx into an empty alert list, which the tracker reads as every alert having ended. The worker then posts "\<event\> has ended" for an alert still in effect and re-announces it on the next good check; the app shows the green "has ended" strip. This is live: versionCode 16 is in Production at 100%. **Fixed on `main` 2026-10-27, not yet checked on a device** — `WeatherData.alertsChecked` is false after a failed NWS request (HTTP 400, NWS's out-of-coverage answer, still counts as checked), and `AlertTracker.diffAndUpdate(null)` then reports nothing and keeps the tracked set; 5 unit tests in `AlertTrackerTest`. Still open: the UI doesn't yet say "couldn't check alerts". Move to `IMPROVEMENTS.md` once the signed-build check below passes. | `WeatherRepository.kt:111`; `WeatherAlertWorker.kt:68`; `WeatherViewModel.kt:148` | Carry "alerts could not be checked" separately from "no alerts" and skip the diff when the fetch failed. A small sealed result for the optional sources (alerts, air quality, tides) would cover this and let the UI say "couldn't check" instead of implying none. |
 | R2 | **Wind thresholds ignore the unit system.** Raw mph is compared with km/h thresholds: a 39 mph gust reads "Breezy" where the same wind in metric reads "Strong gusts", and the wind-streak overlay needs 45 mph instead of 28. | Wind tile advisory, `WeatherComponents.kt:1572`; `windIntensityColor()`, `WeatherComponents.kt:1703`, and its legend at `:1910`; `severeWind`, `WeatherBackground.kt:75` | Convert to km/h first, as `WeatherAdvisor.toKmh` does. |
 | R2a | **Driving advice mixes units.** The gust is converted correctly but printed as "km/h" to imperial users; visibility is compared raw (`<= 2`, so 2 mi and 2 km are treated alike). | `WeatherAdvisor.kt:195`, `:201` | Print the user's own value and unit; convert visibility before comparing. |
 | R3 | **"Rain expected" can appear during snow.** With snow showers now (85/86) and snow ahead (71–77), the snow branch is skipped as "already snowing" and the hour falls through to `code in 61..82`. | `WeatherRepository.buildDayInsights()`, `WeatherRepository.kt:629–644` | Restrict the rain branch to `61..67` and `80..82`. |
@@ -39,6 +39,10 @@ priority.
 | — | **Chat error wording** (2026-10-12). The 401 message says "Check it in the key field above", but the key field is in Settings. The 402 message refers to "your OpenRouter account" even for users on the shared key, which is what they would see if the shared key's credit limit is reached. | `ChatRepository.httpMessage()`, `ChatRepository.kt:133` | Point to Settings; give shared-key users a message that doesn't mention an account they don't have. |
 | — | **Two quick place changes can show the older result.** `load()` keeps no job handle and never cancels an in-flight load. | `WeatherViewModel.kt:93` | Hold the load `Job` and cancel it when a new load starts. |
 | R6 | **Device clock used for a remote city.** The sun dot, the dawn/dusk sky tint and the golden-hour motes use the phone's time against the viewed city's sunrise/sunset. | `WeatherComponents.kt:1115`; `ConditionColors.kt:38`; `WeatherBackground.kt:84` | Take "now" from `WeatherData.timezone`. |
+| A7 | **City search can show results for an older query** (2026-10-27, from `USER_ADOPTION_SUGGESTIONS.md`). Each `search()` launches independent work, so a slow earlier response can overwrite a later one. Shortening the query below two characters leaves old results showing, and a failed search (`searchCity()` returns an empty list on any error) looks the same as "no matches". | `WeatherViewModel.search()`, `WeatherViewModel.kt:215`; `WeatherRepository.searchCity()`, `WeatherRepository.kt:172`; `LocationsSheet`, `WeatherScreen.kt:317` | Hold and cancel the search `Job` (same fix as the load race above); clear results for short queries; show "no matches" and "couldn't connect" separately. |
+| A9 | **Suggestion chips can start a second answer while one is streaming** (2026-10-27, from `USER_ADOPTION_SUGGESTIONS.md`). `send()` returns early while `sending` is true; `sendLocal()`/`addLocalExchange()` don't, and both write the shared streaming state. | `ChatViewModel.sendLocal()`, `ChatViewModel.kt:137` | Same early return as `send()`, or disable the chips while sending. |
+| A10 | **Settings option pills have no selected/toggle semantics** (2026-10-27, from `USER_ADOPTION_SUGGESTIONS.md`). Selection is shown by colour only, so TalkBack can't tell which unit or theme is chosen. Small; include only if it fits. | `OptionPill`, `SettingsScreen.kt:614` | `Modifier.selectable(selected, role = Role.RadioButton)` (or `toggleable` for on/off pills). |
+| A2 | **Stretch for 17 — the widget can show a browsed city as if it were the device's location** (2026-10-27, from `USER_ADOPTION_SUGGESTIONS.md`). `ForecastCache` holds one forecast, written by the app for whatever place is being viewed; the widget renders it first and keeps it if its own location fetch fails. The widget's fresh results are never persisted. Separately, the app's "Showing data from Xm ago" label doesn't keep ageing on screen, and a memory-cache hit is saved with the current time as if newly fetched. | `ForecastCache.kt`; `provideGlance()`, `WeatherWidget.kt:182`; `WeatherViewModel.load()` | A second cache slot for the device's location, read and written by the widget; keep the original fetch time. Ship in 17 if ready, otherwise first item for 18. |
 | R5 | **Background animation probably gets choppy with uptime.** The frame clock is converted to `Float`, which loses millisecond precision as it grows — about 16 ms steps after 37 hours awake, 64 ms after 150. From arithmetic, not observed. | `wrap01()`, `WeatherBackground.kt:372`, and each `timeMs / 1000f` | Record the first frame time and animate on the difference. Can wait for a later release. |
 
 **Tests to add with these fixes.** The suite is 54 JVM tests across `WeatherAdvisorTest`,
@@ -46,6 +50,7 @@ priority.
 most of the bugs above live.
 
 - Alert fetch failed vs. succeeded-and-empty (R1).
+- A superseded search or load never overwrites the newer one (A7, load race).
 - Same physical wind and visibility in metric and imperial gives the same advice (R2, R2a).
 - WMO 80–82 take the rain path; 71–77 and 85–86 take the snow path (R3, R7).
 - `matchIntent()` returns null for future-time-frame questions (R4).
@@ -81,8 +86,6 @@ they are meant to say the same thing.
 
 No code needed unless a check turns something up.
 
-- **Production review of versionCode 16** (Submission 27, sent 2026-10-06): wait for the result,
-  then record the rollout percentage that was chosen — it isn't written down anywhere.
 - **Non-Pixel testing of notifications.** Never done; the battery-exemption prompt is a
   mitigation, not a substitute. Ask a few Closed Testing testers on Samsung/Xiaomi/OnePlus to
   confirm checks fire on a normal day.

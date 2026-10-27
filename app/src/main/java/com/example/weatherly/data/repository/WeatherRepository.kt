@@ -106,9 +106,11 @@ class WeatherRepository(private val context: Context) {
                 }
                 val a = async { runCatching { airQualityApi.get(lat, lon) }.getOrNull() }
                 // NWS is US-only and has no key of its own; a failure or an out-of-coverage
-                // point (empty features list) must never fail the overall weather fetch.
+                // point must never fail the overall weather fetch. Kept as a Result rather than
+                // collapsed to null, so a failed check isn't mistaken for "no alerts" — see
+                // alertsChecked().
                 val n = async {
-                    runCatching { nwsApi.getActiveAlerts("%.4f,%.4f".format(Locale.US, lat, lon)) }.getOrNull()
+                    runCatching { nwsApi.getActiveAlerts("%.4f,%.4f".format(Locale.US, lat, lon)) }
                 }
                 // Same defensive shape as NWS above: TideStations.nearest() is the coastal gate
                 // (see its own doc comment) — nothing is fetched at all for an inland location,
@@ -124,7 +126,10 @@ class WeatherRepository(private val context: Context) {
                 Fetched(f.await(), a.await(), n.await(), t.await())
             }
             val name = placeName ?: reverseGeocode(lat, lon)
-            val data = mapToWeatherData(fetched.forecast, fetched.air, fetched.alerts, fetched.tide, name, units)
+            val data = mapToWeatherData(
+                fetched.forecast, fetched.air, fetched.alerts.getOrNull(), alertsChecked(fetched.alerts),
+                fetched.tide, name, units
+            )
             memoryCache = Cached(cacheKey, data, now)
             Result.success(data)
         } catch (e: CancellationException) {
@@ -165,7 +170,7 @@ class WeatherRepository(private val context: Context) {
     private data class Fetched(
         val forecast: OpenMeteoResponse,
         val air: AirQualityResponse?,
-        val alerts: NwsAlertsResponse?,
+        val alerts: Result<NwsAlertsResponse>,
         val tide: Pair<TideStation, TidePredictionsResponse>?
     )
 
@@ -182,6 +187,7 @@ class WeatherRepository(private val context: Context) {
         r: OpenMeteoResponse,
         air: AirQualityResponse?,
         alerts: NwsAlertsResponse?,
+        alertsChecked: Boolean,
         tide: Pair<TideStation, TidePredictionsResponse>?,
         locationName: String,
         units: UnitSystem
@@ -448,6 +454,7 @@ class WeatherRepository(private val context: Context) {
             hourlyAqi = hourlyAqi,
             daily = daily,
             alerts = mapAlerts(alerts),
+            alertsChecked = alertsChecked,
             hourlyPrecipAmount = hourlyPrecipAmount,
             hourlySnowfall = hourlySnowfall,
             dewPointC = current?.dewPoint?.roundToInt(),
@@ -881,5 +888,18 @@ class WeatherRepository(private val context: Context) {
 
     companion object {
         private const val CACHE_TTL_MS = 30 * 60 * 1000L
+
+        /**
+         * Whether an NWS alerts request actually established the active-alert set. A success
+         * does; so does HTTP 400, which is how NWS answers a point outside its coverage ("out of
+         * bounds", checked against the live API) — there are no NWS alerts there by definition.
+         * Anything else (timeout, 5xx, a malformed body) did not, and its empty list must not be
+         * read as "every tracked alert has ended" (R1: the worker posted a false "has ended"
+         * notification for an alert still in effect, then re-announced it on the next good check).
+         */
+        internal fun alertsChecked(result: Result<*>): Boolean {
+            val e = result.exceptionOrNull() ?: return true
+            return e is HttpException && e.code() == 400
+        }
     }
 }

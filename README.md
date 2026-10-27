@@ -98,3 +98,4 @@ See `CLAUDE.md` for full architecture details.
 - minSdk 26; compileSdk/targetSdk 36.
 - Play Store submission status and checklist: see `PLAYSTORE_LAUNCH.md`.
 - Open work: see `IMPROVEMENT_BACKLOG.md`. Completed work and its verification notes: `IMPROVEMENTS.md`.
+- Product and adoption recommendations: see [USER_ADOPTION_SUGGESTIONS.md](USER_ADOPTION_SUGGESTIONS.md) for the source-based review, priorities, and suggested usability checks.

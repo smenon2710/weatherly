@@ -117,7 +117,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                     .onSuccess {
                     forecastCache.save(it)
                     _state.value = WeatherUiState.Success(it)
-                    trackAlertChanges(it.alerts)
+                    trackAlertChanges(it.alerts.takeIf { _ -> it.alertsChecked })
                     // Keep home-screen widget in sync whenever the app fetches fresh data.
                     viewModelScope.launch { WeatherWidget().updateAll(getApplication()) }
                     // Only a foreground load the user is actually looking at (cold start, retry,
@@ -144,7 +144,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     /** Diffs this fetch's alerts against the last-tracked set to detect resolution (an alert
      * that was tracked but is no longer active) — covers alerts that clear silently during a
      * background refresh, not just ones the user is staring at when they expire. */
-    private fun trackAlertChanges(current: List<WeatherAlert>) {
+    private fun trackAlertChanges(current: List<WeatherAlert>?) {
         val newlyResolved = alertTracker.diffAndUpdate(current).newlyResolved
         if (newlyResolved.isNotEmpty()) {
             val alreadyShown = _resolvedAlerts.value.map { it.id }.toSet()

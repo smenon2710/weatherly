@@ -62,7 +62,8 @@ class WeatherAlertWorker(appContext: Context, params: WorkerParameters) :
             val tracker = AlertTracker(prefs::getBackgroundTrackedAlerts, prefs::setBackgroundTrackedAlerts)
             // Only severe/extreme alerts are tracked at all, not just filtered on the way in — so
             // an "ended" notification can only ever follow an alert that was actually announced.
-            val severe = data.alerts.filter {
+            // Null when NWS couldn't be checked, which leaves the tracked set untouched.
+            val severe = data.alerts.takeIf { data.alertsChecked }?.filter {
                 it.severity == AlertSeverity.EXTREME || it.severity == AlertSeverity.SEVERE
             }
             val diff = tracker.diffAndUpdate(severe)

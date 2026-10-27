@@ -30,8 +30,13 @@ class AlertTracker(
      * warning that was merely updated as "ended" plus a fresh new alert. The accepted trade-off is
      * that a second, genuinely separate alert of the same event type arriving while the first is
      * still active isn't reported as new.
+     *
+     * A null [current] means the alert source couldn't be checked (`WeatherData.alertsChecked` is
+     * false): nothing is reported and the tracked set is left as it was, so a failed request can't
+     * turn into "every alert has ended" followed by "every alert is new" on the next good check.
      */
-    fun diffAndUpdate(current: List<WeatherAlert>): Diff {
+    fun diffAndUpdate(current: List<WeatherAlert>?): Diff {
+        if (current == null) return Diff(emptyList(), emptyList())
         val previous = get()
         val previousIds = previous.map { it.id }.toSet()
         val previousEvents = previous.map { it.event }.toSet()

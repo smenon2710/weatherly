@@ -67,6 +67,10 @@ data class WeatherData(
     // Default required: ForecastCache deserializes old cached JSON (written before this field
     // existed) via Moshi's reflective adapter, which only fills in a missing key from a default.
     val alerts: List<WeatherAlert> = emptyList(),
+    // False when the NWS request failed, so `alerts` being empty means "couldn't check", not "none
+    // active" — alert tracking must skip the diff then (see WeatherRepository.alertsChecked()).
+    // Defaults to true for cached JSON written before this field existed.
+    val alertsChecked: Boolean = true,
     // Real per-hour amounts (not probability) — rain+showers combined, and snowfall separately.
     // Same defaulting reason as `alerts`.
     val hourlyPrecipAmount: List<Double> = emptyList(),

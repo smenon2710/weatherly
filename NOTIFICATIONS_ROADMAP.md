@@ -412,10 +412,10 @@ same day, unit-tested where the logic is pure, and exercised on the Pixel 9 Pro 
 - **Channel descriptions** say "current location", not "saved location".
 
 **Submission status:** versionCode 16 is published on Internal and Closed Testing (2026-10-05)
-and was submitted to Production on 2026-10-06, where it is in Google's review — see
+and was submitted to Production on 2026-10-06; it was published there at 100% (confirmed 2026-10-27) — see
 `PLAYSTORE_LAUNCH.md`. versionCode 17 has not been started.
 
-**Known bug, not fixed, in the build under Production review (found by code read 2026-10-05):** a failed NWS request is treated as "no
+**Known bug, not fixed, live in Production in versionCode 16 (found by code read 2026-10-05):** a failed NWS request is treated as "no
 alerts", so the worker can post a false "has ended" notification and then re-announce the alert —
 R1 in `IMPROVEMENTS.md`'s "Open — Second Read-Through Findings (2026-10-05)".
 
