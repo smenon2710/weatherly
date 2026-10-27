@@ -3,6 +3,7 @@ package com.example.weatherly.data.repository
 import android.content.Context
 import android.location.Geocoder
 import android.os.Build
+import com.example.weatherly.util.isSnowCode
 import com.example.weatherly.data.model.AirQualityResponse
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
@@ -640,8 +641,8 @@ class WeatherRepository(private val context: Context) {
     ): List<String> = buildList {
         val totalHours = rawHourly.time?.size ?: 0
         val end = minOf(nowIndex + 13, totalHours) // scan nowIndex+1 .. nowIndex+12
-        val alreadyRain = currentIcon in 61..82
-        val alreadySnow = currentIcon in 71..77 || currentIcon in 85..86
+        val alreadyRain = currentIcon in 61..67 || currentIcon in 80..82
+        val alreadySnow = isSnowCode(currentIcon)
         val alreadyThunder = currentIcon in 95..99
         val alreadyFog = currentIcon == 45 || currentIcon == 48
 
@@ -652,10 +653,10 @@ class WeatherRepository(private val context: Context) {
             val precip = rawHourly.precipitationProbability?.getOrNull(i) ?: 0
             val match = when {
                 code in 95..99 && !alreadyThunder -> "Thunderstorm"
-                (code in 71..77 || code in 85..86) && !alreadySnow ->
+                isSnowCode(code) && !alreadySnow ->
                     if (code in 85..86) "Snow showers" else "Snow"
                 code in 66..67 && !alreadyRain -> "Freezing rain"
-                code in 61..82 && !alreadyRain -> "Rain"
+                (code in 61..67 || code in 80..82) && !alreadyRain -> "Rain"
                 code in 51..57 && !alreadyRain && precip >= 30 -> "Drizzle"
                 (code == 45 || code == 48) && !alreadyFog -> "Fog"
                 else -> null

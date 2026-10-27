@@ -96,6 +96,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.weatherly.util.precipWord
 import com.example.weatherly.data.advice.BriefingSection
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.DayEntry
@@ -2238,7 +2239,7 @@ private fun TideDetailContent(sheet: DetailSheet.Metric) {
  * inlined into either caller so a future second entry point doesn't need to duplicate it again.
  */
 @Composable
-fun DayDetailBody(day: DayEntry, windUnit: String, precipUnit: String) {
+fun DayDetailBody(day: DayEntry, windUnit: String, precipUnit: String, snowUnit: String) {
     Text(day.fullDateLabel, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2273,8 +2274,10 @@ fun DayDetailBody(day: DayEntry, windUnit: String, precipUnit: String) {
     DetailRow("Sunrise", day.sunrise ?: "--")
     DetailRow("Sunset", day.sunset ?: "--")
     DetailRow("Max UV index", day.uvMax?.toString() ?: "--")
-    DetailRow("Chance of rain", day.precipProbMax?.let { "$it%" } ?: "--")
+    DetailRow("Chance of ${precipWord(day.snowfallSum)}", day.precipProbMax?.let { "$it%" } ?: "--")
     DetailRow("Precipitation", day.precipSumMm?.let { "$it $precipUnit" } ?: "0 $precipUnit")
+    // snowUnit, not precipUnit: metric snowfall is in cm while precipitation is in mm.
+    day.snowfallSum?.takeIf { it > 0.0 }?.let { DetailRow("Snowfall", "$it $snowUnit") }
     DetailRow("Max wind", day.windMaxKmh?.let { "$it $windUnit" } ?: "--")
 }
 

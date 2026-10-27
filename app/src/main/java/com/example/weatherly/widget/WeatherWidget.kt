@@ -47,6 +47,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.example.weatherly.util.precipWord
 import com.example.weatherly.MainActivity
 import com.example.weatherly.data.model.AlertSeverity
 import com.example.weatherly.data.model.HourEntry
@@ -582,7 +583,7 @@ private fun MorningFocus(data: WeatherData, c: WColors) {
         // contributor to content overflowing past the bottom of the widget (found investigating a
         // real-device report that the "Updated Xm ago" label had disappeared entirely on TALL).
         Text(
-            "💧 $rain% rain",
+            "💧 $rain% ${precipWord(data.daily.firstOrNull()?.snowfallSum)}",
             style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
             maxLines = 1,
         )
@@ -1011,7 +1012,7 @@ private fun LargeHeader(data: WeatherData, time: TimeOfDay, c: WColors) {
                         val rain = data.daily.firstOrNull()?.precipProbMax ?: 0
                         if (rain > 0) {
                             Text(
-                                "💧 $rain% rain",
+                                "💧 $rain% ${precipWord(data.daily.firstOrNull()?.snowfallSum)}",
                                 style = TextStyle(color = c.textSecondary, fontSize = 10.sp),
                             )
                         }

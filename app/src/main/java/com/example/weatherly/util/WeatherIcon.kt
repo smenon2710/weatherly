@@ -32,3 +32,15 @@ fun wmoText(code: Int): String = when (code) {
     96, 99 -> "Thunderstorm, hail"
     else -> "—"
 }
+
+/** Rain, drizzle included: 51–67 and the rain showers 80–82. Not a plain `51..82` range, which
+ * also swallows the snow codes 71–77 (R3, R7). */
+fun isRainCode(code: Int): Boolean = code in 51..67 || code in 80..82
+
+/** Snow: 71–77 and the snow showers 85–86. */
+fun isSnowCode(code: Int): Boolean = code in 71..77 || code in 85..86
+
+/** "snow" when the day has any forecast snowfall, else "rain" — for labels on a precipitation
+ * probability, which on its own doesn't say which kind (R7). Same length on purpose: the
+ * widget's lines are tuned to fit. */
+fun precipWord(snowfall: Double?): String = if ((snowfall ?: 0.0) > 0.0) "snow" else "rain"

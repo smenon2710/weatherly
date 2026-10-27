@@ -22,9 +22,9 @@ fun skyColor(code: Int, isDay: Boolean, isDark: Boolean): Color {
         // hour but light theme's pastel daytime tones read as a sunny, jarringly-wrong sky at
         // actual night. Only light theme needs a distinct night variant here; dark theme is
         // unchanged.
-        code in 71..86 ->
+        isSnowCode(code) ->
             if (isDark) Color(0xFF283C52) else if (isDay) Color(0xFFD0E0EE) else Color(0xFF1E2E44)
-        code in 51..82 ->
+        isRainCode(code) ->
             if (isDark) Color(0xFF1C3348) else if (isDay) Color(0xFFBFD4E6) else Color(0xFF17293C)
         code in 45..48 ->
             if (isDark) Color(0xFF283038) else if (isDay) Color(0xFFCDD3D8) else Color(0xFF20262C)

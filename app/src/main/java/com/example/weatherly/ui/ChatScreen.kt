@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.weatherly.util.precipWord
 import com.example.weatherly.data.advice.AdviceIntent
 import com.example.weatherly.data.model.ChatMessage
 import com.example.weatherly.data.model.ChatRole
@@ -214,7 +215,7 @@ private fun WeatherContextStrip(weather: WeatherData, units: UnitSystem) {
         )
         WeatherGlyph(code = weather.currentIcon, isDay = weather.isDay, size = 16.dp, contentDescription = null)
         Text("${weather.currentTempC}${units.tempLabel}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        if (rainChance > 0) Text("·  ${rainChance}% rain", color = TextSecondary, fontSize = 13.sp)
+        if (rainChance > 0) Text("·  ${rainChance}% ${precipWord(weather.daily.firstOrNull()?.snowfallSum)}", color = TextSecondary, fontSize = 13.sp)
         weather.uvIndex?.let { Text("·  UV $it", color = TextSecondary, fontSize = 13.sp) }
     }
 }

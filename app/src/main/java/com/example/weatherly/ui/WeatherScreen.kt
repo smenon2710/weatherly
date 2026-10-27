@@ -504,6 +504,7 @@ fun WeatherContent(
                         day = day,
                         windUnit = data.windUnit,
                         precipUnit = data.precipUnit,
+                        snowUnit = data.snowUnit,
                         animatedVisibilityScope = this@AnimatedContent,
                         onBack = { expandedDay = null }
                     )
@@ -750,6 +751,7 @@ private fun SharedTransitionScope.ExpandedDayDetail(
     day: DayEntry,
     windUnit: String,
     precipUnit: String,
+    snowUnit: String,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -776,7 +778,7 @@ private fun SharedTransitionScope.ExpandedDayDetail(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
         }
         Spacer(Modifier.height(8.dp))
-        DayDetailBody(day, windUnit, precipUnit)
+        DayDetailBody(day, windUnit, precipUnit, snowUnit)
         Spacer(Modifier.height(28.dp))
     }
 }

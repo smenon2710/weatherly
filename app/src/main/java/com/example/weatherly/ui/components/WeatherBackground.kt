@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
+import com.example.weatherly.util.isRainCode
+import com.example.weatherly.util.isSnowCode
 import com.example.weatherly.util.isSevereWind
 import com.example.weatherly.util.windToKmh
 import com.example.weatherly.data.model.WeatherAlert
@@ -330,8 +332,8 @@ fun heroBackdropIsDark(code: Int, isDay: Boolean, alerts: List<WeatherAlert>): B
         // snow/rain/fog now render a dark night-specific tone in light theme after dark, not the
         // daytime pastel, so the hero text needs to flip to the light-on-dark pair to match —
         // otherwise this would repeat the exact class of bug this function exists to prevent.
-        code in 71..86 -> !isDay
-        code in 51..82 -> !isDay
+        isSnowCode(code) -> !isDay
+        isRainCode(code) -> !isDay
         code in 45..48 -> !isDay
         !isDay -> true
         else -> false
