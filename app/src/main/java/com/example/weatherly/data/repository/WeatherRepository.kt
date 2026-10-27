@@ -205,9 +205,7 @@ class WeatherRepository(private val context: Context) {
 
         val hourTimes = r.hourly?.time ?: emptyList()
         val currentTime = current?.time
-        val nowIndex = if (currentTime != null) {
-            hourTimes.indexOfFirst { it >= currentTime }.let { if (it == -1) 0 else it }
-        } else 0
+        val nowIndex = currentHourIndex(hourTimes, currentTime)
         val end = minOf(nowIndex + 24, hourTimes.size)
         val window = (nowIndex until end).toList()
 
@@ -246,14 +244,25 @@ class WeatherRepository(private val context: Context) {
             } else {
                 (current?.isDay ?: 1) == 1
             }
-            return HourEntry(
-                hourLabel = if (i == nowIndex) "Now" else formatHour(hourTime),
-                tempC = r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0,
+            val hourTemp = r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0
+            val hourEntry = HourEntry(
+                hourLabel = formatHour(hourTime),
+                tempC = hourTemp,
                 icon = r.hourly?.weatherCode?.getOrNull(i) ?: 0,
                 isDay = isHourDay,
                 precipChance = r.hourly?.precipitationProbability?.getOrNull(i),
-                feelsLikeC = r.hourly?.apparentTemperature?.getOrNull(i)?.roundToInt()
-                    ?: (r.hourly?.temperature?.getOrNull(i)?.roundToInt() ?: 0)
+                feelsLikeC = r.hourly?.apparentTemperature?.getOrNull(i)?.roundToInt() ?: hourTemp
+            )
+            // The "Now" cell shows the same 15-minute `current` reading as the hero, not the
+            // hour slot's forecast, so the two can't disagree by a degree (R8). Done here, not at
+            // a call site, so the day view's Today strip shows the identical values.
+            if (i != nowIndex || current == null) return hourEntry
+            return hourEntry.copy(
+                hourLabel = "Now",
+                tempC = current.temperature?.roundToInt() ?: hourEntry.tempC,
+                icon = current.weatherCode ?: hourEntry.icon,
+                isDay = current.isDay?.let { it == 1 } ?: hourEntry.isDay,
+                feelsLikeC = current.apparentTemperature?.roundToInt() ?: hourEntry.feelsLikeC
             )
         }
         val hourly = window.map { hourEntryAt(it) }
@@ -905,6 +914,15 @@ class WeatherRepository(private val context: Context) {
          * read as "every tracked alert has ended" (R1: the worker posted a false "has ended"
          * notification for an alert still in effect, then re-announced it on the next good check).
          */
+        internal fun currentHourIndex(hourTimes: List<String>, currentTime: String?): Int {
+            if (currentTime == null) return 0
+            // The hour slot containing `current.time`, i.e. at or before it. `current` is 15-minute
+            // data, so "the first slot at or after" picked the next hour from :15 on (R8), and
+            // from about 23:15 started the window at tomorrow's 00:00 (R8a). Both strings are
+            // Open-Meteo's local "yyyy-MM-ddTHH:mm", so string order is time order.
+            return hourTimes.indexOfLast { it <= currentTime }.coerceAtLeast(0)
+        }
+
         internal fun alertsChecked(result: Result<*>): Boolean {
             val e = result.exceptionOrNull() ?: return true
             return e is HttpException && e.code() == 400
