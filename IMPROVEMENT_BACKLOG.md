@@ -112,7 +112,12 @@ No code needed unless a check turns something up.
 - **V5 — "Optimised resource shrinking isn't enabled"** is still flagged despite
   `optimization { enable = true }`. Experiment: remove the legacy `isShrinkResources` line, confirm
   the build output changes, upload and re-check.
-- **Restore the Pixel 9 Pro to the Play Store build** when testing of debug builds is done.
+- **Device check of the versionCode 17 fixes.** Release-signed build of `f20393c` installed on the
+  Pixel 9 Pro 2026-10-27; test steps emailed to the developer. Record results against each
+  section-1 row. R1 can't be exercised by hand — a debug-only "simulate NWS failure" switch
+  was offered.
+- **Restore the Pixel 9 Pro to the Play Store build** when testing is done (it now runs a
+  sideload of `main` that still reports versionCode 16).
 
 ---
 
@@ -140,8 +145,6 @@ Not started. Roughly smallest first.
 
 Done 2026-10-06 (see the last entry in `IMPROVEMENTS.md`). Still open, all in `CLAUDE.md`:
 
-- The "Test device vs. Production" paragraph still describes the Pixel 9 Pro as of 2026-09-04;
-  update it once the phone is back on the Play Store build.
 - (2026-10-12) The "`TipBanner` source data" paragraph says the rain chance passed to
   `buildTips` is always merged with the next 12 hours. The code does that only at night, and the
   result is unused (see "Dead code removal" in section 4). Correct or remove with that cleanup.
