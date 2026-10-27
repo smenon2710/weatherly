@@ -171,8 +171,13 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         _resolvedAlerts.value = _resolvedAlerts.value.filterNot { it.id == id }
     }
 
-    fun onPermissionDenied() {
-        if (_selected.value != null) load() else _state.value = WeatherUiState.NeedsPermission
+    /** Whether the location prompt has been shown this app session. Lives here, not in the
+     * screen, because WeatherScreen is disposed on every switch to Chat/Settings. */
+    var locationPermissionRequested = false
+
+    fun onPermissionDenied(background: Boolean = false) {
+        if (_selected.value != null) load(background = background)
+        else _state.value = WeatherUiState.NeedsPermission
     }
 
     fun selectCurrentLocation() {

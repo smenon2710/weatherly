@@ -413,7 +413,7 @@ same day, unit-tested where the logic is pure, and exercised on the Pixel 9 Pro 
 
 **Submission status:** versionCode 16 is published on Internal and Closed Testing (2026-10-05)
 and was submitted to Production on 2026-10-06; it was published there at 100% (confirmed 2026-10-27) — see
-`PLAYSTORE_LAUNCH.md`. versionCode 17 has not been started.
+`PLAYSTORE_LAUNCH.md`. versionCode 17 is in progress on `main`; R1 below is fixed there (2026-10-27), not yet checked on a device.
 
 **Known bug, not fixed, live in Production in versionCode 16 (found by code read 2026-10-05):** a failed NWS request is treated as "no
 alerts", so the worker can post a false "has ended" notification and then re-announce the alert —

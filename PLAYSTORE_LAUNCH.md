@@ -607,7 +607,7 @@ justify).
   NWS request is treated as "no alerts", so the background worker can post a false "\<event\> has
   ended" notification for an alert still in effect, and then re-announce it. Was meant to be
   fixed before promoting to Production; the build went to Production without it and is live at
-  100%, so the fix now ships as versionCode 17. See `IMPROVEMENT_BACKLOG.md` (R1),
+  100%, so the fix now ships as versionCode 17. **Fixed on `main` 2026-10-27 (`f3a07a5`), not yet checked on a device** — see the R1 row in `IMPROVEMENT_BACKLOG.md`. See `IMPROVEMENT_BACKLOG.md` (R1),
   which also lists the lower-priority findings (R2–R8) and privacy-policy wording to correct.
 - [ ] **Not tested anywhere:** the path for a user who never granted ordinary location (the
   disclosure's "Continue" should ask for foreground location first, then background). Also not

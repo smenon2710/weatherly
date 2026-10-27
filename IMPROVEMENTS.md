@@ -1778,3 +1778,17 @@ Suggested order: R1, then R2 and R3 (both contradict accuracy claims the app mak
 - `CLAUDE.md`'s launch-status section now holds only the current state; the superseded release
   history moved unchanged to `PLAYSTORE_LAUNCH.md`.
 - Closed eight stale unchecked items in `PLAYSTORE_LAUNCH.md`'s Launch Checklist.
+
+## Completed — `CLAUDE.md` Build Recipe and Version Fixes (2026-10-27)
+
+- The command-line build recipe picked whichever cached Gradle distribution sorted first
+  (`find … | head -1`); with 9.4.1 and 9.6.0 both cached it chose 9.4.1 and the build failed
+  ("Minimum supported Gradle version is 9.6.0"). It now reads the version from
+  `gradle/wrapper/gradle-wrapper.properties` and finds that distribution. Used for every build
+  in the 2026-10-27 versionCode 17 work.
+- The widget section said `glance-appwidget:1.1.0`; the build uses 1.1.1.
+- The recipe's `test` comment listed only two test classes; it now just points at `app/src/test`.
+
+The versionCode 17 code fixes made the same day (R1, R2, R2a, R3, R7, R8, R8a, load/search races,
+chip guard, denied-location reload) are tracked in `IMPROVEMENT_BACKLOG.md` until they've been
+checked on a device and a signed build.

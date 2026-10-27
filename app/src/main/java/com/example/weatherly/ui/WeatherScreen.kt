@@ -139,12 +139,28 @@ fun WeatherScreen(
             // Loading state, mirroring the ON_RESUME effect below.
             viewModel.load(background = state is WeatherUiState.Success)
         } else {
-            viewModel.onPermissionDenied()
+            viewModel.onPermissionDenied(background = state is WeatherUiState.Success)
         }
     }
 
+    // Re-runs every time this screen re-enters composition (cold start, and every return from
+    // Chat/Settings). The system prompt is shown at most once per app session: re-requesting on
+    // every return used to send a denied-but-browsing-a-saved-city user through a full foreground
+    // reload each time — spinner, lost scroll position, a replayed haptic. When a forecast is
+    // already showing, the ON_RESUME effect below refreshes it in the background anyway.
+    val permissionContext = LocalContext.current
     LaunchedEffect(Unit) {
-        permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        val granted = ContextCompat.checkSelfPermission(
+            permissionContext, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        when {
+            granted -> viewModel.load(background = state is WeatherUiState.Success)
+            !viewModel.locationPermissionRequested -> {
+                viewModel.locationPermissionRequested = true
+                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+            state !is WeatherUiState.Success -> viewModel.onPermissionDenied()
+        }
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
