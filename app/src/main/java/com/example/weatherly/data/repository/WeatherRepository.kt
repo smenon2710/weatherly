@@ -174,13 +174,20 @@ class WeatherRepository(private val context: Context) {
         val tide: Pair<TideStation, TidePredictionsResponse>?
     )
 
-    suspend fun searchCity(query: String): List<SavedPlace> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) return@withContext emptyList()
-        runCatching {
-            geocodingApi.search(query.trim()).results.orEmpty().map {
+    /** A failure is returned as such (not an empty list) so the search sheet can say it couldn't
+     * connect instead of implying the city doesn't exist. */
+    suspend fun searchCity(query: String): Result<List<SavedPlace>> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) return@withContext Result.success(emptyList())
+        try {
+            Result.success(geocodingApi.search(query.trim()).results.orEmpty().map {
                 SavedPlace(it.name, it.admin1, it.country, it.latitude, it.longitude, it.timezone)
-            }
-        }.getOrDefault(emptyList())
+            })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("WeatherRepository", "searchCity failed", e)
+            Result.failure(e)
+        }
     }
 
     private fun mapToWeatherData(

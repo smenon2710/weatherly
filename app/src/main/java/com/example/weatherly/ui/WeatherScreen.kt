@@ -124,8 +124,7 @@ fun WeatherScreen(
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
-    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
-    val searching by viewModel.searching.collectAsStateWithLifecycle()
+    val search by viewModel.search.collectAsStateWithLifecycle()
     val resolvedAlerts by viewModel.resolvedAlerts.collectAsStateWithLifecycle()
 
     var showLocations by remember { mutableStateOf(false) }
@@ -300,8 +299,7 @@ fun WeatherScreen(
             LocationsSheet(
                 selected = selected,
                 places = places,
-                searchResults = searchResults,
-                searching = searching,
+                search = search,
                 currentLocationTimezone = (state as? WeatherUiState.Success)?.data?.timezone,
                 onSearch = viewModel::search,
                 onAdd = { viewModel.addPlace(it); showLocations = false },
@@ -317,8 +315,7 @@ fun WeatherScreen(
 private fun LocationsSheet(
     selected: SavedPlace?,
     places: List<SavedPlace>,
-    searchResults: List<SavedPlace>,
-    searching: Boolean,
+    search: SearchState,
     // The currently-loaded weather data's own timezone, only meaningful for the "Current
     // location" row: it's only known once that location has actually been fetched (there's no
     // geocoding result for "wherever the device is" ahead of time), and only actually describes
@@ -332,10 +329,10 @@ private fun LocationsSheet(
 ) {
     var query by remember { mutableStateOf("") }
     LaunchedEffect(query) {
-        if (query.length >= 2) {
-            delay(400)
-            onSearch(query)
-        }
+        // Short queries go straight through so the ViewModel clears stale results right away;
+        // only real searches are debounced.
+        if (query.trim().length >= 2) delay(400)
+        onSearch(query)
     }
     Column(
         modifier = Modifier
@@ -358,17 +355,22 @@ private fun LocationsSheet(
                 }
             }
         )
-        if (searching) {
-            Spacer(Modifier.height(12.dp))
-            CircularProgressIndicator(color = TextPrimary, modifier = Modifier.height(24.dp))
-        }
-        searchResults.forEach { place ->
-            PlaceRow(
-                title = place.name,
-                subtitle = place.subtitle,
-                timezone = place.timezone,
-                onClick = { onAdd(place) }
-            )
+        when (search) {
+            SearchState.Idle -> Unit
+            SearchState.Searching -> {
+                Spacer(Modifier.height(12.dp))
+                CircularProgressIndicator(color = TextPrimary, modifier = Modifier.height(24.dp))
+            }
+            SearchState.NoMatches -> SearchNote("No matching cities. Check the spelling, or try a nearby larger city.")
+            SearchState.Failed -> SearchNote("Couldn't search right now. Check your connection and try again.")
+            is SearchState.Results -> search.places.forEach { place ->
+                PlaceRow(
+                    title = place.name,
+                    subtitle = place.subtitle,
+                    timezone = place.timezone,
+                    onClick = { onAdd(place) }
+                )
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -393,6 +395,12 @@ private fun LocationsSheet(
             )
         }
     }
+}
+
+@Composable
+private fun SearchNote(text: String) {
+    Spacer(Modifier.height(12.dp))
+    Text(text, color = TextSecondary, fontSize = 13.sp)
 }
 
 @Composable

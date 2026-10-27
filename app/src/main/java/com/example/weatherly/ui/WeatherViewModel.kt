@@ -14,9 +14,11 @@ import com.example.weatherly.data.prefs.PreferencesStore
 import com.example.weatherly.data.repository.AlertTracker
 import com.example.weatherly.data.repository.WeatherRepository
 import com.example.weatherly.location.LocationProvider
+import com.example.weatherly.util.LatestJob
 import com.example.weatherly.util.playConditionHaptic
 import com.example.weatherly.widget.WeatherWidget
 import androidx.glance.appwidget.updateAll
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,16 @@ sealed interface WeatherUiState {
     data class Success(val data: WeatherData, val cachedAt: Long? = null) : WeatherUiState
     data class Error(val message: String) : WeatherUiState
     data object NeedsPermission : WeatherUiState
+}
+
+/** City search in the locations sheet. No-matches and failure are separate so a lost connection
+ * isn't shown as "that city doesn't exist". */
+sealed interface SearchState {
+    data object Idle : SearchState
+    data object Searching : SearchState
+    data class Results(val places: List<SavedPlace>) : SearchState
+    data object NoMatches : SearchState
+    data object Failed : SearchState
 }
 
 class WeatherViewModel(app: Application) : AndroidViewModel(app) {
@@ -59,11 +71,13 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val _selected = MutableStateFlow(prefs.getSelected())
     val selected: StateFlow<SavedPlace?> = _selected.asStateFlow()
 
-    private val _searchResults = MutableStateFlow<List<SavedPlace>>(emptyList())
-    val searchResults: StateFlow<List<SavedPlace>> = _searchResults.asStateFlow()
+    private val _search = MutableStateFlow<SearchState>(SearchState.Idle)
+    val search: StateFlow<SearchState> = _search.asStateFlow()
 
-    private val _searching = MutableStateFlow(false)
-    val searching: StateFlow<Boolean> = _searching.asStateFlow()
+    // Only the newest load/search may finish: picking two places in quick succession, or typing
+    // past a slow search, used to let the older response land last and overwrite the newer one.
+    private val loadJob = LatestJob(viewModelScope)
+    private val searchJob = LatestJob(viewModelScope)
 
     /** Alerts that were previously active and are no longer, awaiting user dismissal. Populated
      * by comparing each fetch's alerts against PreferencesStore's last-tracked set — see
@@ -91,7 +105,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
      * blip doesn't wipe a good screen.
      */
     fun load(forceRefresh: Boolean = false, background: Boolean = false) {
-        viewModelScope.launch {
+        loadJob.launch {
             if (background) _refreshing.value = true else _state.value = WeatherUiState.Loading
             try {
                 val sel = _selected.value
@@ -133,7 +147,8 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
             } finally {
-                _refreshing.value = false
+                // A superseded load's finally runs after the newer load has already set this.
+                if (loadJob.isCurrent(coroutineContext[Job])) _refreshing.value = false
             }
         }
     }
@@ -188,7 +203,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         val list = (_places.value + place).distinctBy { "${it.lat},${it.lon}" }
         _places.value = list
         prefs.setPlaces(list)
-        _searchResults.value = emptyList()
+        clearSearch()
         selectPlace(place)
     }
 
@@ -212,15 +227,24 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         prefs.setThemePreference(preference)
     }
 
+    /** Below two characters there's nothing worth searching for: clears the results instead,
+     * so shortening the query doesn't leave the previous query's matches on screen. */
     fun search(query: String) {
-        viewModelScope.launch {
-            _searching.value = true
-            _searchResults.value = repository.searchCity(query)
-            _searching.value = false
+        if (query.trim().length < 2) {
+            clearSearch()
+            return
+        }
+        searchJob.launch {
+            _search.value = SearchState.Searching
+            _search.value = repository.searchCity(query).fold(
+                onSuccess = { if (it.isEmpty()) SearchState.NoMatches else SearchState.Results(it) },
+                onFailure = { SearchState.Failed }
+            )
         }
     }
 
     fun clearSearch() {
-        _searchResults.value = emptyList()
+        searchJob.cancel()
+        _search.value = SearchState.Idle
     }
 }
