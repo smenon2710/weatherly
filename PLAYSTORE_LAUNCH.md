@@ -848,7 +848,13 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   now reports versionCode 17 / 1.0.16. Launched with no crash in the crash log and the process
   still running after 8 s. The forecast screen itself wasn't seen (the notification shade was open
   over it) — that's part of the device check below.
-- [ ] **Upload to Internal Testing** with the release notes below.
+- [x] **Published to Internal Testing, 2026-10-27** (`17 (1.0.16)`, release notes below). One
+  non-blocking warning, the usual "This App Bundle contains native code, and you've not uploaded
+  debug symbols": the bundle still carries only `libandroidx.graphics.path.so` (all four ABIs,
+  pulled in by Compose UI), checked with `unzip -l` on this AAB — the same benign cause recorded in
+  `IMPROVEMENTS.md` at versionCode 12. No errors.
+- [ ] **Closed Testing**, then **Production** — after the device check below and, for
+  Production, the privacy-page step.
 - [ ] **Device check of every fix** (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
   privacy row opens the policy.
