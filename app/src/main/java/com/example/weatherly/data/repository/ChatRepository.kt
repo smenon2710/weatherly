@@ -44,7 +44,8 @@ class ChatRepository {
         weather: WeatherData?,
         units: UnitSystem,
         apiKey: String,
-        model: String
+        model: String,
+        ownKey: Boolean
     ): Flow<String> = flow {
         if (apiKey.isBlank()) {
             throw IllegalStateException(
@@ -87,7 +88,7 @@ class ChatRepository {
 
             if (!response.isSuccessful) {
                 response.close()
-                throw IllegalStateException(httpMessage(response.code))
+                throw IllegalStateException(httpMessage(response.code, ownKey))
             }
 
             val source = response.body?.source()
@@ -129,12 +130,22 @@ class ChatRepository {
         }
     }
 
-    private fun httpMessage(code: Int): String = when (code) {
-        401 -> "Invalid API key. Check it in the key field above."
-        402 -> "This model needs credits on your OpenRouter account, or pick a free model."
-        429 -> "Rate limited by OpenRouter — wait a moment and try again."
-        in 500..599 -> "OpenRouter is having trouble right now. Try again shortly."
-        else -> "Request failed (HTTP $code)."
+    companion object {
+        /** [ownKey] is whether the user entered their own key in Settings. Users on the shared
+         * built-in key have no OpenRouter account and no key to fix, so a rejected or out-of-credit
+         * shared key gets its own wording rather than pointing them at either. */
+        internal fun httpMessage(code: Int, ownKey: Boolean): String = when (code) {
+            401 -> if (ownKey) "Your OpenRouter key was rejected. Check it in Settings."
+                else "The assistant isn't available right now. The quick suggestions still " +
+                    "work, or you can add your own OpenRouter key in Settings."
+            402 -> if (ownKey) "This model needs credits on your OpenRouter account. Add " +
+                    "credits, or pick a free model in Settings."
+                else "The assistant has reached its usage limit for now. The quick suggestions " +
+                    "still work, or you can add your own OpenRouter key in Settings."
+            429 -> "Rate limited by OpenRouter — wait a moment and try again."
+            in 500..599 -> "OpenRouter is having trouble right now. Try again shortly."
+            else -> "Request failed (HTTP $code)."
+        }
     }
 
     private fun systemPrompt(w: WeatherData?, units: UnitSystem): String {

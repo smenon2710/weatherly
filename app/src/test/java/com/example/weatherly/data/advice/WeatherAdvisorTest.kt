@@ -283,4 +283,18 @@ class WeatherAdvisorTest {
     @Test fun `matchIntent - short umbrella question with extra words still matches`() {
         assertTrue(WeatherAdvisor.matchIntent("hey, umbrella needed today?") == AdviceIntent.UMBRELLA)
     }
+
+    @Test fun `matchIntent - another time frame falls through to the LLM`() {
+        // The chat empty state's own example: "run" alone used to route it to WALKING.
+        assertTrue(WeatherAdvisor.matchIntent("Best day this week for a long run?") == null)
+        assertTrue(WeatherAdvisor.matchIntent("umbrella tomorrow?") == null)
+        assertTrue(WeatherAdvisor.matchIntent("do I need a jacket tonight?") == null)
+        assertTrue(WeatherAdvisor.matchIntent("good weekend for hiking?") == null)
+        assertTrue(WeatherAdvisor.matchIntent("is Saturday OK for a jog?") == null)
+    }
+
+    @Test fun `matchIntent - today and right now still route locally`() {
+        assertTrue(WeatherAdvisor.matchIntent("is it safe for driving right now?") == AdviceIntent.DRIVING)
+        assertTrue(WeatherAdvisor.matchIntent("good weather for a walk today?") == AdviceIntent.WALKING)
+    }
 }

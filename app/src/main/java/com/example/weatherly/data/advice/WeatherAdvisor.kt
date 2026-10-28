@@ -47,6 +47,12 @@ object WeatherAdvisor {
     private val HIKING_RE = Regex("\\b(hik(e|ing)|trail)\\b")
     private val CLOTHING_RE = Regex("\\b(wear|outfit|clothes|clothing)\\b")
 
+    // Local answers describe right now; a question about another time is left to the LLM.
+    private val OTHER_TIME_FRAME_RE = Regex(
+        "\\b(tomorrow|tonight|later|week|weekend|(mon|tues|wednes|thurs|fri|satur|sun)day|" +
+            "best day|which day|what day)\\b"
+    )
+
     /**
      * Matches free-form chat text to the same six local intents the quick-suggestion chips
      * already answer for free — lets a *typed* "should I bring an umbrella today?" get the
@@ -62,6 +68,9 @@ object WeatherAdvisor {
      * rule-based answer would only half-address; (2) intents are checked in a fixed priority
      * order and the first match wins, so a message mentioning two keywords still gets exactly one
      * (predictable, if not necessarily the "best") local answer rather than an ambiguous one.
+     * A message naming another time frame ("tomorrow", "this week", a weekday, "best day") is
+     * never routed locally, since every local answer is about current conditions — "Best day this
+     * week for a long run?" used to match "run" and get a right-now walking answer.
      * Not tuned against a large real corpus of user phrasing — a reasonable first cut, expected
      * to need revisiting once real usage shows what gets misrouted either direction.
      */
@@ -70,6 +79,7 @@ object WeatherAdvisor {
         if (trimmed.isEmpty()) return null
         if (trimmed.split(Regex("\\s+")).size > 12) return null
         val t = trimmed.lowercase()
+        if (OTHER_TIME_FRAME_RE.containsMatchIn(t)) return null
         return when {
             UMBRELLA_RE.containsMatchIn(t) -> AdviceIntent.UMBRELLA
             JACKET_RE.containsMatchIn(t) -> AdviceIntent.JACKET

@@ -105,7 +105,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     weather = weather,
                     units = units,
                     apiKey = apiKey,
-                    model = model
+                    model = model,
+                    ownKey = prefs.hasOwnOpenRouterKey()
                 ).collect { chunk -> _streamingText.value += chunk }
 
                 val full = _streamingText.value
