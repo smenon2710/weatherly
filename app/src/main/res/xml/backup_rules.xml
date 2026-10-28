@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower. The user's own OpenRouter key never goes into a backup; see
+     PreferencesStore's secrets file. Everything else keeps the default behaviour. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="weatherly_secrets.xml" />
+</full-backup-content>

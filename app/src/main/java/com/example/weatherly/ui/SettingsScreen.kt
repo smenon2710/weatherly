@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -55,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -88,6 +90,7 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     // Without this the system Back button/gesture finished the activity from Settings — MainActivity
     // swaps screens with AnimatedContent, not a back stack. Same handler ChatScreen already has.
     BackHandler(onBack = onBack)
@@ -575,6 +578,17 @@ fun SettingsScreen(
                         Spacer(Modifier.width(12.dp))
                         Text("Rate SkySpeak on Google Play", color = TextPrimary, fontSize = 15.sp)
                     }
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { uriHandler.openUri(PRIVACY_POLICY_URL) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.PrivacyTip, contentDescription = null, tint = Cyan, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Privacy policy", color = TextPrimary, fontSize = 15.sp)
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Version ${BuildConfig.VERSION_NAME}", color = TextSecondary, fontSize = 12.sp)
                 }
@@ -637,6 +651,10 @@ private fun OptionPill(
         Text(label, color = fg, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
+
+/** The same page Play Console lists (docs/privacy.html, served by GitHub Pages). Linked from
+ * Settings because Google expects an in-app link for apps that use background location. */
+private const val PRIVACY_POLICY_URL = "https://smenon2710.github.io/weatherly/privacy.html"
 
 /**
  * Deep-links directly to the Play Store app (bypassing implicit-intent

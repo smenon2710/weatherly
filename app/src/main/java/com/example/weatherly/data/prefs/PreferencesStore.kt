@@ -14,6 +14,15 @@ import java.util.Locale
 class PreferencesStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("weatherly_prefs", Context.MODE_PRIVATE)
+    // The user's own OpenRouter key lives in a file of its own so it can be kept out of device
+    // backups (res/xml/backup_rules.xml, data_extraction_rules.xml) while saved places and
+    // settings still back up. A key saved by an older version is moved here on first use.
+    private val secrets = context.getSharedPreferences(SECRETS_FILE, Context.MODE_PRIVATE).also {
+        prefs.getString(KEY_OR_KEY, null)?.let { old ->
+            it.edit().putString(KEY_OR_KEY, old).commit()
+            prefs.edit().remove(KEY_OR_KEY).commit()
+        }
+    }
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val placesType = Types.newParameterizedType(List::class.java, SavedPlace::class.java)
     private val placesAdapter = moshi.adapter<List<SavedPlace>>(placesType)
@@ -55,10 +64,10 @@ class PreferencesStore(context: Context) {
     // --- AI chat (OpenRouter) ---------------------------------------------
     /** Returns a user-entered key, falling back to the build-time key. */
     fun getOpenRouterKey(buildDefault: String): String =
-        prefs.getString(KEY_OR_KEY, null)?.takeIf { it.isNotBlank() } ?: buildDefault
+        secrets.getString(KEY_OR_KEY, null)?.takeIf { it.isNotBlank() } ?: buildDefault
 
     fun setOpenRouterKey(key: String) {
-        prefs.edit().apply {
+        secrets.edit().apply {
             if (key.isBlank()) remove(KEY_OR_KEY) else putString(KEY_OR_KEY, key.trim())
         }.apply()
     }
@@ -72,7 +81,7 @@ class PreferencesStore(context: Context) {
      * LLM usage cap below: the cap protects the developer's own shared build-time key from
      * runaway cost, so it must never apply once a user is paying for their own key. */
     fun hasOwnOpenRouterKey(): Boolean =
-        prefs.getString(KEY_OR_KEY, null)?.isNotBlank() == true
+        secrets.getString(KEY_OR_KEY, null)?.isNotBlank() == true
 
     /** Count of chat messages actually routed to the LLM today (never chip taps or local-intent
      * matches, which cost nothing) — resets automatically once the stored date is no longer
@@ -221,6 +230,8 @@ class PreferencesStore(context: Context) {
         private const val KEY_PLACES = "places"
         private const val KEY_SELECTED = "selected"
         private const val KEY_OR_KEY = "openrouter_key"
+        /** Excluded from backups by name in res/xml/backup_rules.xml and data_extraction_rules.xml. */
+        private const val SECRETS_FILE = "weatherly_secrets"
         private const val KEY_OR_MODEL = "openrouter_model"
         private const val KEY_THEME = "theme_preference"
         private const val KEY_TRACKED_ALERTS = "tracked_alerts"
