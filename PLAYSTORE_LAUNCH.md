@@ -829,6 +829,44 @@ reproducible demonstration for the video.
 
 ---
 
+## versionCode 17 (1.0.16) — fixes release (built 2026-10-27)
+
+**Contents:** the versionCode 17 rows in `IMPROVEMENT_BACKLOG.md` section 1 marked fixed (R1, R2,
+R2a, R3, R4, R7, R8, R8a, load and search races, denied-location reload, chip busy guard, chat
+error wording) plus, from section 2, the Settings privacy-policy link and the user's OpenRouter
+key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of section 2.
+
+- [x] **Built and verified 2026-10-27** from `9baaddb` plus the version bump (`versionCode = 17`,
+  `versionName = "1.0.16"`) committed with this entry. `clean test bundleRelease assembleRelease`
+  succeeded; unit tests 81/81 (debug and release variants); `jarsigner -verify` → `jar verified`
+  (CN=SM); `apksigner verify` → v2 signer SHA-256 `d625f19f…` (same release key as the Pixel's
+  installed copy); `aapt2` → `versionCode='17' versionName='1.0.16'`, targetSdk 36; merged manifest
+  carries `fullBackupContent` and `dataExtractionRules`; `WeatherAlertWorker` kept by R8. `lintDebug`
+  on the same source showed no errors and no warnings from the new code.
+- [ ] **Sanity install on the Pixel 9 Pro** — not done: no device was connected at build time.
+  `adb install -r app/build/outputs/apk/release/app-release.apk` (release-signed, so it updates the
+  existing sideload in place).
+- [ ] **Upload to Internal Testing** with the release notes below.
+- [ ] **Device check of every fix** (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
+  shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
+  privacy row opens the policy.
+- [ ] **Before Production:** publish the `docs/privacy.html` corrections in section 2 of the
+  backlog — the backup wording at the same time as the Production release (Pages serves `main` at
+  once, and it's false for versionCode 16), the others (NOAA, geocoding, shipped AI key, key
+  location, Weather Status → NWS) can go any time. Re-check the Data safety form against them.
+
+**Release notes (en-US, 480/500 characters):**
+
+```
+• Fixed: a brief connection problem could say a weather alert had ended when it hadn't
+• Wind and visibility advice now match in mph and km/h
+• Snow is no longer described as rain
+• "Now" in the hourly forecast matches the current temperature
+• Switching cities or searching quickly always shows your latest choice; search tells you when it can't connect
+• Chat: "this week" planning questions now reach the assistant, with clearer error messages
+• Privacy policy link in Settings
+```
+
 ## Release history moved from `CLAUDE.md` (2026-10-06)
 
 These paragraphs sat in `CLAUDE.md`'s "Play Store launch status" section until 2026-10-06 and were moved
