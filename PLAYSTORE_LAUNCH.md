@@ -855,9 +855,11 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   `IMPROVEMENTS.md` at versionCode 12. No errors.
 - [x] **Published to Closed Testing (Track_1), 2026-10-27 22:02** (same `17 (1.0.16)` bundle, promoted after
   Internal Testing).
-- [ ] **Production** — after the device check and the privacy-page step below. **Code freeze:**
-  no new code changes until versionCode 17 is in Production; they start with versionCode 18.
-- [ ] **Device check of every fix** (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
+- [ ] **Production — submitted 2026-10-28, awaiting Google's review.** Promoted from Closed
+  Testing (same `17 (1.0.16)` bundle) by the developer. Rollout percentage and submission ID not
+  yet recorded. Record the publish date here when Play Console shows "Published". **Code freeze**
+  stays until then; new code changes start with versionCode 18.
+- [ ] **Device check of every fix** — results not recorded as of the Production submission (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
   privacy row opens the policy.
 - [x] **`docs/privacy.html` corrections published 2026-10-27** (`181974d`, live on GitHub Pages):
