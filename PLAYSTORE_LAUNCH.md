@@ -843,9 +843,11 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   installed copy); `aapt2` → `versionCode='17' versionName='1.0.16'`, targetSdk 36; merged manifest
   carries `fullBackupContent` and `dataExtractionRules`; `WeatherAlertWorker` kept by R8. `lintDebug`
   on the same source showed no errors and no warnings from the new code.
-- [ ] **Sanity install on the Pixel 9 Pro** — not done: no device was connected at build time.
-  `adb install -r app/build/outputs/apk/release/app-release.apk` (release-signed, so it updates the
-  existing sideload in place).
+- [x] **Sanity install on the Pixel 9 Pro, 2026-10-27 9:32 PM** — the installed copy's signer was
+  confirmed as `d625f19f…` first, then `adb install -r` of the release APK → `Success`; the phone
+  now reports versionCode 17 / 1.0.16. Launched with no crash in the crash log and the process
+  still running after 8 s. The forecast screen itself wasn't seen (the notification shade was open
+  over it) — that's part of the device check below.
 - [ ] **Upload to Internal Testing** with the release notes below.
 - [ ] **Device check of every fix** (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
