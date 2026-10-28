@@ -22,6 +22,11 @@ read-through added the items marked "(2026-10-12)" below; none of them was repro
 
 ## 1. versionCode 17 — correctness fixes
 
+**Status, 2026-10-27:** versionCode 17 (1.0.16) is built and published to Internal Testing and
+Closed Testing. **Code freeze until it is in Production** — the items still open below (R5, R6,
+A2, A10, the R1 "couldn't check alerts" UI) and the in-app disclosure fix in section 2 move to
+versionCode 18. Before Production: the device check below and the privacy step in section 2.
+
 Keep this release small: fixes, their tests, and the privacy corrections in section 2. Ordered by
 priority.
 

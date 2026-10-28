@@ -853,15 +853,20 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   debug symbols": the bundle still carries only `libandroidx.graphics.path.so` (all four ABIs,
   pulled in by Compose UI), checked with `unzip -l` on this AAB — the same benign cause recorded in
   `IMPROVEMENTS.md` at versionCode 12. No errors.
-- [ ] **Closed Testing**, then **Production** — after the device check below and, for
-  Production, the privacy-page step.
+- [x] **Published to Closed Testing, 2026-10-27** (same `17 (1.0.16)` bundle, promoted after
+  Internal Testing).
+- [ ] **Production** — after the device check and the privacy-page step below. **Code freeze:**
+  no new code changes until versionCode 17 is in Production; they start with versionCode 18.
 - [ ] **Device check of every fix** (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
   privacy row opens the policy.
-- [ ] **Before Production:** publish the `docs/privacy.html` corrections in section 2 of the
-  backlog — the backup wording at the same time as the Production release (Pages serves `main` at
-  once, and it's false for versionCode 16), the others (NOAA, geocoding, shipped AI key, key
-  location, Weather Status → NWS) can go any time. Re-check the Data safety form against them.
+- [x] **`docs/privacy.html` corrections published 2026-10-27** (`181974d`, live on GitHub Pages):
+  NOAA and the phone's geocoder as recipients, the built-in AI key and Settings key field, what
+  chat sends, either notification feature → NWS, the widget, device backups.
+- [ ] **With the Production release:** add "Your OpenRouter API key is never included in a
+  backup." to the page's uninstall paragraph (false for versionCode 16 until then). In Play
+  Console, re-check the Location permissions declaration (still says "only Open-Meteo and the
+  U.S. National Weather Service") and the Data safety form against the updated page.
 
 **Release notes (en-US, 480/500 characters):**
 
