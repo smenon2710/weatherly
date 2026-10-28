@@ -25,8 +25,8 @@ read-through added the items marked "(2026-10-12)" below; none of them was repro
 **Status, 2026-10-28:** versionCode 17 (1.0.16) is on Internal Testing and Closed Testing and was
 submitted to Production on 2026-10-28; awaiting publication. **Code freeze until it is published**
 — the items still open below (R5, R6, A2, A10, the R1 "couldn't check alerts" UI) and the in-app
-disclosure fix in section 2 move to versionCode 18. Device-check results were not recorded before
-submission. Once published: the privacy-page step in section 2, then move the fixed rows to
+disclosure fix in section 2 move to versionCode 18. Device check: the developer tested the build on the
+Pixel 9 Pro and reported no issues (2026-10-28; individual checks not itemised). Once published: the privacy-page step in section 2, then move the fixed rows to
 `IMPROVEMENTS.md`.
 
 Keep this release small: fixes, their tests, and the privacy corrections in section 2. Ordered by

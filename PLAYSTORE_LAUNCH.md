@@ -859,7 +859,7 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   Testing (same `17 (1.0.16)` bundle) by the developer. Rollout percentage and submission ID not
   yet recorded. Record the publish date here when Play Console shows "Published". **Code freeze**
   stays until then; new code changes start with versionCode 18.
-- [ ] **Device check of every fix** — results not recorded as of the Production submission (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
+- [x] **Device check, 2026-10-28** — the developer tested the versionCode 17 build on the Pixel 9 Pro and reported no issues. Which individual checks were run wasn't itemised; R1 can't be exercised by hand and rests on `AlertTrackerTest`. Original list: (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
   privacy row opens the policy.
 - [x] **`docs/privacy.html` corrections published 2026-10-27** (`181974d`, live on GitHub Pages):
