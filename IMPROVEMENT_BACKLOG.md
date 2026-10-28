@@ -117,12 +117,15 @@ No code needed unless a check turns something up.
 - **V5 — "Optimised resource shrinking isn't enabled"** is still flagged despite
   `optimization { enable = true }`. Experiment: remove the legacy `isShrinkResources` line, confirm
   the build output changes, upload and re-check.
-- **Device check of the versionCode 17 fixes.** Release-signed build of `f20393c` installed on the
-  Pixel 9 Pro 2026-10-27; test steps emailed to the developer. Record results against each
+- **Device check of the versionCode 17 fixes.** The release-signed versionCode 17 build
+  (`7720e0f`, the same code as the AAB on Internal and Closed Testing) is installed on the Pixel 9
+  Pro since 2026-10-27 9:32 PM; test steps emailed to the developer. Record results against each
   section-1 row. R1 can't be exercised by hand — a debug-only "simulate NWS failure" switch
   was offered.
 - **Restore the Pixel 9 Pro to the Play Store build** when testing is done (it now runs a
-  sideload of `main` that still reports versionCode 16).
+  sideload of versionCode 17 / 1.0.16, ahead of Production). Once 17 is in Production the
+  sideload and the Play build are the same signed code, so the Play Store will treat it as
+  up to date; a reinstall is then optional.
 
 ---
 
@@ -148,11 +151,8 @@ Not started. Roughly smallest first.
 
 ## 5. Documentation cleanup
 
-Done 2026-10-06 (see the last entry in `IMPROVEMENTS.md`). Still open, all in `CLAUDE.md`:
-
-- (2026-10-12) The "`TipBanner` source data" paragraph says the rain chance passed to
-  `buildTips` is always merged with the next 12 hours. The code does that only at night, and the
-  result is unused (see "Dead code removal" in section 4). Correct or remove with that cleanup.
+Done 2026-10-06 (see the last entry in `IMPROVEMENTS.md`). The `CLAUDE.md` "`TipBanner` source
+data" paragraph was corrected 2026-10-28. Nothing open.
 
 ---
 

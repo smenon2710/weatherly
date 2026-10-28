@@ -853,7 +853,7 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   debug symbols": the bundle still carries only `libandroidx.graphics.path.so` (all four ABIs,
   pulled in by Compose UI), checked with `unzip -l` on this AAB — the same benign cause recorded in
   `IMPROVEMENTS.md` at versionCode 12. No errors.
-- [x] **Published to Closed Testing, 2026-10-27** (same `17 (1.0.16)` bundle, promoted after
+- [x] **Published to Closed Testing (Track_1), 2026-10-27 22:02** (same `17 (1.0.16)` bundle, promoted after
   Internal Testing).
 - [ ] **Production** — after the device check and the privacy-page step below. **Code freeze:**
   no new code changes until versionCode 17 is in Production; they start with versionCode 18.
