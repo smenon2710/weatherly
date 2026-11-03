@@ -184,12 +184,29 @@ The rest of the items under Play Console → Policy → App content, beyond Data
 
 Character counts verified — safe to paste directly into Play Console.
 
-**App title** (30 char limit): `SkySpeak: Premium Weather Chat` — exactly 30 characters.
+**Listing update, 2026-11-03 — under Google review.** Changed in Play Console; the store shows the
+old values until each change is approved:
 
-**Short description** (80 char limit, 79 used):
+| Item | Before | After | Status |
+|---|---|---|---|
+| Developer name | Scorp#1 | Scorp Labs Apps | Under Google review; the store shows "Scorp#1" until approved |
+| App title | SkySpeak: Premium Weather Chat | SkySpeak: Weather Chat | Sent for review |
+| Short description | Ad-free forecasts, a live weather view, and an AI assistant. No account needed. | Built-in AI weather chat: ask about rain, outfits & plans, plus live alerts | Sent for review |
+
+Once the title is approved, rename the app in `README.md`'s heading and in `docs/privacy.html`
+(opening paragraph and footer) — not before, since GitHub Pages serves `main` straight away. The
+in-app name (`app_name` in `strings.xml`) is plain "SkySpeak" and needs no change.
+
+**App title** (30 char limit): `SkySpeak: Weather Chat` — 22 characters. (Previously
+`SkySpeak: Premium Weather Chat`, exactly 30.)
+
+**Short description** (80 char limit, 75 used):
 ```
-Ad-free forecasts, a live weather view, and an AI assistant. No account needed.
+Built-in AI weather chat: ask about rain, outfits & plans, plus live alerts
 ```
+(Previously: `Ad-free forecasts, a live weather view, and an AI assistant. No account needed.`)
+
+**Developer name:** `Scorp Labs Apps` (previously `Scorp#1`).
 
 **Full description** (4000 char limit, updated 2026-09-09 to cover the new notification features — see draft below):
 ```
@@ -855,19 +872,20 @@ key kept out of device backups. Not in it: R5, R6, A2, A10 and the rest of secti
   `IMPROVEMENTS.md` at versionCode 12. No errors.
 - [x] **Published to Closed Testing (Track_1), 2026-10-27 22:02** (same `17 (1.0.16)` bundle, promoted after
   Internal Testing).
-- [ ] **Production — submitted 2026-10-28, awaiting Google's review.** Promoted from Closed
-  Testing (same `17 (1.0.16)` bundle) by the developer. Rollout percentage and submission ID not
-  yet recorded. Record the publish date here when Play Console shows "Published". **Code freeze**
-  stays until then; new code changes start with versionCode 18.
+- [x] **Production — published 2026-10-29 3:15 AM at full rollout** (Submission ID 29, "Start
+  full rollout", submitted 2026-10-28 9:25 AM; Play Console screenshot shared 2026-11-03).
+  Promoted from Closed Testing (same `17 (1.0.16)` bundle). Replaces versionCode 16. The code
+  freeze is over; new code changes start with versionCode 18.
 - [x] **Device check, 2026-10-28** — the developer tested the versionCode 17 build on the Pixel 9 Pro and reported no issues. Which individual checks were run wasn't itemised; R1 can't be exercised by hand and rests on `AlertTrackerTest`. Original list: (`IMPROVEMENT_BACKLOG.md` section 1, "Signed-build checks before
   shipping 17"), plus: a saved own key survives the update and chat still uses it; the Settings
   privacy row opens the policy.
 - [x] **`docs/privacy.html` corrections published 2026-10-27** (`181974d`, live on GitHub Pages):
   NOAA and the phone's geocoder as recipients, the built-in AI key and Settings key field, what
   chat sends, either notification feature → NWS, the widget, device backups.
-- [ ] **With the Production release:** add "Your OpenRouter API key is never included in a
-  backup." to the page's uninstall paragraph (false for versionCode 16 until then). In Play
-  Console, re-check the Location permissions declaration (still says "only Open-Meteo and the
+- [x] **Backup sentence added 2026-11-03:** "Your OpenRouter API key is never included in a
+  backup." is now in the page's uninstall paragraph, with the "Last updated" date moved to
+  November 3, 2026.
+- [ ] **Still to do in Play Console:** re-check the Location permissions declaration (still says "only Open-Meteo and the
   U.S. National Weather Service") and the Data safety form against the updated page.
 
 **Release notes (en-US, 480/500 characters):**
